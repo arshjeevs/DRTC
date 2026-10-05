@@ -1,0 +1,7 @@
+# Pipeline smoke test with Jack Vial's pretrained SmolVLA (not trained on this rig).
+description: End-to-end DRTC check, no faults
+policy_type: smolvla
+pretrained_name_or_path: jackvial/so101_smolvla_pickplaceorangecube_e100
+task: Pick up the orange cube and place it on the black X marker with the white background
+fps: 60
+full_diagnostics: true

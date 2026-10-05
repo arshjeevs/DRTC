@@ -1,0 +1,4 @@
+#!/bin/bash
+# Run an experiment condition: lab/bin/run <group/name> [--trials N] [--note TEXT] [--no-label]
+source "$(dirname "$0")/_env"
+exec "$PY" -m lab.tools.run "$@"

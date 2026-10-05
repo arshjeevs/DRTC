@@ -1,0 +1,24 @@
+#!/bin/bash
+# One-time Pi setup (safe to re-run): packages, /dev/video10 at boot, clock sync to laptop, venv.
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+LAPTOP_IP="${LAPTOP_IP:-10.42.0.1}"
+set -e
+
+sudo apt update
+sudo apt install -y adb ffmpeg v4l-utils tmux chrony v4l2loopback-dkms v4l2loopback-utils "linux-headers-$(uname -r)"
+
+echo v4l2loopback | sudo tee /etc/modules-load.d/v4l2loopback.conf >/dev/null
+echo 'options v4l2loopback devices=1 video_nr=10 card_label="PhoneCam" exclusive_caps=1' \
+    | sudo tee /etc/modprobe.d/v4l2loopback.conf >/dev/null
+[ -e /dev/video10 ] || sudo modprobe v4l2loopback
+
+if ! grep -q "server $LAPTOP_IP" /etc/chrony/chrony.conf; then
+    printf "server %s iburst prefer\nmakestep 1 -1\n" "$LAPTOP_IP" | sudo tee -a /etc/chrony/chrony.conf >/dev/null
+fi
+sudo systemctl restart chrony
+
+cd "$REPO_ROOT"
+command -v uv >/dev/null || { curl -LsSf https://astral.sh/uv/install.sh | sh; export PATH="$HOME/.local/bin:$PATH"; }
+[ -d .venv ] || uv venv --python 3.12
+uv pip install -e ".[async,feetech]"
+echo "Pi setup complete."

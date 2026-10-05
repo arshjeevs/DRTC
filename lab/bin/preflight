@@ -1,0 +1,4 @@
+#!/bin/bash
+# Check robot, calibration, cameras, server and clock (Pi).
+source "$(dirname "$0")/_env"
+exec "$PY" -m lab.tools.preflight "$@"

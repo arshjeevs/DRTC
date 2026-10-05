@@ -1,0 +1,29 @@
+# Shared settings for every experiment. An experiment file overrides any key here.
+
+# DRTC
+estimator: jk
+cooldown: true
+latency_k: 1.5
+epsilon: 1
+actions_per_chunk: 50
+s_min: 20
+latency_alpha: 0.125
+latency_beta: 0.25
+
+# Timing
+duration_s: 25.0
+fps: 30
+
+# Flow matching / RTC
+num_flow_matching_steps: 8
+rtc_enabled: true
+rtc_sigma_d: 0.2
+rtc_prefix_attention_schedule: linear
+
+# Action filter
+action_filter_mode: butterworth
+action_filter_butterworth_cutoff: 3.0
+action_filter_gain: 1.4
+
+# Diagnostics
+full_diagnostics: false

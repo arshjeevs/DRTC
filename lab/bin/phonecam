@@ -1,0 +1,24 @@
+#!/bin/bash
+# DroidCam (Android over USB) -> ffmpeg -> v4l2loopback device. Reconnects automatically (Pi).
+source "$(dirname "$0")/_env"
+
+dev="$(rig phonecam.device)"
+port="$(rig phonecam.droidcam_port)"
+size="$(rig cameras.width):$(rig cameras.height)"
+fps="$(rig cameras.fps)"
+url="http://127.0.0.1:$port/video"
+trap 'exit 0' SIGINT SIGTERM
+
+[ -e "$dev" ] || sudo modprobe v4l2loopback devices=1 video_nr="${dev#/dev/video}" card_label=PhoneCam exclusive_caps=1
+
+while true; do
+    if [ "$(adb get-state 2>/dev/null)" != "device" ]; then
+        echo "waiting for phone (USB + 'Allow' prompt)"; sleep 3; continue
+    fi
+    adb forward "tcp:$port" "tcp:$port" >/dev/null
+    echo "streaming $url -> $dev"
+    # No availability probe: DroidCam serves one client and a probe makes ffmpeg get a busy reply.
+    ffmpeg -nostdin -loglevel error -fflags nobuffer -flags low_delay -rw_timeout 5000000 \
+        -f mjpeg -i "$url" -vf "scale=$size,format=yuyv422" -r "$fps" -f v4l2 "$dev"
+    echo "stream ended -- is DroidCam open with no other viewer? retrying"; sleep 3
+done

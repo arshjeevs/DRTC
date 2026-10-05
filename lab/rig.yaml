@@ -1,0 +1,35 @@
+# Physical rig -- the single source of truth for hardware.
+# Experiments never set these; change them here when the hardware changes.
+
+hosts:
+  server: laptop4060          # labels recorded with every run
+  client: raspberrypiv5
+  gpu: RTX 4060 Laptop
+
+server:
+  host: 10.42.0.1             # laptop hotspot
+  port: 8080
+
+robot:
+  type: so101
+  port: /dev/ttyACM0
+  id: follower                # calibration/robots/so101_follower/follower.json
+
+leader:
+  port: /dev/ttyACM1
+  id: leader                  # calibration/teleoperators/so101_leader/leader.json
+
+# Order is fixed: datasets and trained models depend on camera1/camera2 identity.
+cameras:
+  width: 800
+  height: 600
+  fps: 30
+  camera1:                    # Logitech Brio 100
+    path: /dev/v4l/by-path/platform-xhci-hcd.1-usb-0:1:1.0-video-index0
+    fourcc: MJPG
+  camera2:                    # Android phone (DroidCam over USB -> v4l2loopback)
+    path: /dev/video10
+
+phonecam:
+  droidcam_port: 4747
+  device: /dev/video10

@@ -1,0 +1,17 @@
+#!/bin/bash
+# Start the DRTC policy server on the laptop GPU: lab/bin/server [--fps N] (match the experiment fps; default 30)
+source "$(dirname "$0")/_env"
+set -e
+
+"$PY" -c "import torch, sys; sys.exit(not torch.cuda.is_available())" || { echo "CUDA unavailable"; exit 1; }
+for ac in /sys/class/power_supply/{AC,ADP}*/online; do
+    [ -f "$ac" ] && [ "$(cat "$ac")" = "0" ] && echo "WARNING: on battery -- GPU will throttle"
+done
+port="$(rig server.port)"
+ss -tln | grep -q ":$port " && { echo "Port $port in use (pkill -f policy_server_drtc)"; exit 1; }
+
+mkdir -p logs
+log="logs/server_$(date +%Y%m%d-%H%M%S).log"
+echo "Serving on 0.0.0.0:$port -> $log"
+PYTHONUNBUFFERED=1 "$PY" examples/tutorial/async-inf/policy_server_drtc.py \
+    --host 0.0.0.0 --port "$port" --verbose-diagnostics "$@" 2>&1 | tee "$log"

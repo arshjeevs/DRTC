@@ -1,0 +1,9 @@
+#!/bin/bash
+# Pi session: tmux "robot" with phonecam + a work shell that runs preflight. Re-run to re-attach.
+source "$(dirname "$0")/_env"
+
+tmux has-session -t robot 2>/dev/null && exec tmux attach -t robot
+tmux new-session -d -s robot -n phonecam -c "$REPO_ROOT" "lab/bin/phonecam; exec bash"
+tmux new-window -t robot -n work -c "$REPO_ROOT"
+tmux send-keys -t robot:work "source .venv/bin/activate && sleep 6 && lab/bin/preflight" C-m
+exec tmux attach -t robot:work

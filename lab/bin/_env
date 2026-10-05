@@ -1,0 +1,7 @@
+# Sourced by lab/bin scripts: repo root, venv python, PYTHONPATH for `lab.tools`.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+PY="$REPO_ROOT/.venv/bin/python"
+export PYTHONPATH="$REPO_ROOT${PYTHONPATH:+:$PYTHONPATH}"
+cd "$REPO_ROOT"
+[ -x "$PY" ] || { echo "Missing .venv in $REPO_ROOT (see lab/README.md)"; exit 1; }
+rig() { "$PY" -m lab.tools.config get "$1"; }
