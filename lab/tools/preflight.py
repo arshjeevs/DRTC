@@ -37,14 +37,20 @@ def check_camera(name: str, cam: dict, fmt: dict) -> bool:
         return report(False, f"{name}: {e}", hint)
 
 
+def serial_ids() -> str:
+    by_id = Path("/dev/serial/by-id")
+    links = sorted(by_id.iterdir()) if by_id.is_dir() else []
+    return "; ".join(f"{p} -> {p.resolve().name}" for p in links) or "no USB serial devices; check cables and dmesg"
+
+
 def main() -> None:
     rig = load_rig()
     results = []
 
     port = rig["robot"]["port"]
-    results.append(report(Path(port).exists(), f"follower port {port}", "lerobot-find-port (ttyACM0/1 can swap)"))
+    results.append(report(Path(port).exists(), f"follower port {port}", serial_ids()))
     results.append(report(Path(rig["leader"]["port"]).exists(), f"leader port {rig['leader']['port']}",
-                          "needed for recording only"))
+                          f"needed for recording only. {serial_ids()}"))
     for kind, sub, cid in [("robots", "so101_follower", rig["robot"]["id"]),
                            ("teleoperators", "so101_leader", rig["leader"]["id"])]:
         path = CALIB_DIR / kind / sub / f"{cid}.json"

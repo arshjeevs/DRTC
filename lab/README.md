@@ -92,6 +92,8 @@ git clone https://github.com/arshjeevs/DRTC.git ~/drtc && cd ~/drtc && lab/bin/p
 
 **Phone**: install the classic *DroidCam - Webcam for PC* app (not DroidCam OBS). Turn on USB debugging, choose *Always allow* for the Pi, and set *Stay awake*, auto-rotate off, landscape.
 
+**Arm ports**: `ttyACM0/1` swap depending on plug order. Run `ls -l /dev/serial/by-id/` on the Pi, unplug one arm to see which ID is which, and put those paths in `rig.yaml` (`robot.port`, `leader.port`).
+
 **Physical**: mount both cameras rigidly and tape-mark the camera, robot, cube and target positions. Keep lighting fixed. Never swap camera1 and camera2.
 
 ## Troubleshooting
@@ -102,7 +104,8 @@ git clone https://github.com/arshjeevs/DRTC.git ~/drtc && cd ~/drtc && lab/bin/p
 | phonecam keeps retrying | DroidCam must be open, with no other viewer (browser, laptop client) connected |
 | `/dev/video10` missing | `lab/bin/pi-setup` (makes it load at boot) |
 | `failed to set fourcc ... /dev/video10` | Harmless; the virtual camera is YUYV |
-| Arm unresponsive / port error | `lerobot-find-port`, then update `rig.yaml` (ttyACM0/1 swap on re-plug) |
+| Arm unresponsive / port error | `ls -l /dev/serial/by-id/` and put the stable `by-id` paths in `rig.yaml` (ttyACM0/1 swap on re-plug) |
+| `write failed: [Errno 19] No such device` | The arm's USB dropped mid-connect. `dmesg \| tail -30`: `over-current` or `disconnect` means power. Use the official 27 W (5 V/5 A) Pi supply, or a powered USB hub; don't charge the phone from the Pi |
 | Asked to recalibrate | Wrong `follower.json`; stop and check it |
 | No motion for 20–45 s | Model loading on the laptop; normal |
 | `obs_one_way_latency_ms` in the hours | Pi clock unsynced (chrony). RTT unaffected |

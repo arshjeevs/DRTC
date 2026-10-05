@@ -50,6 +50,7 @@ def main() -> None:
         f"--dataset.push_to_hub={str(not args.no_push).lower()}",
         f"--resume={str(args.resume).lower()}",
         "--display_data=false",
+        "--play_sounds=false",  # voice prompts need spd-say; useless over SSH anyway
     ]
     print(" ".join(cmd), flush=True)  # flush: execvp discards buffered output
     os.execvp(cmd[0], cmd)
