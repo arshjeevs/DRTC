@@ -1,4 +1,5 @@
 # Baseline (no faults) -- policy server on a local laptop GPU, client on a Raspberry Pi
+# Lab setup guide: docs/LAB_SETUP.md
 name: baseline_laptop_raspberry
 
 # Hardware
@@ -7,18 +8,18 @@ gpu: RTX 4060 Laptop
 client_host: raspberrypiv5
 server_host: laptop4060
 
-# Robot + cameras (set these to the values on YOUR Raspberry Pi)
-# robot_id must match the calibration file name created by lerobot-calibrate:
-#   ~/.cache/huggingface/lerobot/calibration/robots/so101_follower/<robot_id>.json
-# Camera paths: ls /dev/v4l/by-path/   (use the *-video-index0 entries)
+# Robot + cameras
+# robot_id must match ~/.cache/huggingface/lerobot/calibration/robots/so101_follower/<robot_id>.json
 robot_port: /dev/ttyACM0
-robot_id: CHANGE_ME
-camera1_path: /dev/v4l/by-path/CHANGE_ME-video-index0
-camera2_path: /dev/v4l/by-path/CHANGE_ME-video-index0
+robot_id: follower
+camera1_path: /dev/v4l/by-path/platform-xhci-hcd.1-usb-0:1:1.0-video-index0   # Brio 100
+camera2_path: /dev/video10                                                   # Phone (DroidCam via v4l2loopback)
 camera_width: 800
 camera_height: 600
 camera_fps: 30
 camera_fourcc: MJPG
+camera_use_threaded_async_read: true
+camera_allow_stale_frames: true
 
 # Policy
 policy_type: smolvla

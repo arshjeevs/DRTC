@@ -1,5 +1,7 @@
 # Distributed Real-Time Chunking (DRTC)
 
+> **Lab setup (SO101 + Raspberry Pi + laptop GPU):** see [docs/LAB_SETUP.md](docs/LAB_SETUP.md).
+
 Distributed Real-Time Chunking (DRTC) is an async inference approach for action chunking policies in distributed client-server deployments. It combines RTC-compatible in-painting with resilient message handling under unreliable communication.
 
 ## Abstract
