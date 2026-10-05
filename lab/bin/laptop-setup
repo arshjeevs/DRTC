@@ -1,0 +1,15 @@
+#!/bin/bash
+# One-time laptop setup (safe to re-run): serve time to the Pi, open firewall ports.
+set -e
+SUBNET="${SUBNET:-10.42.0.0/24}"
+
+sudo apt install -y chrony
+# local stratum 10: keep serving the Pi even when the laptop itself has no internet time source.
+sudo mkdir -p /etc/chrony/conf.d
+printf "allow %s\nlocal stratum 10\n" "$SUBNET" | sudo tee /etc/chrony/conf.d/lab.conf >/dev/null
+sudo systemctl restart chrony
+
+if command -v ufw >/dev/null && sudo ufw status | grep -q "Status: active"; then
+    sudo ufw allow 8080/tcp && sudo ufw allow 123/udp
+fi
+echo "Laptop setup complete."

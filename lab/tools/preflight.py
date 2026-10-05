@@ -33,8 +33,18 @@ def check_camera(name: str, cam: dict, fmt: dict) -> bool:
         c.disconnect()
         return report(shape == (h, w, 3), f"{name} {shape}", f"expected ({h}, {w}, 3)")
     except Exception as e:  # noqa: BLE001
-        hint = "is lab/bin/phonecam running?" if "video10" in cam["path"] else "is the camera plugged in?"
+        if "video10" in cam["path"]:
+            hint = ("phonecam not running: start lab/bin/session" if Path(cam["path"]).exists()
+                    else "v4l2loopback not loaded: start lab/bin/session, or lab/bin/pi-setup to load it at boot")
+        else:
+            hint = f"connected cameras: {camera_ids()}"
         return report(False, f"{name}: {e}", hint)
+
+
+def camera_ids() -> str:
+    by_id = Path("/dev/v4l/by-id")
+    links = sorted(p for p in by_id.iterdir() if p.name.endswith("index0")) if by_id.is_dir() else []
+    return "; ".join(str(p) for p in links) or "none; check cables and dmesg"
 
 
 def serial_ids() -> str:
@@ -69,9 +79,11 @@ def main() -> None:
 
     if shutil.which("chronyc"):
         out = subprocess.run(["chronyc", "tracking"], capture_output=True, text=True).stdout
-        ref = next((l.split(":", 1)[1].strip() for l in out.splitlines() if l.startswith("Reference ID")), "")
-        results.append(report(host in ref, f"clock synced to laptop ({ref or 'no source'})",
-                              "laptop must run chrony as a server; RTT is still valid without it"))
+        field = {k.strip(): v.strip() for k, _, v in (l.partition(":") for l in out.splitlines())}
+        ref = field.get("Reference ID", "")
+        results.append(report(field.get("Leap status") == "Normal" and host in ref,
+                              f"clock synced to laptop ({ref or 'no source'})",
+                              "run lab/bin/laptop-setup (laptop) and lab/bin/pi-setup (Pi); RTT is valid without it"))
     else:
         results.append(report(False, "chrony installed", "run lab/bin/pi-setup"))
 

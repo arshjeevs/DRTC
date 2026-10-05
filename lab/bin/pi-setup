@@ -12,9 +12,12 @@ echo 'options v4l2loopback devices=1 video_nr=10 card_label="PhoneCam" exclusive
     | sudo tee /etc/modprobe.d/v4l2loopback.conf >/dev/null
 [ -e /dev/video10 ] || sudo modprobe v4l2loopback
 
-if ! grep -q "server $LAPTOP_IP" /etc/chrony/chrony.conf; then
-    printf "server %s iburst prefer\nmakestep 1 -1\n" "$LAPTOP_IP" | sudo tee -a /etc/chrony/chrony.conf >/dev/null
-fi
+# The laptop is the only time source: one-way latency needs Pi-laptop agreement, not true UTC,
+# and this works with or without internet.
+sudo mkdir -p /etc/chrony/conf.d
+sudo sed -i -E 's/^(pool|server) /#&/' /etc/chrony/chrony.conf
+printf "server %s iburst minpoll 2 maxpoll 4\nmakestep 1 -1\n" "$LAPTOP_IP" \
+    | sudo tee /etc/chrony/conf.d/lab.conf >/dev/null
 sudo systemctl restart chrony
 
 cd "$REPO_ROOT"

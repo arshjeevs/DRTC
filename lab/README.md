@@ -29,7 +29,8 @@ Config precedence: `_defaults.yaml` < `rig.yaml` < `models.yaml[model]` < experi
 | `lab/bin/record <user>/<dataset> --task "..." [--episodes 50] [--resume]` | Pi | Record demos with the leader arm, hardware taken from `rig.yaml` |
 | `lab/bin/preflight` | Pi | Check ports, calibration, cameras, server, clock |
 | `lab/bin/phonecam` | Pi | DroidCam → `/dev/video10` bridge (started by `session`) |
-| `lab/bin/pi-setup` | Pi, once | Packages, `/dev/video10` at boot, clock sync, venv |
+| `lab/bin/pi-setup` | Pi, once | Packages, `/dev/video10` at boot, clock synced to laptop, venv |
+| `lab/bin/laptop-setup` | laptop, once | Serve time to the Pi (chrony), open firewall ports |
 
 ## Session
 
@@ -74,8 +75,7 @@ Conventions:
 **Laptop**
 ```bash
 uv venv --python 3.12 && uv pip install -e ".[smolvla,async,feetech]"
-sudo apt install -y chrony && printf "allow 10.42.0.0/24\nlocal stratum 10\n" | sudo tee -a /etc/chrony/chrony.conf && sudo systemctl restart chrony
-# If ufw is active: sudo ufw allow 8080/tcp && sudo ufw allow 123/udp
+lab/bin/laptop-setup
 ```
 Copy the calibration files to the Pi. The laptop's newer LeRobot uses different folder names:
 ```bash
@@ -92,6 +92,8 @@ git clone https://github.com/arshjeevs/DRTC.git ~/drtc && cd ~/drtc && lab/bin/p
 
 **Phone**: install the classic *DroidCam - Webcam for PC* app (not DroidCam OBS). Turn on USB debugging, choose *Always allow* for the Pi, and set *Stay awake*, auto-rotate off, landscape.
 
+**Camera paths**: `by-path` names change when the camera moves to another USB port. Use `by-id` (stable): `ls /dev/v4l/by-id/`, then set `cameras.camera1.path` in `rig.yaml` to the `...-video-index0` entry.
+
 **Arm ports**: `ttyACM0/1` swap depending on plug order. Run `ls -l /dev/serial/by-id/` on the Pi, unplug one arm to see which ID is which, and put those paths in `rig.yaml` (`robot.port`, `leader.port`).
 
 **Physical**: mount both cameras rigidly and tape-mark the camera, robot, cube and target positions. Keep lighting fixed. Never swap camera1 and camera2.
@@ -102,7 +104,7 @@ git clone https://github.com/arshjeevs/DRTC.git ~/drtc && cd ~/drtc && lab/bin/p
 |---|---|
 | `adb` shows `unauthorized` | Unlock the phone and tap *Allow*. If no prompt: `adb kill-server` |
 | phonecam keeps retrying | DroidCam must be open, with no other viewer (browser, laptop client) connected |
-| `/dev/video10` missing | `lab/bin/pi-setup` (makes it load at boot) |
+| `/dev/video10` missing | `sudo modprobe v4l2loopback`. If that errors after a kernel update: `sudo apt install --reinstall v4l2loopback-dkms` and reboot |
 | `failed to set fourcc ... /dev/video10` | Harmless; the virtual camera is YUYV |
 | Arm unresponsive / port error | `ls -l /dev/serial/by-id/` and put the stable `by-id` paths in `rig.yaml` (ttyACM0/1 swap on re-plug) |
 | `write failed: [Errno 19] No such device` | The arm's USB dropped mid-connect. `dmesg \| tail -30`: `over-current` or `disconnect` means power. Use the official 27 W (5 V/5 A) Pi supply, or a powered USB hub; don't charge the phone from the Pi |
