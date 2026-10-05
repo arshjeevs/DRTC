@@ -1,0 +1,33 @@
+# Model registry. Experiments refer to models by name (`model: <name>`); `lab/bin/run --model <name>`
+# swaps the model without touching the experiment.
+#
+# pretrained_name_or_path is resolved ON THE LAPTOP (server): a Hugging Face repo id, or a local
+# checkpoint path relative to the laptop repo root, e.g. outputs/train/<run>/checkpoints/last/pretrained_model
+#
+# Per model:
+#   fps          control rate = fps of the dataset the model was trained on
+#   task         default language instruction (experiments may override)
+#   rtc_enabled  only for flow-matching policies: smolvla, pi0, pi05
+
+jack_smolvla_cube:
+  policy_type: smolvla
+  pretrained_name_or_path: jackvial/so101_smolvla_pickplaceorangecube_e100
+  fps: 60
+  task: Pick up the orange cube and place it on the black X marker with the white background
+  rtc_enabled: true
+
+# Template for our own models:
+# smolvla_cube_v1:
+#   policy_type: smolvla
+#   pretrained_name_or_path: <hf_user>/smolvla_cube_v1
+#   fps: 30
+#   task: <exact sentence used when recording>
+#   rtc_enabled: true
+#
+# act_cube_v1:
+#   policy_type: act
+#   pretrained_name_or_path: outputs/train/act_cube_v1/checkpoints/last/pretrained_model
+#   fps: 30
+#   task: <exact sentence used when recording>
+#   rtc_enabled: false
+#   num_flow_matching_steps: null

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Start the DRTC policy server on the laptop GPU: lab/bin/server [--fps N] (match the experiment fps; default 30)
+# Start the DRTC policy server on the laptop GPU (logs in logs/). Models are chosen per run by the Pi.
 source "$(dirname "$0")/_env"
 set -e
 

@@ -5,6 +5,7 @@ Our research layer on top of DRTC/LeRobot. Everything we own lives here; upstrea
 ```
 lab/
 ├── rig.yaml                 hardware: hosts, ports, calibration IDs, cameras (only place they live)
+├── models.yaml              model registry: policy type, checkpoint, fps, task, RTC on/off
 ├── experiments/
 │   ├── _defaults.yaml       shared DRTC / RTC / filter settings
 │   └── <group>/<name>.yaml  one file = one experimental condition
@@ -12,18 +13,19 @@ lab/
 └── tools/                   Python behind the entry points
 results/                     (gitignored)
 ├── index.csv                one row per trial: experiment, success label, git commit, note
-└── <group>/<name>/<run_id>/ metrics CSV/JSON + resolved config.yaml + run.json
+└── <group>/<name>/<model>/<run_id>/   metrics CSV/JSON + resolved config.yaml + run.json
 ```
 
-Config precedence: `_defaults.yaml` < `rig.yaml` < experiment file.
+Config precedence: `_defaults.yaml` < `rig.yaml` < `models.yaml[model]` < experiment file.
 
 ## Commands
 
 | Command | Where | Purpose |
 |---|---|---|
-| `lab/bin/server [--fps N]` | laptop | Policy server on the GPU. `--fps` must match the experiment (default 30) |
+| `lab/bin/server` | laptop | Policy server on the GPU. Loads whichever model each run asks for |
 | `lab/bin/session` | Pi | tmux: `phonecam` window + `work` window running preflight. Re-run to re-attach |
-| `lab/bin/run <group/name> [--trials N] [--note TEXT] [--no-label]` | Pi | Run a condition. Prompts for scene reset before and success after each trial |
+| `lab/bin/run <group/name> [--model M] [--trials N] [--note TEXT] [--no-label]` | Pi | Run a condition. Prompts for scene reset before and success after each trial |
+| `lab/bin/list` | any | Registered models and experiments |
 | `lab/bin/record <user>/<dataset> --task "..." [--episodes 50] [--resume]` | Pi | Record demos with the leader arm, hardware taken from `rig.yaml` |
 | `lab/bin/preflight` | Pi | Check ports, calibration, cameras, server, clock |
 | `lab/bin/phonecam` | Pi | DroidCam → `/dev/video10` bridge (started by `session`) |
@@ -32,21 +34,30 @@ Config precedence: `_defaults.yaml` < `rig.yaml` < experiment file.
 ## Session
 
 1. Laptop plugged in, hotspot on. Robot powered. Phone in the Pi's USB with DroidCam open.
-2. Laptop: `git pull && lab/bin/server --fps 60`. Use 60 for `smoke/jack_baseline`; otherwise use the experiment's `fps`.
+2. Laptop: `git pull && lab/bin/server`
 3. Pi: `git pull && lab/bin/session`. All preflight lines should say `ok`.
 4. Pi, in the `work` window: `lab/bin/run smoke/jack_baseline --trials 3`
 
 tmux keys: `Ctrl+b n`/`p` switches windows, `Ctrl+b d` detaches.
 
+## Adding a model
+
+Add an entry to `lab/models.yaml` (templates are in the file). `pretrained_name_or_path` is resolved **on the laptop**: a Hugging Face repo id, or a local checkpoint path such as `outputs/train/<run>/checkpoints/last/pretrained_model`, so you can test checkpoints without uploading them. `fps` is the fps of the training dataset. Set `rtc_enabled: true` only for flow-matching policies (smolvla, pi0, pi05); `run` refuses the invalid combination.
+
+The same condition across models:
+```bash
+lab/bin/run replication/drop_obs --model smolvla_cube_v1 --trials 20
+lab/bin/run replication/drop_obs --model act_cube_v1     --trials 20
+```
+`--model` replaces the experiment's model, including any model fields the experiment pinned.
+
 ## Adding an experiment
 
-Create `lab/experiments/<group>/<name>.yaml` with only what differs from `_defaults.yaml`:
+Create `lab/experiments/<group>/<name>.yaml` with only what differs from the defaults:
 
 ```yaml
-description: Observation drops, own SmolVLA
-policy_type: smolvla
-pretrained_name_or_path: <hf_user>/<model>
-task: <the exact sentence used when recording>
+description: Observation drops
+model: smolvla_cube_v1
 drop_obs:
   - {start_s: 3.0, duration_s: 2.0}
 ```

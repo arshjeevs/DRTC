@@ -1,0 +1,4 @@
+#!/bin/bash
+# List registered models and experiments.
+source "$(dirname "$0")/_env"
+exec "$PY" -m lab.tools.config list
