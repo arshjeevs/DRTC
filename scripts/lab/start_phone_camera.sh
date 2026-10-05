@@ -42,22 +42,16 @@ while true; do
     # 2. Forward the DroidCam port over USB (re-done every loop; it drops on reconnect)
     adb forward "tcp:${DROIDCAM_PORT}" "tcp:${DROIDCAM_PORT}" >/dev/null
 
-    # 3. DroidCam serving video? (the stream never ends, so curl times out; check the HTTP code)
-    http_code="$(curl -s -o /dev/null --max-time 2 -w '%{http_code}' "$STREAM_URL")"
-    if [ "$http_code" != "200" ]; then
-        echo "[phonecam] Phone connected but DroidCam is not serving (HTTP ${http_code:-none}). Open the DroidCam app (main screen)."
-        sleep 3
-        continue
-    fi
-    sleep 1  # DroidCam serves one client at a time; let it release the check connection
-
-    # 4. Bridge into the virtual camera (blocks until the stream ends or stalls)
+    # 3. Bridge into the virtual camera (blocks until the stream ends or stalls).
+    #    No separate "is DroidCam up?" probe: DroidCam serves one client at a time and a probe
+    #    connection makes the next request get a busy reply. -f mjpeg skips format auto-detection,
+    #    which rejects DroidCam's multipart stream on some ffmpeg builds.
     echo "[phonecam] Streaming $STREAM_URL -> $PHONECAM_DEV (${CAM_WIDTH}x${CAM_HEIGHT} @ ${CAM_FPS} fps)"
     ffmpeg -nostdin -loglevel error -fflags nobuffer -flags low_delay \
         -rw_timeout 5000000 \
-        -i "$STREAM_URL" \
+        -f mjpeg -i "$STREAM_URL" \
         -vf "scale=${CAM_WIDTH}:${CAM_HEIGHT},format=yuyv422" -r "$CAM_FPS" \
         -f v4l2 "$PHONECAM_DEV"
-    echo "[phonecam] Stream ended (exit $?). Reconnecting in 2s..."
-    sleep 2
+    echo "[phonecam] Stream ended (exit $?). Is DroidCam open on its main screen, with nothing else viewing it? Retrying in 3s..."
+    sleep 3
 done
