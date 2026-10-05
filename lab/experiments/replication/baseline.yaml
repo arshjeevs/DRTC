@@ -1,0 +1,4 @@
+# Replication of the DRTC paper conditions (upstream: examples/experiments/configs/).
+# Fault windows are seconds from the first observation sent (after the model has loaded).
+description: No faults; reference for every other condition
+model: jack_smolvla_cube

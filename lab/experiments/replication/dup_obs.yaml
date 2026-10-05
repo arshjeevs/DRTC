@@ -1,0 +1,9 @@
+description: Each observation sent twice, 6 windows
+model: jack_smolvla_cube
+dup_obs:
+  - {start_s: 3.0, duration_s: 2.0}
+  - {start_s: 6.0, duration_s: 1.0}
+  - {start_s: 10.0, duration_s: 1.0}
+  - {start_s: 14.0, duration_s: 3.0}
+  - {start_s: 20.0, duration_s: 1.0}
+  - {start_s: 23.0, duration_s: 1.0}

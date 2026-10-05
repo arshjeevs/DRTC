@@ -1,0 +1,6 @@
+description: Server inference delayed once by 0.5 s and once by 1 s; latency estimator max_last_10
+model: jack_smolvla_cube
+estimator: max_last_10
+spikes:
+  - {start_s: 5.0, delay_ms: 500}
+  - {start_s: 15.0, delay_ms: 1000}
