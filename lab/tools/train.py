@@ -78,6 +78,8 @@ def main() -> None:
             "--steps": train.get("steps", 20_000),
             "--save_freq": train.get("save_freq", 5_000),
             "--wandb.enable": "false",
+            # LeRobot picks torchcodec whenever it is installed, but it cannot load with FFmpeg 8.
+            "--dataset.video_backend": "pyav",
         }
         if push:
             flags["--policy.repo_id"] = target
