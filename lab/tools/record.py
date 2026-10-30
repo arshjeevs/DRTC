@@ -2,6 +2,7 @@
 
 Runs on whichever machine the arms and cameras are plugged into. The Rerun viewer opens
 automatically when a display is available (laptop), and stays off over SSH (Pi).
+Controls come from this terminal (lab/tools/keys.py): -> / n next, <- / r re-record, Esc / q stop.
 
 Any other lerobot-record flag is passed through and overrides the generated value for the same key
 (`lerobot-record --help` lists them all). --dry-run prints the final command without running it.
@@ -94,7 +95,7 @@ def main() -> None:
     flags.update(overrides)
 
     cmd = ["lerobot-record", *(f"{key}={value}" for key, value in flags.items())]
-    print(" \\\n    ".join(shlex.quote(part) for part in cmd), flush=True)  # flush: execvp discards buffers
+    print(" \\\n    ".join(shlex.quote(part) for part in cmd), flush=True)
     if overrides:
         print(f"overrides: {', '.join(overrides)}", flush=True)
 
@@ -108,9 +109,17 @@ def main() -> None:
         return
     if missing:
         sys.exit(1)
-    # Venv bin first: lerobot-record and the Rerun viewer binary resolve without activating the venv.
+    # Venv bin first, so the Rerun viewer binary resolves without activating the venv.
     os.environ["PATH"] = f"{Path(sys.executable).parent}{os.pathsep}{os.environ['PATH']}"
-    os.execvp(cmd[0], cmd)
+
+    # Run lerobot-record in-process with terminal key controls (pynput misses keys on Wayland/SSH).
+    from lerobot.scripts import lerobot_record
+
+    from lab.tools import keys
+
+    lerobot_record.init_keyboard_listener = keys.init_keyboard_listener
+    sys.argv = cmd
+    lerobot_record.main()
 
 
 if __name__ == "__main__":

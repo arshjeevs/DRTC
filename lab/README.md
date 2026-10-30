@@ -55,6 +55,16 @@ Record on the laptop: you get the Rerun viewer, and the dataset lands where trai
    ```
    If interrupted, continue with the same command plus `--resume`.
 
+Controls, typed **in the terminal** running `record`, not in the Rerun window (click back on the terminal after Rerun opens):
+
+| Key | Action |
+|---|---|
+| `→` or `n` | Episode done: save it and start the reset early. During the reset: start the next episode |
+| `←` or `r` | Discard this episode and record it again |
+| `Esc` or `q` | Stop: save the finished episodes and exit |
+
+These replace LeRobot's own arrow-key listener, which misses keys on Wayland and over SSH. They also work over SSH on the Pi.
+
 `rig.yaml` uses `by-id` device paths, so the same file works on both machines. Only the USB cables move.
 
 ### Recording flags
