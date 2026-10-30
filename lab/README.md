@@ -26,7 +26,7 @@ Config precedence: `_defaults.yaml` < `rig.yaml` < `models.yaml[model]` < experi
 | `lab/bin/session [record]` | Pi / laptop | tmux: `phonecam` window + `work` window running preflight. Re-run to re-attach |
 | `lab/bin/run <group/name> [--model M] [--trials N] [--note TEXT] [--no-label]` | Pi | Run a condition. Prompts for scene reset before and success after each trial |
 | `lab/bin/list` | any | Registered models and experiments |
-| `lab/bin/record <user>/<dataset> --task "..." [--episodes 50] [--resume] [--no-push]` | laptop | Record demos with the leader arm. Rerun viewer opens when a display exists (`--no-display` to skip) |
+| `lab/bin/record <user>/<dataset> --task "..." [options] [--<lerobot flag>=value ...]` | laptop | Record demos with the leader arm. Rerun viewer opens when a display exists. See [Recording flags](#recording-flags) |
 | `lab/bin/preflight [record]` | Pi / laptop | `run` (default): follower, cameras, server, clock. `record`: both arms, cameras |
 | `lab/bin/phonecam` | Pi / laptop | DroidCam → `/dev/video10` bridge (started by `session`) |
 | `lab/bin/pi-setup` | Pi, once | Packages, `/dev/video10` at boot, clock synced to laptop, venv |
@@ -56,6 +56,20 @@ Record on the laptop: you get the Rerun viewer, and the dataset lands where trai
    If interrupted, continue with the same command plus `--resume`.
 
 `rig.yaml` uses `by-id` device paths, so the same file works on both machines. Only the USB cables move.
+
+### Recording flags
+
+`lab/bin/record` builds a `lerobot-record` command from `rig.yaml`. Shortcuts: `--episodes` (50), `--episode-time` (30 s), `--reset-time` (10 s), `--resume`, `--no-push`, `--display/--no-display`, `--dry-run` (print the command, don't run).
+
+Any other `lerobot-record` flag is passed through and **overrides** the generated value for the same key (`.venv/bin/lerobot-record --help` lists them all):
+```bash
+lab/bin/record arshjeevs/cube_v1 --task "..." --dry-run \
+    --dataset.episode_time_s=45 \
+    --robot.max_relative_target=10 \
+    --dataset.private=true \
+    --dataset.tags='[so101,cube]'
+```
+Always `--dry-run` first after changing flags. Overriding `--robot.cameras` replaces both cameras, so keep the names `camera1` and `camera2`.
 
 ## Adding a model
 
