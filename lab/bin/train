@@ -1,9 +1,11 @@
 #!/bin/bash
 # Train a registry model on the laptop GPU and push it to the Hub (laptop):
 #   lab/bin/train <model> [--dry-run] [--no-push] [--resume] [--<lerobot-train flag>=value ...]
+#   lab/bin/train <model> --push [checkpoint]     (upload a saved checkpoint, e.g. after stopping early)
 source "$(dirname "$0")/_env"
 mkdir -p logs
 log="logs/train_${1:-none}_$(date +%Y%m%d-%H%M%S).log"
 case " $* " in *" --dry-run "*) exec "$PY" -m lab.tools.train "$@" ;; esac
 echo "log: $log"
+set -o pipefail
 PYTHONUNBUFFERED=1 "$PY" -m lab.tools.train "$@" 2>&1 | tee "$log"

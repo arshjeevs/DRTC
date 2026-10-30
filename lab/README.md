@@ -25,7 +25,7 @@ Config precedence: `_defaults.yaml` < `rig.yaml` < `models.yaml[model]` < experi
 | `lab/bin/server` | laptop | Policy server on the GPU. Loads whichever model each run asks for |
 | `lab/bin/session [record]` | Pi / laptop | tmux: `phonecam` window + `work` window running preflight. Re-run to re-attach |
 | `lab/bin/run <group/name> [--model M] [--trials N] [--note TEXT] [--no-label]` | Pi | Run a condition. Prompts for scene reset before and success after each trial |
-| `lab/bin/train <model> [--dry-run] [--no-push] [--resume] [--<lerobot flag>=value ...]` | laptop | Train a `models.yaml` entry that has a `train:` block and push it to its Hub id. See [Training](#training) |
+| `lab/bin/train <model> [--dry-run] [--no-push] [--resume] [--push [ckpt]] [--<lerobot flag>=value ...]` | laptop | Train a `models.yaml` entry that has a `train:` block and push it to its Hub id. See [Training](#training) |
 | `lab/bin/list` | any | Registered models and experiments |
 | `lab/bin/record <user>/<dataset> --task "..." [options] [--<lerobot flag>=value ...]` | laptop | Record demos with the leader arm. Rerun viewer opens when a display exists. See [Recording flags](#recording-flags) |
 | `lab/bin/calibrate follower\|leader` | where the arms are | Calibrate an arm with `rig.yaml`'s port and id. Backs up the old file. See [Recalibrating](#recalibrating) |
@@ -96,6 +96,7 @@ lab/bin/train smolvla_test_run_1                            # full run, pushes t
 ```
 - Checkpoints go to `outputs/train/<model>/checkpoints/` every `save_freq` steps, and logs to `logs/train_<model>_*.log`.
 - Interrupted? Run `lab/bin/train <model> --resume`.
+- Stopped early on purpose (Ctrl+C) and want to use what you have? `lab/bin/train <model> --push` uploads the latest checkpoint (or `--push 005000` for a specific one) to the model's Hub id. Training more later with `--resume` and pushing again replaces it.
 - Out of GPU memory? Add `--batch_size=4`.
 - Any `lerobot-train` flag passes through and overrides the generated one.
 

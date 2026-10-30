@@ -7,8 +7,12 @@ pushed. The policy server loads models from that same field, so once training fi
 Checkpoints go to outputs/train/<name>/. Any other lerobot-train flag is passed through and
 overrides the generated value (`lerobot-train --help`).
 
+A run stopped early pushes nothing; `--push [checkpoint]` uploads a saved checkpoint instead
+(default: the latest), e.g. after Ctrl+C at step 5000.
+
 Usage:
     python -m lab.tools.train <model> [--dry-run] [--no-push] [--resume] [--<lerobot-train flag>=value ...]
+    python -m lab.tools.train <model> --push [last | 005000]
 """
 
 from __future__ import annotations
@@ -38,12 +42,35 @@ def check_local_dataset(repo_id: str) -> None:
                  f"dataset.\nMove it aside, or pass --dataset.root=<empty dir> to download a fresh copy.")
 
 
+def push_checkpoint(out: Path, name: str, target: str) -> None:
+    """Upload checkpoints/<name>/pretrained_model (weights, config, processors) to the Hub."""
+    from huggingface_hub import HfApi
+
+    checkpoints = out / "checkpoints"
+    folder = checkpoints / name / "pretrained_model"
+    if not folder.is_dir() and name.isdigit():
+        folder = checkpoints / f"{int(name):06d}" / "pretrained_model"
+    if not folder.is_dir():
+        saved = sorted(p.name for p in checkpoints.glob("*")) if checkpoints.is_dir() else []
+        sys.exit(f"No checkpoint {name!r} in {checkpoints}. Saved: {', '.join(saved) or 'none'}")
+    if not HUB_ID.match(target) or target.startswith("outputs/"):
+        sys.exit(f"pretrained_name_or_path {target!r} is not a Hub repo id")
+    step = folder.resolve().parent.name
+    print(f"pushing {folder} (step {step}) -> https://huggingface.co/{target}", flush=True)
+    api = HfApi()
+    api.create_repo(target, exist_ok=True)
+    api.upload_folder(repo_id=target, folder_path=folder, commit_message=f"{out.name}: checkpoint {step}")
+    print("done", flush=True)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train a registry model (lerobot-train)", allow_abbrev=False)
     parser.add_argument("model", help="Name in lab/models.yaml with a train: block")
     parser.add_argument("--dry-run", action="store_true", help="Print the lerobot-train command and exit")
     parser.add_argument("--no-push", action="store_true", help="Keep the model local (no Hub upload)")
     parser.add_argument("--resume", action="store_true", help="Continue from outputs/train/<model>/checkpoints/last")
+    parser.add_argument("--push", nargs="?", const="last", metavar="CHECKPOINT",
+                        help="Don't train: upload a saved checkpoint (default: last) to the Hub")
     args, passthrough = parser.parse_known_args()
 
     models = load_models()
@@ -56,6 +83,8 @@ def main() -> None:
 
     out = TRAIN_DIR / args.model
     target = entry["pretrained_name_or_path"]
+    if args.push:
+        return push_checkpoint(out, args.push, target)
     push = not args.no_push and bool(HUB_ID.match(target)) and not target.startswith("outputs/")
 
     if args.resume:
