@@ -27,6 +27,7 @@ Config precedence: `_defaults.yaml` < `rig.yaml` < `models.yaml[model]` < experi
 | `lab/bin/run <group/name> [--model M] [--trials N] [--note TEXT] [--no-label]` | Pi | Run a condition. Prompts for scene reset before and success after each trial |
 | `lab/bin/list` | any | Registered models and experiments |
 | `lab/bin/record <user>/<dataset> --task "..." [options] [--<lerobot flag>=value ...]` | laptop | Record demos with the leader arm. Rerun viewer opens when a display exists. See [Recording flags](#recording-flags) |
+| `lab/bin/calibrate follower\|leader` | where the arms are | Calibrate an arm with `rig.yaml`'s port and id. Backs up the old file. See [Recalibrating](#recalibrating) |
 | `lab/bin/preflight [record]` | Pi / laptop | `run` (default): follower, cameras, server, clock. `record`: both arms, cameras |
 | `lab/bin/phonecam` | Pi / laptop | DroidCam → `/dev/video10` bridge (started by `session`) |
 | `lab/bin/pi-setup` | Pi, once | Packages, `/dev/video10` at boot, clock synced to laptop, venv |
@@ -135,6 +136,24 @@ git clone https://github.com/arshjeevs/DRTC.git ~/drtc && cd ~/drtc && lab/bin/p
 **Device paths** (once, on either machine): `rig.yaml` uses `/dev/*/by-id/` names, which carry the USB vendor and serial number, so they are the same on the Pi and the laptop and survive re-plugging. Globs resolve to their single match: camera1 is `/dev/v4l/by-id/usb-*Brio*-video-index0`. For the arms, plug in only the follower and run `ls /dev/serial/by-id/`, then plug in the leader and run it again. Put the two paths in `robot.port` and `leader.port`. Never use `ttyACMn`: plug order changes it, and on the laptop the phone itself takes `ttyACM0`.
 
 **Physical**: mount both cameras rigidly and tape-mark the camera, robot, cube and target positions. Keep lighting fixed. Never swap camera1 and camera2.
+
+## Recalibrating
+
+On the machine the arms are plugged into (`git pull` first, so the ports match):
+```bash
+lab/bin/calibrate follower
+lab/bin/calibrate leader
+```
+Follow the prompts: put the arm in the middle of its range, press Enter, move every joint through its full range, then press Enter.
+
+Both machines must use the **same** calibration files. Actions are stored in calibrated units, so a dataset recorded with one calibration and replayed with another moves the arm differently. After recalibrating on the Pi, copy the files to the laptop:
+```bash
+C=.cache/huggingface/lerobot/calibration
+rm -f ~/$C/robots/so101_follower/follower.json ~/$C/teleoperators/so101_leader/leader.json  # old files or links
+scp rasp@raspberrypi.local:~/$C/robots/so101_follower/follower.json ~/$C/robots/so101_follower/
+scp rasp@raspberrypi.local:~/$C/teleoperators/so101_leader/leader.json ~/$C/teleoperators/so101_leader/
+```
+Recalibrating invalidates datasets recorded before it. Re-record them, or keep the old files (`*.bak`).
 
 ## Troubleshooting
 

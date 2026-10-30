@@ -1,0 +1,22 @@
+#!/bin/bash
+# Calibrate one arm using rig.yaml's port and id: lab/bin/calibrate follower|leader
+# The previous calibration is kept next to it as <id>.json.<timestamp>.bak.
+source "$(dirname "$0")/_env"
+C="$HOME/.cache/huggingface/lerobot/calibration"
+type="$(rig robot.type)"
+
+case "$1" in
+    follower) kind=robot  sub="robots/${type}_follower"        port="$(rig robot.port)"  id="$(rig robot.id)" ;;
+    leader)   kind=teleop sub="teleoperators/${type}_leader"   port="$(rig leader.port)" id="$(rig leader.id)" ;;
+    *) echo "usage: lab/bin/calibrate follower|leader"; exit 1 ;;
+esac
+[ -e "$port" ] || { echo "$1 not found at $port -- plugged in? (ls /dev/serial/by-id/)"; exit 1; }
+
+file="$C/$sub/$id.json"
+if [ -e "$file" ]; then
+    cp -L "$file" "$file.$(date +%Y%m%d-%H%M%S).bak"
+    rm "$file"  # also drops a laptop-setup symlink, so the new calibration is a real file
+    echo "previous calibration backed up next to $file"
+fi
+"$REPO_ROOT/.venv/bin/lerobot-calibrate" --$kind.type="${sub#*/}" --$kind.port="$port" --$kind.id="$id"
+echo "saved $file"
