@@ -1,9 +1,12 @@
 #!/bin/bash
-# Pi session: tmux "robot" with phonecam + a work shell that runs preflight. Re-run to re-attach.
+# tmux "robot": phonecam window + work shell running preflight. Re-run to re-attach.
+#   lab/bin/session          DRTC runs (Pi)
+#   lab/bin/session record   recording demos (laptop or Pi)
 source "$(dirname "$0")/_env"
+mode="${1:-run}"
 
 tmux has-session -t robot 2>/dev/null && exec tmux attach -t robot
 tmux new-session -d -s robot -n phonecam -c "$REPO_ROOT" "lab/bin/phonecam; exec bash"
 tmux new-window -t robot -n work -c "$REPO_ROOT"
-tmux send-keys -t robot:work "source .venv/bin/activate && sleep 6 && lab/bin/preflight" C-m
+tmux send-keys -t robot:work "source .venv/bin/activate && sleep 6 && lab/bin/preflight $mode" C-m
 exec tmux attach -t robot:work

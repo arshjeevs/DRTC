@@ -1,11 +1,15 @@
-"""Hardware and connectivity checks before a session (run on the Pi).
+"""Hardware and connectivity checks before a session.
+
+    run     (default) DRTC client: follower, cameras, policy server, clock   -- Pi
+    record  teleoperated demos: follower + leader, cameras                    -- laptop or Pi
 
 Usage:
-    python -m lab.tools.preflight
+    python -m lab.tools.preflight [run|record]
 """
 
 from __future__ import annotations
 
+import argparse
 import shutil
 import socket
 import subprocess
@@ -35,7 +39,7 @@ def check_camera(name: str, cam: dict, fmt: dict) -> bool:
     except Exception as e:  # noqa: BLE001
         if "video10" in cam["path"]:
             hint = ("phonecam not running: start lab/bin/session" if Path(cam["path"]).exists()
-                    else "v4l2loopback not loaded: start lab/bin/session, or lab/bin/pi-setup to load it at boot")
+                    else "v4l2loopback not loaded: start lab/bin/session (lab/bin/*-setup loads it at boot)")
         else:
             hint = f"connected cameras: {camera_ids()}"
         return report(False, f"{name}: {e}", hint)
@@ -54,21 +58,27 @@ def serial_ids() -> str:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Pre-session hardware checks")
+    parser.add_argument("mode", nargs="?", choices=["run", "record"], default="run")
+    mode = parser.parse_args().mode
     rig = load_rig()
     results = []
 
-    port = rig["robot"]["port"]
-    results.append(report(Path(port).exists(), f"follower port {port}", serial_ids()))
-    results.append(report(Path(rig["leader"]["port"]).exists(), f"leader port {rig['leader']['port']}",
-                          f"needed for recording only. {serial_ids()}"))
-    for kind, sub, cid in [("robots", "so101_follower", rig["robot"]["id"]),
-                           ("teleoperators", "so101_leader", rig["leader"]["id"])]:
-        path = CALIB_DIR / kind / sub / f"{cid}.json"
-        results.append(report(path.is_file(), f"calibration {kind}/{sub}/{cid}.json", "see lab/README.md"))
+    arms = [("follower", rig["robot"], "robots", "so101_follower")]
+    if mode == "record":
+        arms.append(("leader", rig["leader"], "teleoperators", "so101_leader"))
+    for name, arm, kind, sub in arms:
+        results.append(report(Path(arm["port"]).exists(), f"{name} port {arm['port']}", serial_ids()))
+        calib = f"{kind}/{sub}/{arm['id']}.json"
+        results.append(report((CALIB_DIR / calib).is_file(), f"calibration {calib}", "see lab/README.md"))
 
     cams = rig["cameras"]
     for name in ("camera1", "camera2"):
         results.append(check_camera(name, cams[name], cams))
+
+    if mode == "record":
+        print(f"\n{sum(results)}/{len(results)} checks passed")
+        return
 
     host, sport = rig["server"]["host"], int(rig["server"]["port"])
     try:

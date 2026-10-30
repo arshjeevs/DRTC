@@ -9,6 +9,7 @@ CLI (for shell scripts):
 
 from __future__ import annotations
 
+import glob
 import sys
 from pathlib import Path
 from typing import Any
@@ -31,8 +32,25 @@ def load_yaml(path: Path) -> dict[str, Any]:
     return yaml.safe_load(path.read_text()) or {}
 
 
+def resolve_device(path: str) -> str:
+    """Expand a /dev glob (e.g. /dev/v4l/by-id/*Brio*-video-index0) to its single match.
+
+    Zero or several matches return the pattern unchanged, so preflight reports it as missing.
+    """
+    matches = glob.glob(path) if any(c in path for c in "*?[") else [path]
+    return matches[0] if len(matches) == 1 else path
+
+
+def _resolve_devices(node: Any) -> Any:
+    if isinstance(node, dict):
+        return {k: _resolve_devices(v) for k, v in node.items()}
+    if isinstance(node, str) and node.startswith("/dev/"):
+        return resolve_device(node)
+    return node
+
+
 def load_rig() -> dict[str, Any]:
-    return load_yaml(RIG_PATH)
+    return _resolve_devices(load_yaml(RIG_PATH))
 
 
 def rig_get(dotted_key: str) -> Any:

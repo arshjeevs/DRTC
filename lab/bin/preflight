@@ -1,4 +1,4 @@
 #!/bin/bash
-# Check robot, calibration, cameras, server and clock (Pi).
+# Pre-session checks: lab/bin/preflight [run|record]   (run = DRTC client on the Pi, record = demos)
 source "$(dirname "$0")/_env"
 exec "$PY" -m lab.tools.preflight "$@"

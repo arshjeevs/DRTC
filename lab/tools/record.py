@@ -1,5 +1,8 @@
 """Record teleoperated demonstrations with the leader arm, using rig.yaml for all hardware.
 
+Runs on whichever machine the arms and cameras are plugged into. The Rerun viewer opens
+automatically when a display is available (laptop), and stays off over SSH (Pi).
+
 Usage:
     python -m lab.tools.record <hf_user>/<dataset> --task "Pick up the cube ..." --episodes 50
 """
@@ -8,6 +11,8 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
+from pathlib import Path
 
 from lab.tools.config import load_rig
 
@@ -21,7 +26,11 @@ def main() -> None:
     parser.add_argument("--reset-time", type=float, default=10)
     parser.add_argument("--resume", action="store_true", help="Append to an existing dataset")
     parser.add_argument("--no-push", action="store_true", help="Keep the dataset local (no Hugging Face upload)")
+    parser.add_argument("--display", action=argparse.BooleanOptionalAction, default=None,
+                        help="Rerun viewer (default: on when a display is available)")
     args = parser.parse_args()
+    display = args.display if args.display is not None else bool(
+        os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
 
     rig = load_rig()
     cams = rig["cameras"]
@@ -49,9 +58,11 @@ def main() -> None:
         f"--dataset.reset_time_s={args.reset_time}",
         f"--dataset.push_to_hub={str(not args.no_push).lower()}",
         f"--resume={str(args.resume).lower()}",
-        "--display_data=false",
+        f"--display_data={str(display).lower()}",
         "--play_sounds=false",  # voice prompts need spd-say; useless over SSH anyway
     ]
+    # Venv bin first: lerobot-record and the Rerun viewer binary resolve without activating the venv.
+    os.environ["PATH"] = f"{Path(sys.executable).parent}{os.pathsep}{os.environ['PATH']}"
     print(" ".join(cmd), flush=True)  # flush: execvp discards buffered output
     os.execvp(cmd[0], cmd)
 

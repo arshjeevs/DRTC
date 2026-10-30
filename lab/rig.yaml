@@ -1,5 +1,8 @@
 # Physical rig -- the single source of truth for hardware.
 # Experiments never set these; change them here when the hardware changes.
+#
+# Device paths use /dev/*/by-id names (USB vendor + serial), so the same file works on the Pi
+# and the laptop whichever USB socket things are plugged into. Globs resolve to their single match.
 
 hosts:
   server: laptop4060          # labels recorded with every run
@@ -12,11 +15,11 @@ server:
 
 robot:
   type: so101
-  port: /dev/ttyACM0
+  port: /dev/ttyACM0          # TODO: /dev/serial/by-id/... (ttyACMn changes with plug order)
   id: follower                # calibration/robots/so101_follower/follower.json
 
 leader:
-  port: /dev/ttyACM1
+  port: /dev/ttyACM1          # TODO: /dev/serial/by-id/...
   id: leader                  # calibration/teleoperators/so101_leader/leader.json
 
 # Order is fixed: datasets and trained models depend on camera1/camera2 identity.
@@ -25,7 +28,7 @@ cameras:
   height: 600
   fps: 30
   camera1:                    # Logitech Brio 100
-    path: /dev/v4l/by-path/platform-xhci-hcd.1-usb-0:1:1.0-video-index0
+    path: /dev/v4l/by-id/usb-*Brio*-video-index0
     fourcc: MJPG
   camera2:                    # Android phone (DroidCam over USB -> v4l2loopback)
     path: /dev/video10

@@ -1,9 +1,12 @@
 #!/bin/bash
-# One-time laptop setup (safe to re-run): serve time to the Pi, open firewall ports.
+# One-time laptop setup (safe to re-run): time server for the Pi, firewall, recording station
+# (phone camera bridge, /dev/video10 at boot, calibration under this repo's folder names).
+source "$(dirname "$0")/_env"
 set -e
 SUBNET="${SUBNET:-10.42.0.0/24}"
 
-sudo apt install -y chrony
+sudo apt install -y chrony adb ffmpeg v4l-utils tmux v4l2loopback-dkms v4l2loopback-utils
+
 # local stratum 10: keep serving the Pi even when the laptop itself has no internet time source.
 sudo mkdir -p /etc/chrony/conf.d
 printf "allow %s\nlocal stratum 10\n" "$SUBNET" | sudo tee /etc/chrony/conf.d/lab.conf >/dev/null
@@ -12,4 +15,21 @@ sudo systemctl restart chrony
 if command -v ufw >/dev/null && sudo ufw status | grep -q "Status: active"; then
     sudo ufw allow 8080/tcp && sudo ufw allow 123/udp
 fi
+
+echo v4l2loopback | sudo tee /etc/modules-load.d/v4l2loopback.conf >/dev/null
+echo 'options v4l2loopback devices=1 video_nr=10 card_label="PhoneCam" exclusive_caps=1' \
+    | sudo tee /etc/modprobe.d/v4l2loopback.conf >/dev/null
+[ -e /dev/video10 ] || sudo modprobe v4l2loopback
+
+# Calibration was made with a newer LeRobot (so_follower / so_leader folders). Link, don't copy,
+# so there is one file per arm. Existing files are left alone.
+C="$HOME/.cache/huggingface/lerobot/calibration"
+link() {  # link <existing file> <name this repo expects>
+    [ -e "$2" ] && return
+    [ -f "$1" ] || { echo "missing calibration $1 -- calibrate first"; return; }
+    mkdir -p "$(dirname "$2")" && ln -s "$1" "$2" && echo "linked $2 -> $1"
+}
+link "$C/robots/so_follower/$(rig robot.id).json"       "$C/robots/so101_follower/$(rig robot.id).json"
+link "$C/teleoperators/so_leader/$(rig leader.id).json" "$C/teleoperators/so101_leader/$(rig leader.id).json"
+
 echo "Laptop setup complete."

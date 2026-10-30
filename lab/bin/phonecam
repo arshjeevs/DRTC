@@ -1,5 +1,5 @@
 #!/bin/bash
-# DroidCam (Android over USB) -> ffmpeg -> v4l2loopback device. Reconnects automatically (Pi).
+# DroidCam (Android over USB) -> ffmpeg -> v4l2loopback device. Reconnects automatically.
 source "$(dirname "$0")/_env"
 
 dev="$(rig phonecam.device)"

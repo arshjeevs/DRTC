@@ -23,14 +23,14 @@ Config precedence: `_defaults.yaml` < `rig.yaml` < `models.yaml[model]` < experi
 | Command | Where | Purpose |
 |---|---|---|
 | `lab/bin/server` | laptop | Policy server on the GPU. Loads whichever model each run asks for |
-| `lab/bin/session` | Pi | tmux: `phonecam` window + `work` window running preflight. Re-run to re-attach |
+| `lab/bin/session [record]` | Pi / laptop | tmux: `phonecam` window + `work` window running preflight. Re-run to re-attach |
 | `lab/bin/run <group/name> [--model M] [--trials N] [--note TEXT] [--no-label]` | Pi | Run a condition. Prompts for scene reset before and success after each trial |
 | `lab/bin/list` | any | Registered models and experiments |
-| `lab/bin/record <user>/<dataset> --task "..." [--episodes 50] [--resume]` | Pi | Record demos with the leader arm, hardware taken from `rig.yaml` |
-| `lab/bin/preflight` | Pi | Check ports, calibration, cameras, server, clock |
-| `lab/bin/phonecam` | Pi | DroidCam → `/dev/video10` bridge (started by `session`) |
+| `lab/bin/record <user>/<dataset> --task "..." [--episodes 50] [--resume] [--no-push]` | laptop | Record demos with the leader arm. Rerun viewer opens when a display exists (`--no-display` to skip) |
+| `lab/bin/preflight [record]` | Pi / laptop | `run` (default): follower, cameras, server, clock. `record`: both arms, cameras |
+| `lab/bin/phonecam` | Pi / laptop | DroidCam → `/dev/video10` bridge (started by `session`) |
 | `lab/bin/pi-setup` | Pi, once | Packages, `/dev/video10` at boot, clock synced to laptop, venv |
-| `lab/bin/laptop-setup` | laptop, once | Serve time to the Pi (chrony), open firewall ports |
+| `lab/bin/laptop-setup` | laptop, once | Time server for the Pi, firewall, phone-camera packages, `/dev/video10` at boot, calibration links |
 
 ## Session
 
@@ -40,6 +40,22 @@ Config precedence: `_defaults.yaml` < `rig.yaml` < `models.yaml[model]` < experi
 4. Pi, in the `work` window: `lab/bin/run smoke/jack_baseline --trials 3`
 
 tmux keys: `Ctrl+b n`/`p` switches windows, `Ctrl+b d` detaches.
+
+## Recording session (laptop)
+
+Record on the laptop: you get the Rerun viewer, and the dataset lands where training runs.
+
+1. Plug both arms, the Brio and the phone (DroidCam open) into the laptop. Robot powered.
+2. `lab/bin/session record`. All preflight lines should say `ok`.
+3. In the `work` window:
+   ```bash
+   lab/bin/record <hf_user>/<dataset> --task "<exact sentence>" --episodes 2 --no-push   # dry run
+   rm -rf ~/.cache/huggingface/lerobot/<hf_user>/<dataset>                              # discard it
+   lab/bin/record <hf_user>/<dataset> --task "<exact sentence>" --episodes 50
+   ```
+   If interrupted, continue with the same command plus `--resume`.
+
+`rig.yaml` uses `by-id` device paths, so the same file works on both machines. Only the USB cables move.
 
 ## Adding a model
 
@@ -80,9 +96,9 @@ lab/bin/laptop-setup
 Copy the calibration files to the Pi. The laptop's newer LeRobot uses different folder names:
 ```bash
 C=.cache/huggingface/lerobot/calibration
-ssh rasp@raspberrypi "mkdir -p ~/$C/robots/so101_follower ~/$C/teleoperators/so101_leader"
-scp ~/$C/robots/so_follower/follower.json rasp@raspberrypi:~/$C/robots/so101_follower/
-scp ~/$C/robots/so_follower/leader.json   rasp@raspberrypi:~/$C/teleoperators/so101_leader/
+ssh rasp@raspberrypi.local "mkdir -p ~/$C/robots/so101_follower ~/$C/teleoperators/so101_leader"
+scp ~/$C/robots/so_follower/follower.json rasp@raspberrypi.local:~/$C/robots/so101_follower/
+scp ~/$C/teleoperators/so_leader/leader.json rasp@raspberrypi.local:~/$C/teleoperators/so101_leader/
 ```
 
 **Pi**: join the laptop hotspot, then:
@@ -92,9 +108,7 @@ git clone https://github.com/arshjeevs/DRTC.git ~/drtc && cd ~/drtc && lab/bin/p
 
 **Phone**: install the classic *DroidCam - Webcam for PC* app (not DroidCam OBS). Turn on USB debugging, choose *Always allow* for the Pi, and set *Stay awake*, auto-rotate off, landscape.
 
-**Camera paths**: `by-path` names change when the camera moves to another USB port. Use `by-id` (stable): `ls /dev/v4l/by-id/`, then set `cameras.camera1.path` in `rig.yaml` to the `...-video-index0` entry.
-
-**Arm ports**: `ttyACM0/1` swap depending on plug order. Run `ls -l /dev/serial/by-id/` on the Pi, unplug one arm to see which ID is which, and put those paths in `rig.yaml` (`robot.port`, `leader.port`).
+**Device paths** (once, on either machine): `rig.yaml` uses `/dev/*/by-id/` names, which carry the USB vendor and serial number, so they are the same on the Pi and the laptop and survive re-plugging. Globs resolve to their single match: camera1 is `/dev/v4l/by-id/usb-*Brio*-video-index0`. For the arms, plug in only the follower and run `ls /dev/serial/by-id/`, then plug in the leader and run it again. Put the two paths in `robot.port` and `leader.port`. Never use `ttyACMn`: plug order changes it, and on the laptop the phone itself takes `ttyACM0`.
 
 **Physical**: mount both cameras rigidly and tape-mark the camera, robot, cube and target positions. Keep lighting fixed. Never swap camera1 and camera2.
 
@@ -108,6 +122,9 @@ git clone https://github.com/arshjeevs/DRTC.git ~/drtc && cd ~/drtc && lab/bin/p
 | `failed to set fourcc ... /dev/video10` | Harmless; the virtual camera is YUYV |
 | Arm unresponsive / port error | `ls -l /dev/serial/by-id/` and put the stable `by-id` paths in `rig.yaml` (ttyACM0/1 swap on re-plug) |
 | `write failed: [Errno 19] No such device` | The arm's USB dropped mid-connect. `dmesg \| tail -30`: `over-current` or `disconnect` means power. Use the official 27 W (5 V/5 A) Pi supply, or a powered USB hub; don't charge the phone from the Pi |
+| `FeetechMotorsBus motor check failed` with `ttyACM0` | That port is another device (on the laptop, the phone). Use the `by-id` paths in `rig.yaml` |
+| record: dataset `already exists` | A failed run leaves the folder behind. Delete `~/.cache/huggingface/lerobot/<hf_user>/<dataset>`, or add `--resume` if it holds real episodes |
+| `Failed to find Rerun Viewer` | Run through `lab/bin/record` (puts the venv on `PATH`) |
 | Asked to recalibrate | Wrong `follower.json`; stop and check it |
 | No motion for 20–45 s | Model loading on the laptop; normal |
 | `obs_one_way_latency_ms` in the hours | Pi clock unsynced (chrony). RTT unaffected |
