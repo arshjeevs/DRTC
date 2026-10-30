@@ -91,7 +91,9 @@ def main() -> None:
         out = subprocess.run(["chronyc", "tracking"], capture_output=True, text=True).stdout
         field = {k.strip(): v.strip() for k, _, v in (l.partition(":") for l in out.splitlines())}
         ref = field.get("Reference ID", "")
-        results.append(report(field.get("Leap status") == "Normal" and host in ref,
+        # Reference ID is the source's IPv4 in hex, then its name: "0A2A0001 (arshjeevs)" for 10.42.0.1.
+        from_laptop = ref.split(" ")[0] == socket.inet_aton(host).hex().upper() or host in ref
+        results.append(report(field.get("Leap status") == "Normal" and from_laptop,
                               f"clock synced to laptop ({ref or 'no source'})",
                               "run lab/bin/laptop-setup (laptop) and lab/bin/pi-setup (Pi); RTT is valid without it"))
     else:
