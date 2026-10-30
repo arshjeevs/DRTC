@@ -15,11 +15,11 @@ server:
 
 robot:
   type: so101
-  port: /dev/ttyACM0          # TODO: /dev/serial/by-id/... (ttyACMn changes with plug order)
+  port: /dev/serial/by-id/usb-1a86_USB_Single_Serial_5B79017420-if00
   id: follower                # calibration/robots/so101_follower/follower.json
 
 leader:
-  port: /dev/ttyACM1          # TODO: /dev/serial/by-id/...
+  port: /dev/serial/by-id/usb-1a86_USB_Single_Serial_5B79016953-if00
   id: leader                  # calibration/teleoperators/so101_leader/leader.json
 
 # Order is fixed: datasets and trained models depend on camera1/camera2 identity.
@@ -27,8 +27,8 @@ cameras:
   width: 800
   height: 600
   fps: 30
-  camera1:                    # Logitech Brio 100
-    path: /dev/v4l/by-id/usb-*Brio*-video-index0
+  camera1:                    # Zebronics Zeb Live Pro
+    path: /dev/v4l/by-id/usb-*ZEB_LIVE_PRO*-video-index0
     fourcc: MJPG
   camera2:                    # Android phone (DroidCam over USB -> v4l2loopback)
     path: /dev/video10
