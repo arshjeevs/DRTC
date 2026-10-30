@@ -25,6 +25,7 @@ Config precedence: `_defaults.yaml` < `rig.yaml` < `models.yaml[model]` < experi
 | `lab/bin/server` | laptop | Policy server on the GPU. Loads whichever model each run asks for |
 | `lab/bin/session [record]` | Pi / laptop | tmux: `phonecam` window + `work` window running preflight. Re-run to re-attach |
 | `lab/bin/run <group/name> [--model M] [--trials N] [--note TEXT] [--no-label]` | Pi | Run a condition. Prompts for scene reset before and success after each trial |
+| `lab/bin/train <model> [--dry-run] [--no-push] [--resume] [--<lerobot flag>=value ...]` | laptop | Train a `models.yaml` entry that has a `train:` block and push it to its Hub id. See [Training](#training) |
 | `lab/bin/list` | any | Registered models and experiments |
 | `lab/bin/record <user>/<dataset> --task "..." [options] [--<lerobot flag>=value ...]` | laptop | Record demos with the leader arm. Rerun viewer opens when a display exists. See [Recording flags](#recording-flags) |
 | `lab/bin/calibrate follower\|leader` | where the arms are | Calibrate an arm with `rig.yaml`'s port and id. Backs up the old file. See [Recalibrating](#recalibrating) |
@@ -81,6 +82,27 @@ lab/bin/record arshjeevs/cube_v1 --task "..." --dry-run \
     --dataset.tags='[so101,cube]'
 ```
 Always `--dry-run` first after changing flags. Overriding `--robot.cameras` replaces both cameras, so keep the names `camera1` and `camera2`.
+
+## Training
+
+A `models.yaml` entry with a `train:` block covers the whole lifecycle: `lab/bin/train` trains it and pushes the result to `pretrained_name_or_path`, and the policy server later loads it from that same field.
+
+```bash
+.venv/bin/hf auth login                                     # once, with a WRITE token
+lab/bin/train smolvla_test_run_1 --dry-run                  # check the command
+lab/bin/train smolvla_test_run_1 --no-push --steps=50 --output_dir=outputs/train/smoke   # ~5 min: GPU memory and speed
+rm -rf outputs/train/smoke
+lab/bin/train smolvla_test_run_1                            # full run, pushes to the Hub at the end
+```
+- Checkpoints go to `outputs/train/<model>/checkpoints/` every `save_freq` steps, and logs to `logs/train_<model>_*.log`.
+- Interrupted? Run `lab/bin/train <model> --resume`.
+- Out of GPU memory? Add `--batch_size=4`.
+- Any `lerobot-train` flag passes through and overrides the generated one.
+
+Then run it (laptop: `lab/bin/server`; Pi: `git pull`, then):
+```bash
+lab/bin/run replication/baseline --model smolvla_test_run_1 --trials 3
+```
 
 ## Adding a model
 

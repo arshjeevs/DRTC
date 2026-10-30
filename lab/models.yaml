@@ -6,8 +6,12 @@
 #
 # Per model:
 #   fps          control rate = fps of the dataset the model was trained on
-#   task         default language instruction (experiments may override)
+#   task         default language instruction: the exact sentence used when recording
 #   rtc_enabled  only for flow-matching policies: smolvla, pi0, pi05
+#   train        (optional) what lab/bin/train trains; the result is pushed to pretrained_name_or_path
+#     dataset      Hub dataset repo id
+#     from         checkpoint to fine-tune (e.g. lerobot/smolvla_base); omit to train policy_type from scratch
+#     steps, batch_size, save_freq
 
 jack_smolvla_cube:
   policy_type: smolvla
@@ -15,6 +19,19 @@ jack_smolvla_cube:
   fps: 60
   task: Pick up the orange cube and place it on the black X marker with the white background
   rtc_enabled: true
+
+# First model on our rig: SmolVLA fine-tuned on 10 demos (pipeline check; 50 demos for real results).
+smolvla_test_run_1:
+  policy_type: smolvla
+  pretrained_name_or_path: arshjeevs/smolvla_test_run_1
+  fps: 30
+  task: Pick the Cube and Place it in the box
+  rtc_enabled: true
+  train:
+    dataset: arshjeevs/test_run_1
+    from: lerobot/smolvla_base
+    steps: 20000
+    batch_size: 8
 
 # Template for our own models:
 # smolvla_cube_v1:
