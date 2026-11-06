@@ -37,19 +37,33 @@ smolvla_test_run_1:
     batch_size: 8
 
 # The same data with LoRA: compare against smolvla_test_run_1 (full) on the same experiments.
-smolvla_test_run_1_lora:
+smolvla_train_1_lora_0:
   policy_type: smolvla
-  pretrained_name_or_path: arshjeevs/smolvla_test_run_1_lora
+  pretrained_name_or_path: orangemoon599/smolvla_train_1_lora
   finetune: lora
   fps: 30
-  task: Pick the Cube and Place it in the box
+  task: Pick the green cube and place it in the box
   rtc_enabled: true
   train:
-    dataset: arshjeevs/test_run_1
+    dataset: orangemoon599/train_1
     from: lerobot/smolvla_base
     steps: 20000
-    batch_size: 8
+    batch_size: 128
     lora: {r: 32, alpha: 32, targets: expert}
+
+smolvla_train_1_lora_1:
+  policy_type: smolvla
+  pretrained_name_or_path: orangemoon599/smolvla_train_1_lora
+  finetune: lora
+  fps: 30
+  task: Pick the green cube and place it in the box
+  rtc_enabled: true
+  train:
+    dataset: orangemoon599/train_1
+    from: lerobot/smolvla_base
+    steps: 20000
+    batch_size: 128
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
 
 # Template for our own models:
 # smolvla_cube_v1:

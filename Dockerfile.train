@@ -1,0 +1,32 @@
+FROM ubuntu:24.04
+
+ARG PYTHON_VERSION=3.12
+ARG TORCH_CUDA=cu128
+ARG EXTRAS=smolvla
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    UV_LINK_MODE=copy \
+    UV_NO_CACHE=1 \
+    UV_PYTHON_INSTALL_DIR=/opt/python \
+    VIRTUAL_ENV=/opt/venv \
+    PATH=/opt/venv/bin:$PATH \
+    HF_HOME=/cache/huggingface \
+    HOME=/tmp
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git ffmpeg build-essential cmake pkg-config \
+        libgl1 libglib2.0-0 curl ca-certificates \
+        tmux nano htop \
+    && rm -rf /var/lib/apt/lists/* \
+    && git config --system --add safe.directory '*'
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+RUN uv venv --python ${PYTHON_VERSION} /opt/venv
+
+WORKDIR /opt/drtc
+COPY . /opt/drtc
+RUN uv pip install --torch-backend ${TORCH_CUDA} -e ".[${EXTRAS}]" \
+    && chmod -R a+rwX /opt/venv
+
+CMD ["sleep", "infinity"]
