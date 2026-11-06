@@ -4,6 +4,14 @@ The entry's `train:` block says what to train; its `pretrained_name_or_path` is 
 pushed. The policy server loads models from that same field, so once training finishes
 `lab/bin/run <experiment> --model <name>` runs the new model.
 
+Fine-tuning method: the entry's `finetune:` (default full), the same field the client sends to the
+policy server so it knows how to load the model.
+    full  update the weights SmolVLA normally trains (action expert + projections; VLM frozen) and
+          save the whole model (~900 MB)
+    lora  freeze the policy, train low-rank adapters (src/lerobot/policies/lora.py) and save only
+          those (~21 MB at r=32); the server loads the base model named in the adapter, then the adapter
+LoRA settings come from `train.lora:` (r, alpha, dropout, targets) and `--lora.<key>=value` flags.
+
 Checkpoints go to outputs/train/<name>/. Any other lerobot-train flag is passed through and
 overrides the generated value (`lerobot-train --help`).
 
@@ -12,6 +20,7 @@ A run stopped early pushes nothing; `--push [checkpoint]` uploads a saved checkp
 
 Usage:
     python -m lab.tools.train <model> [--dry-run] [--no-push] [--resume] [--<lerobot-train flag>=value ...]
+    python -m lab.tools.train <model> --finetune lora --lora.r=16 --lora.targets=vlm+expert --no-push
     python -m lab.tools.train <model> --push [last | 005000]
 """
 
@@ -19,7 +28,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import shlex
 import sys
@@ -27,6 +35,7 @@ from pathlib import Path
 
 from lab.tools.config import REPO_ROOT, load_models
 from lab.tools.passthrough import parse_passthrough
+from lerobot.policies import lora
 
 TRAIN_DIR = REPO_ROOT / "outputs/train"
 HUB_ID = re.compile(r"^[\w.-]+/[\w.-]+$")
@@ -56,11 +65,33 @@ def push_checkpoint(out: Path, name: str, target: str) -> None:
     if not HUB_ID.match(target) or target.startswith("outputs/"):
         sys.exit(f"pretrained_name_or_path {target!r} is not a Hub repo id")
     step = folder.resolve().parent.name
-    print(f"pushing {folder} (step {step}) -> https://huggingface.co/{target}", flush=True)
+    kind = "lora" if (folder / lora.ADAPTER_CONFIG).is_file() else "full"
+    print(f"pushing {kind} checkpoint {folder} (step {step}) -> https://huggingface.co/{target}", flush=True)
     api = HfApi()
     api.create_repo(target, exist_ok=True)
-    api.upload_folder(repo_id=target, folder_path=folder, commit_message=f"{out.name}: checkpoint {step}")
+    # Drop the other method's weights, so the repo never holds a stale model next to the new one.
+    stale = ["model.safetensors"] if kind == "lora" else [lora.ADAPTER_CONFIG, lora.ADAPTER_WEIGHTS]
+    api.upload_folder(repo_id=target, folder_path=folder, delete_patterns=stale,
+                      commit_message=f"{out.name}: {kind} checkpoint {step}")
     print("done", flush=True)
+
+
+def lora_make_policy(make_policy, spec: dict):
+    """Wrap lerobot-train's make_policy: base policy + adapters (or, on resume, the saved adapters)."""
+    def make(cfg, **kwargs):
+        checkpoint = cfg.pretrained_path
+        if checkpoint and lora.is_adapter(checkpoint):  # --resume: rebuild base, then load adapters
+            saved, base, weights = lora.read_adapter(checkpoint)
+            cfg.pretrained_path = base
+            try:
+                policy = make_policy(cfg, **kwargs)
+            finally:
+                cfg.pretrained_path = checkpoint
+            lora.apply_lora(policy, saved, base)
+            lora.load_adapter_weights(policy, weights)
+            return policy
+        return lora.apply_lora(make_policy(cfg, **kwargs), spec, checkpoint)
+    return make
 
 
 def main() -> None:
@@ -71,6 +102,8 @@ def main() -> None:
     parser.add_argument("--resume", action="store_true", help="Continue from outputs/train/<model>/checkpoints/last")
     parser.add_argument("--push", nargs="?", const="last", metavar="CHECKPOINT",
                         help="Don't train: upload a saved checkpoint (default: last) to the Hub")
+    parser.add_argument("--finetune", choices=lora.FINETUNE_METHODS,
+                        help="Override the entry's finetune: (only with --no-push; the server reads the entry)")
     args, passthrough = parser.parse_known_args()
 
     models = load_models()
@@ -86,13 +119,28 @@ def main() -> None:
     if args.push:
         return push_checkpoint(out, args.push, target)
     push = not args.no_push and bool(HUB_ID.match(target)) and not target.startswith("outputs/")
+    finetune = args.finetune or entry.get("finetune", "full")
+    if finetune != entry.get("finetune", "full") and push:
+        sys.exit(f"models.yaml says {args.model!r} is finetune: {entry.get('finetune', 'full')}, and the server "
+                 f"loads it that way. Change the entry (or add a new one with its own Hub id), or add --no-push.")
+
+    overrides = parse_passthrough(passthrough)
+    lora_flags = {k.removeprefix("--lora."): overrides.pop(k) for k in list(overrides) if k.startswith("--lora.")}
+    if lora_flags and finetune != "lora":
+        sys.exit(f"--lora.* flags given, but {args.model!r} trains with finetune: {finetune}")
 
     if args.resume:
-        config = out / "checkpoints/last/pretrained_model/train_config.json"
+        last = out / "checkpoints/last/pretrained_model"
+        config = last / "train_config.json"
         if not config.is_file():
             sys.exit(f"Nothing to resume: {config} not found")
+        saved = "lora" if (last / lora.ADAPTER_CONFIG).is_file() else "full"
+        if saved != finetune:
+            sys.exit(f"{last} is a {saved} checkpoint, but {args.model!r} is finetune: {finetune}")
         flags = {"--config_path": str(config), "--resume": "true"}
     else:
+        if finetune == "lora" and "from" not in train:
+            sys.exit(f"finetune: lora needs a base checkpoint: set train.from for {args.model!r}")
         if out.exists():
             sys.exit(f"{out} exists. Continue it with --resume, or delete it to start over.")
         base = {"--policy.path": train["from"]} if "from" in train else {"--policy.type": entry["policy_type"]}
@@ -100,7 +148,8 @@ def main() -> None:
             "--dataset.repo_id": train["dataset"],
             **base,
             "--policy.device": "cuda",
-            "--policy.push_to_hub": str(push).lower(),
+            # Pushed below from the last checkpoint, the same way for both methods.
+            "--policy.push_to_hub": "false",
             "--output_dir": str(out),
             "--job_name": args.model,
             "--batch_size": train.get("batch_size", 8),
@@ -110,9 +159,6 @@ def main() -> None:
             # LeRobot picks torchcodec whenever it is installed, but it cannot load with FFmpeg 8.
             "--dataset.video_backend": "pyav",
         }
-        if push:
-            flags["--policy.repo_id"] = target
-    overrides = parse_passthrough(passthrough)
     flags.update(overrides)
     if not args.resume and "--dataset.root" not in flags:
         check_local_dataset(flags["--dataset.repo_id"])
@@ -121,11 +167,25 @@ def main() -> None:
     print(" \\\n    ".join(shlex.quote(part) for part in cmd), flush=True)
     if overrides:
         print(f"overrides: {', '.join(overrides)}", flush=True)
+    spec = None
+    if finetune == "lora":
+        spec = lora.resolve_spec(entry["policy_type"], {**train.get("lora", {}), **lora_flags})
+        print(f"finetune: lora r={spec['r']} alpha={spec['alpha']} dropout={spec['dropout']}\n"
+              f"    adapters on {spec['target_modules']}\n    trained in full: {spec['trainable']}", flush=True)
+    else:
+        print("finetune: full", flush=True)
     print(f"push to Hub: {target}" if push else "push to Hub: no (local only)", flush=True)
     if args.dry_run:
         return
-    os.environ["PATH"] = f"{Path(sys.executable).parent}{os.pathsep}{os.environ['PATH']}"
-    os.execvp(cmd[0], cmd)
+
+    from lerobot.scripts import lerobot_train
+
+    if spec:  # on --resume the saved adapter settings win (lora_make_policy)
+        lerobot_train.make_policy = lora_make_policy(lerobot_train.make_policy, spec)
+    sys.argv = cmd
+    lerobot_train.main()
+    if push:
+        push_checkpoint(out, "last", target)
 
 
 if __name__ == "__main__":

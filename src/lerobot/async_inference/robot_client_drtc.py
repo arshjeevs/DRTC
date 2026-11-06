@@ -332,6 +332,7 @@ class RobotClientDrtc:
             lerobot_features,
             config.actions_per_chunk,
             config.policy_device,
+            finetune=config.finetune,
             rtc_enabled=config.rtc_enabled,
             rtc_max_guidance_weight=config.rtc_max_guidance_weight,
             rtc_prefix_attention_schedule=config.rtc_prefix_attention_schedule,

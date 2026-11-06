@@ -78,6 +78,7 @@ class ExperimentConfig:
     # Policy
     policy_type: str = "smolvla"
     pretrained_name_or_path: str = DEFAULT_MODEL_PATH
+    finetune: str = "full"  # "lora": the server loads the adapter's base model, then the adapter
     # DRTC parameters
     latency_k: float = 2.0
     epsilon: int = 2
@@ -125,7 +126,7 @@ _SCALAR_FIELDS = frozenset({
     "camera1_path", "camera2_path",
     "camera_width", "camera_height", "camera_fps", "camera_fourcc",
     "camera_use_threaded_async_read", "camera_allow_stale_frames",
-    "policy_type", "pretrained_name_or_path",
+    "policy_type", "pretrained_name_or_path", "finetune",
     "latency_k", "epsilon", "s_min", "latency_alpha", "latency_beta",
     "duration_s", "fps", "actions_per_chunk",
     "num_flow_matching_steps", "rtc_enabled", "rtc_max_guidance_weight",
@@ -288,6 +289,7 @@ def create_client_config(
         policy_device="cuda",
         policy_type=config.policy_type,
         pretrained_name_or_path=config.pretrained_name_or_path,
+        finetune=config.finetune,
         actions_per_chunk=config.actions_per_chunk,
         fps=config.fps,
         s_min=config.s_min,

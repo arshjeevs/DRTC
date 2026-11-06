@@ -8,10 +8,13 @@
 #   fps          control rate = fps of the dataset the model was trained on
 #   task         default language instruction: the exact sentence used when recording
 #   rtc_enabled  only for flow-matching policies: smolvla, pi0, pi05
+#   finetune     full (default) or lora. Sent to the policy server, which loads a lora checkpoint as
+#                its base model (recorded in the adapter) + the adapter. lab/bin/train trains this way.
 #   train        (optional) what lab/bin/train trains; the result is pushed to pretrained_name_or_path
 #     dataset      Hub dataset repo id
 #     from         checkpoint to fine-tune (e.g. lerobot/smolvla_base); omit to train policy_type from scratch
 #     steps, batch_size, save_freq
+#     lora         (finetune: lora) r (32), alpha (32), dropout (0.05), targets: expert (default) | vlm+expert
 
 jack_smolvla_cube:
   policy_type: smolvla
@@ -32,6 +35,21 @@ smolvla_test_run_1:
     from: lerobot/smolvla_base
     steps: 20000
     batch_size: 8
+
+# The same data with LoRA: compare against smolvla_test_run_1 (full) on the same experiments.
+smolvla_test_run_1_lora:
+  policy_type: smolvla
+  pretrained_name_or_path: arshjeevs/smolvla_test_run_1_lora
+  finetune: lora
+  fps: 30
+  task: Pick the Cube and Place it in the box
+  rtc_enabled: true
+  train:
+    dataset: arshjeevs/test_run_1
+    from: lerobot/smolvla_base
+    steps: 20000
+    batch_size: 8
+    lora: {r: 32, alpha: 32, targets: expert}
 
 # Template for our own models:
 # smolvla_cube_v1:

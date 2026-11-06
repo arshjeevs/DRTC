@@ -100,6 +100,25 @@ lab/bin/train smolvla_test_run_1                            # full run, pushes t
 - Out of GPU memory? Add `--batch_size=4`.
 - Any `lerobot-train` flag passes through and overrides the generated one.
 
+### Full fine-tuning or LoRA
+
+The entry's `finetune:` picks the method. The client sends the same field to the policy server, which loads the model accordingly, so nothing else changes between the two.
+
+| `finetune:` | What trains | What is saved / pushed | How the server loads it |
+|---|---|---|---|
+| `full` (default) | everything SmolVLA normally trains: the action expert and projections (~100M params; the VLM stays frozen) | the whole model, ~900 MB | `from_pretrained(repo)` |
+| `lora` | low-rank adapters on the action expert, plus the small projections in full (8.5M params at r=32) | `adapter_config.json` + `adapter_model.safetensors`, ~21 MB at r=32 | base model named in the adapter (`lerobot/smolvla_base`) + the adapter, kept unmerged (the base weights are bf16; merging would round the update away) |
+
+```bash
+lab/bin/train smolvla_test_run_1_lora                          # entry has finetune: lora and train.lora settings
+lab/bin/train smolvla_test_run_1_lora --lora.r=16 --lora.targets=vlm+expert   # override LoRA settings
+lab/bin/train smolvla_test_run_1 --finetune lora --no-push --output_dir=outputs/train/try_lora  # one-off, local only
+```
+- LoRA settings (`train.lora:` or `--lora.<key>=`): `r` (32), `alpha` (32), `dropout` (0.05), `targets`: `expert` (default) or `vlm+expert` (adapts the VLM's language layers too; more GPU memory, since backprop then runs through the VLM).
+- Give each method its own entry and Hub id (as `smolvla_test_run_1` / `smolvla_test_run_1_lora`), so you can run the same experiment on both. `--finetune` that disagrees with the entry is refused unless `--no-push`: the server would load the pushed model the wrong way.
+- `--resume` and `--push` detect a LoRA checkpoint by its `adapter_config.json`. Pushing one method removes the other's weights from the Hub repo.
+- Testing a local LoRA checkpoint: set `pretrained_name_or_path: outputs/train/<run>/checkpoints/last/pretrained_model` with `finetune: lora`.
+
 Then run it (laptop: `lab/bin/server`; Pi: `git pull`, then):
 ```bash
 lab/bin/run replication/baseline --model smolvla_test_run_1 --trials 3

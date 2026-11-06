@@ -104,6 +104,11 @@ class RobotClientDrtcConfig:
         default=False, metadata={"help": "Visualize the action queue size after stopping"}
     )
 
+    finetune: str = field(
+        default="full",
+        metadata={"help": "How the checkpoint was fine-tuned: 'full' or 'lora' (server loads the base + adapter)"},
+    )
+
     # RTC (client-driven, server-side inpainting; flow policies only)
     rtc_enabled: bool = field(
         default=True,
@@ -358,6 +363,8 @@ class RobotClientDrtcConfig:
             raise ValueError("policy_type cannot be empty")
         if not self.pretrained_name_or_path:
             raise ValueError("pretrained_name_or_path cannot be empty")
+        if self.finetune not in ("full", "lora"):
+            raise ValueError(f"finetune must be 'full' or 'lora', got {self.finetune!r}")
         if self.fps <= 0:
             raise ValueError(f"fps must be positive, got {self.fps}")
         if self.actions_per_chunk <= 0:

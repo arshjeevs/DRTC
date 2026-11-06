@@ -34,6 +34,7 @@ import grpc
 import torch
 
 from lerobot.policies.factory import get_policy_class, make_pre_post_processors
+from lerobot.policies.lora import load_policy
 from lerobot.processor import (
     PolicyAction,
     PolicyProcessorPipeline,
@@ -321,8 +322,13 @@ class PolicyServerDrtc(services_pb2_grpc.AsyncInferenceServicer):
         policy_class = get_policy_class(self.policy_type)
 
         t_load_start = time.perf_counter()
-        self.policy = policy_class.from_pretrained(policy_specs.pretrained_name_or_path)
+        # "lora": base model from the adapter's base_model_name_or_path, then the adapter
+        self.policy = load_policy(policy_class, policy_specs.pretrained_name_or_path, policy_specs.finetune)
         t_load_done = time.perf_counter()
+        self.logger.info(
+            f"Loaded {policy_specs.policy_type} ({policy_specs.finetune}) "
+            f"{policy_specs.pretrained_name_or_path} in {t_load_done - t_load_start:.1f}s"
+        )
 
         t_to_start = time.perf_counter()
         self.policy.to(self.device)

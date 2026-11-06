@@ -353,6 +353,8 @@ class RemotePolicyConfig:
     actions_per_chunk: int
     device: str = "cpu"
     rename_map: dict[str, str] = field(default_factory=dict)
+    # How the checkpoint was fine-tuned: "full" (complete weights) or "lora" (adapter on its base model)
+    finetune: str = "full"
     # Client-driven RTC configuration (optional; server may ignore if policy doesn't support RTC)
     rtc_enabled: bool = False
     rtc_max_guidance_weight: float | None = None  # None = use num_flow_matching_steps (Alex Soare opt)
@@ -370,6 +372,7 @@ class RemotePolicyConfig:
     def __setstate__(self, state: dict[str, Any]) -> None:
         """Back-compat for pickles created before RTC/spike fields existed."""
         self.__dict__.update(state)
+        self.__dict__.setdefault("finetune", "full")
         self.__dict__.setdefault("rtc_enabled", False)
         self.__dict__.setdefault("rtc_max_guidance_weight", None)  # Default to auto (Alex Soare opt)
         self.__dict__.setdefault("rtc_prefix_attention_schedule", "linear")
