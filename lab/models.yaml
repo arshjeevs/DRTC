@@ -23,24 +23,11 @@ jack_smolvla_cube:
   task: Pick up the orange cube and place it on the black X marker with the white background
   rtc_enabled: true
 
-# First model on our rig: SmolVLA fine-tuned on 10 demos (pipeline check; 50 demos for real results).
-smolvla_test_run_1:
-  policy_type: smolvla
-  pretrained_name_or_path: arshjeevs/smolvla_test_run_1
-  fps: 30
-  task: Pick the Cube and Place it in the box
-  rtc_enabled: true
-  train:
-    dataset: arshjeevs/test_run_1
-    from: lerobot/smolvla_base
-    steps: 20000
-    batch_size: 8
-
 # The same data with LoRA: compare against smolvla_test_run_1 (full) on the same experiments.
 smolvla_train_1_lora_0:
   policy_type: smolvla
   pretrained_name_or_path: orangemoon599/smolvla_train_1_lora
-  finetune: lora
+  finetune: full
   fps: 30
   task: Pick the green cube and place it in the box
   rtc_enabled: true
@@ -63,6 +50,87 @@ smolvla_train_1_lora_1:
     from: lerobot/smolvla_base
     steps: 20000
     batch_size: 128
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
+
+smolvla_train_5_full:
+  policy_type: smolvla
+  pretrained_name_or_path: orangemoon599/smolvla_train_5_full
+  finetune: full
+  fps: 30
+  task: Pick the green cube and place it in the box
+  rtc_enabled: true
+  train:
+    dataset: orangemoon599/train_5
+    from: lerobot/smolvla_base
+    steps: 20000
+    batch_size: 64
+
+smolvla_train_5_lora:
+  policy_type: smolvla
+  pretrained_name_or_path: orangemoon599/smolvla_train_5_lora
+  finetune: lora
+  fps: 30
+  task: Pick the green cube and place it in the box
+  rtc_enabled: true
+  train:
+    dataset: orangemoon599/train_5
+    from: lerobot/smolvla_base
+    steps: 20000
+    batch_size: 64
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
+
+smolvla_train_6_full:
+  policy_type: smolvla
+  pretrained_name_or_path: orangemoon599/smolvla_train_6_full
+  finetune: full
+  fps: 30
+  task: Pick the green cube and place it in the box
+  rtc_enabled: true
+  train:
+    dataset: orangemoon599/train_6
+    from: lerobot/smolvla_base
+    steps: 20000
+    batch_size: 64
+
+smolvla_train_6_lora:
+  policy_type: smolvla
+  pretrained_name_or_path: orangemoon599/smolvla_train_6_lora
+  finetune: lora
+  fps: 30
+  task: Pick the green cube and place it in the box
+  rtc_enabled: true
+  train:
+    dataset: orangemoon599/train_6
+    from: lerobot/smolvla_base
+    steps: 20000
+    batch_size: 64
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
+
+smolvla_train_5_train_6_full:
+  policy_type: smolvla
+  pretrained_name_or_path: orangemoon599/train_5_train_6_combined
+  finetune: full
+  fps: 30
+  task: Pick the green cube and place it in the box
+  rtc_enabled: true
+  train:
+    dataset: orangemoon599/train_5_train_6_combined
+    from: lerobot/smolvla_base
+    steps: 20000
+    batch_size: 56
+
+smolvla_train_5_train_6_lora:
+  policy_type: smolvla
+  pretrained_name_or_path: orangemoon599/train_5_train_6_combined
+  finetune: lora
+  fps: 30
+  task: Pick the green cube and place it in the box
+  rtc_enabled: true
+  train:
+    dataset: orangemoon599/train_5_train_6_combined
+    from: lerobot/smolvla_base
+    steps: 40000
+    batch_size: 64
     lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
 
 # Template for our own models:
