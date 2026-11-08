@@ -39,6 +39,8 @@ from lerobot.policies import lora
 
 TRAIN_DIR = REPO_ROOT / "outputs/train"
 HUB_ID = re.compile(r"^[\w.-]+/[\w.-]+$")
+# Every run (new or resumed) logs to wandb; checkpoints stay local and go to the Hub, not to wandb.
+WANDB = {"--wandb.enable": "true", "--wandb.project": "drtc-smolvla", "--wandb.disable_artifact": "true"}
 
 
 def check_local_dataset(repo_id: str) -> None:
@@ -137,7 +139,14 @@ def main() -> None:
         saved = "lora" if (last / lora.ADAPTER_CONFIG).is_file() else "full"
         if saved != finetune:
             sys.exit(f"{last} is a {saved} checkpoint, but {args.model!r} is finetune: {finetune}")
-        flags = {"--config_path": str(config), "--resume": "true"}
+        # --resume runs up to the run's saved step target; a finished run needs a larger --steps.
+        done = json.loads((last.parent / "training_state/training_step.json").read_text())["step"]
+        goal = int(overrides.get("--steps", json.loads(config.read_text())["steps"]))
+        if done >= goal:
+            sys.exit(f"{args.model!r} already finished: checkpoint at step {done}, target {goal}.\n"
+                     f"To train further, raise the target, e.g. lab/bin/train {args.model} --resume --steps={done + 10_000}")
+        print(f"resuming at step {done}, training to {goal}", flush=True)
+        flags = {"--config_path": str(config), "--resume": "true", **WANDB}
     else:
         if finetune == "lora" and "from" not in train:
             sys.exit(f"finetune: lora needs a base checkpoint: set train.from for {args.model!r}")
@@ -155,7 +164,7 @@ def main() -> None:
             "--batch_size": train.get("batch_size", 8),
             "--steps": train.get("steps", 20_000),
             "--save_freq": train.get("save_freq", 5_000),
-            "--wandb.enable": "false",
+            **WANDB,
             # LeRobot picks torchcodec whenever it is installed, but it cannot load with FFmpeg 8.
             "--dataset.video_backend": "pyav",
         }
