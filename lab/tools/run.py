@@ -19,6 +19,7 @@ import csv
 import importlib.util
 import json
 import logging
+import os
 import socket
 import subprocess
 import time
@@ -94,7 +95,8 @@ def main() -> None:
     host, port = rig["server"]["host"], int(rig["server"]["port"])
 
     if not server_reachable(host, port):
-        raise SystemExit(f"Policy server not reachable at {host}:{port}. Start lab/bin/server on the laptop.")
+        start = "the policy server (lab/WINDOWS.md, step 11)" if os.name == "nt" else "lab/bin/server on the laptop"
+        raise SystemExit(f"Policy server not reachable at {host}:{port}. Start {start}.")
 
     runner = load_upstream_runner()
     config = runner._parse_experiment_dict(resolved)

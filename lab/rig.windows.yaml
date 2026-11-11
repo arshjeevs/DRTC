@@ -1,0 +1,36 @@
+# Rig for a Windows laptop with the arms and cameras plugged into it (see lab/WINDOWS.md).
+# Selected with:  $env:LAB_RIG = "lab\rig.windows.yaml"   (rig.yaml stays the Linux/Pi rig)
+#
+# Windows has no /dev/*/by-id names: serial ports are COM numbers and cameras are OpenCV indexes,
+# and both can change when you plug into a different USB socket. Re-check them after re-plugging:
+#   lerobot-find-port              -> follower / leader COM ports
+#   lerobot-find-cameras opencv    -> camera indexes (and saves a test frame from each)
+
+hosts:
+  server: windows-laptop      # labels recorded with every run
+  client: windows-laptop
+  gpu: RTX 4060 Laptop
+
+server:
+  host: 127.0.0.1             # server on this laptop; Windows cannot connect to 0.0.0.0
+  port: 8080
+
+robot:
+  type: so101
+  port: COM5                  # follower: from lerobot-find-port
+  id: follower                # calibration/robots/so101_follower/follower.json
+
+leader:
+  port: COM6                  # leader: from lerobot-find-port
+  id: leader                  # calibration/teleoperators/so101_leader/leader.json
+
+# Same names as rig.yaml: datasets and trained models depend on camera1/camera2 identity.
+cameras:
+  width: 800
+  height: 600
+  fps: 30
+  camera1:                    # Zebronics Zeb Live Pro -- WRIST camera
+    path: 0                   # OpenCV index from lerobot-find-cameras opencv
+    fourcc: MJPG              # 800x600 at 30 fps needs MJPG; remove if the camera refuses it
+  camera2:                    # Android phone via the DroidCam Windows client -- SCENE camera
+    path: 1

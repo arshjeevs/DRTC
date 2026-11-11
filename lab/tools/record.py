@@ -20,7 +20,7 @@ import shlex
 import sys
 from pathlib import Path
 
-from lab.tools.config import load_rig
+from lab.tools.config import device_present, load_rig
 from lab.tools.passthrough import parse_passthrough
 
 
@@ -42,7 +42,7 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true", help="Print the lerobot-record command and exit")
     args, passthrough = parser.parse_known_args()
     display = args.display if args.display is not None else bool(
-        os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
+        os.name == "nt" or os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
 
     rig = load_rig()
     cams = rig["cameras"]
@@ -83,9 +83,10 @@ def main() -> None:
     devices = [flags["--robot.port"], flags["--teleop.port"]]
     if "--robot.cameras" not in overrides:
         devices += [cams[name]["path"] for name in ("camera1", "camera2")]
-    missing = [d for d in devices if not Path(d).exists()]
+    missing = [str(d) for d in devices if not device_present(d)]
     if missing:
-        print(f"missing devices: {', '.join(missing)}  (lab/bin/preflight record)", flush=True)
+        check = "python -m lab.tools.preflight record" if os.name == "nt" else "lab/bin/preflight record"
+        print(f"missing devices: {', '.join(missing)}  ({check})", flush=True)
     if args.dry_run:
         return
     if missing:

@@ -10,6 +10,8 @@ CLI (for shell scripts):
 from __future__ import annotations
 
 import glob
+import os
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -18,7 +20,8 @@ import yaml
 
 LAB_DIR = Path(__file__).resolve().parent.parent
 REPO_ROOT = LAB_DIR.parent
-RIG_PATH = LAB_DIR / "rig.yaml"
+# LAB_RIG picks another rig file, e.g. lab/rig.windows.yaml on a Windows laptop.
+RIG_PATH = Path(os.environ.get("LAB_RIG") or LAB_DIR / "rig.yaml").resolve()
 MODELS_PATH = LAB_DIR / "models.yaml"
 EXPERIMENTS_DIR = LAB_DIR / "experiments"
 DEFAULTS_PATH = EXPERIMENTS_DIR / "_defaults.yaml"
@@ -29,7 +32,7 @@ RTC_POLICIES = {"smolvla", "pi0", "pi05"}
 
 
 def load_yaml(path: Path) -> dict[str, Any]:
-    return yaml.safe_load(path.read_text()) or {}
+    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
 
 def resolve_device(path: str) -> str:
@@ -39,6 +42,20 @@ def resolve_device(path: str) -> str:
     """
     matches = glob.glob(path) if any(c in path for c in "*?[") else [path]
     return matches[0] if len(matches) == 1 else path
+
+
+def device_present(device: Any) -> bool:
+    """Whether a serial port or camera exists: a /dev path, a Windows COM port, or a camera index.
+
+    Camera indexes (Windows) cannot be checked without opening the camera, so they count as present.
+    """
+    if isinstance(device, int) or str(device).isdigit():
+        return True
+    if re.fullmatch(r"COM\d+", str(device), re.IGNORECASE):
+        from serial.tools import list_ports
+
+        return any(p.device.upper() == str(device).upper() for p in list_ports.comports())
+    return Path(device).exists()
 
 
 def _resolve_devices(node: Any) -> Any:

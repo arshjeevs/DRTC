@@ -10,12 +10,13 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
 import socket
 import subprocess
 from pathlib import Path
 
-from lab.tools.config import load_rig
+from lab.tools.config import device_present, load_rig
 
 CALIB_DIR = Path.home() / ".cache/huggingface/lerobot/calibration"
 
@@ -37,7 +38,7 @@ def check_camera(name: str, cam: dict, fmt: dict) -> bool:
         c.disconnect()
         return report(shape == (h, w, 3), f"{name} {shape}", f"expected ({h}, {w}, 3)")
     except Exception as e:  # noqa: BLE001
-        if "video10" in cam["path"]:
+        if "video10" in str(cam["path"]):
             hint = ("phonecam not running: start lab/bin/session" if Path(cam["path"]).exists()
                     else "v4l2loopback not loaded: start lab/bin/session (lab/bin/*-setup loads it at boot)")
         else:
@@ -46,12 +47,19 @@ def check_camera(name: str, cam: dict, fmt: dict) -> bool:
 
 
 def camera_ids() -> str:
+    if os.name == "nt":
+        return "list camera indexes with: lerobot-find-cameras opencv"
     by_id = Path("/dev/v4l/by-id")
     links = sorted(p for p in by_id.iterdir() if p.name.endswith("index0")) if by_id.is_dir() else []
     return "; ".join(str(p) for p in links) or "none; check cables and dmesg"
 
 
 def serial_ids() -> str:
+    if os.name == "nt":
+        from serial.tools import list_ports
+
+        ports = [f"{p.device} ({p.description})" for p in list_ports.comports()]
+        return "; ".join(ports) or "no COM ports; check cables and Device Manager"
     by_id = Path("/dev/serial/by-id")
     links = sorted(by_id.iterdir()) if by_id.is_dir() else []
     return "; ".join(f"{p} -> {p.resolve().name}" for p in links) or "no USB serial devices; check cables and dmesg"
@@ -68,7 +76,7 @@ def main() -> None:
     if mode == "record":
         arms.append(("leader", rig["leader"], "teleoperators", "so101_leader"))
     for name, arm, kind, sub in arms:
-        results.append(report(Path(arm["port"]).exists(), f"{name} port {arm['port']}", serial_ids()))
+        results.append(report(device_present(arm["port"]), f"{name} port {arm['port']}", serial_ids()))
         calib = f"{kind}/{sub}/{arm['id']}.json"
         results.append(report((CALIB_DIR / calib).is_file(), f"calibration {calib}", "see lab/README.md"))
 
@@ -87,7 +95,11 @@ def main() -> None:
     except OSError:
         results.append(report(False, f"policy server {host}:{sport}", "start lab/bin/server on the laptop"))
 
-    if shutil.which("chronyc"):
+    if host in ("0.0.0.0", "127.0.0.1", "localhost"):
+        print("  skip  clock sync (server and client on this machine)")
+    elif os.name == "nt":
+        print("  skip  clock sync check (no chrony on Windows; RTT is valid without it)")
+    elif shutil.which("chronyc"):
         out = subprocess.run(["chronyc", "tracking"], capture_output=True, text=True).stdout
         field = {k.strip(): v.strip() for k, _, v in (l.partition(":") for l in out.splitlines())}
         ref = field.get("Reference ID", "")
