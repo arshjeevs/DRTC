@@ -23,14 +23,16 @@ leader:
   id: leader                  # calibration/teleoperators/so101_leader/leader.json
 
 # Order is fixed: datasets and trained models depend on camera1/camera2 identity.
+# Before 2026-11-11 both were scene cameras (Zebronics + phone); data and models from then
+# do not match the current wrist/scene layout.
 cameras:
   width: 800
   height: 600
   fps: 30
-  camera1:                    # Zebronics Zeb Live Pro
+  camera1:                    # Zebronics Zeb Live Pro -- WRIST camera (since 2026-11-11)
     path: /dev/v4l/by-id/usb-*ZEB_LIVE_PRO*-video-index0
     fourcc: MJPG
-  camera2:                    # Android phone (DroidCam over USB -> v4l2loopback)
+  camera2:                    # Android phone (DroidCam over USB -> v4l2loopback) -- SCENE camera (since 2026-11-11)
     path: /dev/video10
 
 phonecam:
