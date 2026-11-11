@@ -133,6 +133,20 @@ smolvla_train_5_train_6_lora:
     batch_size: 64
     lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
 
+smolvla_train_new_1_lora:
+  policy_type: smolvla
+  pretrained_name_or_path: orangemoon599/smolvla_train_new_1_lora
+  finetune: lora
+  fps: 30
+  task: Pick the green cube and place it in the box
+  rtc_enabled: true
+  train:
+    dataset: orangemoon599/train_new_1
+    from: lerobot/smolvla_base
+    steps: 20000
+    batch_size: 64
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
+
 # Template for our own models:
 # smolvla_cube_v1:
 #   policy_type: smolvla
