@@ -21,7 +21,7 @@ from lab.tools.config import REPO_ROOT
 
 STEP = re.compile(r"^INFO (\S+ \S+) .*?step:(\S+) .*?epch:(\S+) loss:(\S+) .*?updt_s:(\S+) data_s:(\S+)")
 VAL = re.compile(r"step:(\S+) val_loss:(\S+)")
-CONFIG = {key: re.compile(rf"'{key}': ([^,}}]+)") for key in ("batch_size", "num_workers", "steps")}
+CONFIG = {key: re.compile(rf"'{key}': ([^,}}]+)") for key in ("batch_size", "num_workers", "steps", "log_freq")}
 POLICY_TYPE = re.compile(r"'type': '([^']+)'")
 
 
@@ -73,15 +73,21 @@ def main() -> None:
     if len(rows) < 2:
         sys.exit("Fewer than two step lines yet; wait for the run to log more.")
 
+    print(f"{len(rows)} step lines, step ~{rows[0][1]:.0f} to ~{rows[-1][1]:.0f}, epoch {rows[0][2]:.1f} to {rows[-1][2]:.1f}"
+          + ("  (resumed run: this log covers only part of the training)" if rows[0][1] > 2000 else ""))
     rows = rows[1:] if len(rows) > 3 else rows  # the first interval includes start-up and warm-up
     update = statistics.median(r[4] for r in rows)
     data = statistics.median(r[5] for r in rows)
-    (t0, s0, *_), (t1, s1, *_) = rows[0], rows[-1]
-    wall = (t1 - t0).total_seconds() / (s1 - s0) if s1 > s0 else update + data
+    s1 = rows[-1][1]
+    # Consecutive step lines are exactly log_freq steps apart; the printed step counts are rounded
+    # (20.6K and 21.4K both print as 21K), so time per step comes from the gaps between lines.
+    log_freq = number(config["log_freq"]) if config["log_freq"] != "?" else 200
+    gaps = [(b[0] - a[0]).total_seconds() / log_freq for a, b in zip(rows, rows[1:])]
+    wall = statistics.median(gaps) if gaps else update + data
     share = data / (update + data) if update + data else 0
     print(f"\nper step (median): GPU work {update:.3f} s + data loading {data:.3f} s = {update + data:.3f} s "
           f"(data loading {share:.0%})")
-    print(f"measured from timestamps: {wall:.3f} s/step"
+    print(f"measured from timestamps: {wall:.3f} s/step (median over {len(gaps)} intervals of {log_freq:.0f} steps)"
           + (f"  ({wall - update - data:+.3f} s of other overhead per step)" if wall > 1.15 * (update + data) else ""))
     if config["steps"] != "?":
         total = number(config["steps"])
