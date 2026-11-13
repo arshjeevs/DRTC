@@ -1,5 +1,7 @@
 # Sourced by lab/bin scripts: repo root, venv python, PYTHONPATH for `lab.tools`.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# H200 server only: paths and credentials written by lab/bin/h200-setup (absent elsewhere).
+[ -f "$REPO_ROOT/.server.env" ] && . "$REPO_ROOT/.server.env"
 BASE_PY="$REPO_ROOT/.venv/bin/python"
 # LAB_VENV forces a venv; otherwise use_model_venv picks one per model (pi0 / pi05 -> .venv-pi).
 PY="${LAB_VENV:+$LAB_VENV/bin/python}"

@@ -179,4 +179,6 @@ outputs/
 *.xml
 *.part
 results/
-archived_results/
+archived_results/.server.env
+.secrets.env
+.tools/

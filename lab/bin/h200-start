@@ -1,0 +1,51 @@
+#!/bin/bash
+# H200 GPU server only (host gpuh200): start the DRTC container the way the server guide prescribes
+# ("Tensorflow & PyTorch in H200 GPU Server", PyTorch steps 2-5). See lab/H200.md.
+#
+#   tmux new -s drtc_lab            # keeps the container alive after you log out
+#   ~/drtc_lab/lab/bin/h200-start   # then, inside the container: lab/bin/h200-setup (once), jupyter-notebook
+#
+# Guide command, unchanged except --shm-size (data-loading workers need shared memory) and --name
+# (to find our container):
+#   docker run -it --rm --gpus device=<ID from nvidia-smi -L> -v /home/<user>:/workspace -p <port>:8888 \
+#       nvcr.io/nvidia/pytorch:26.02-py3
+# DRTC_GPU=<MIG or GPU id> and DRTC_PORT=<port> override the automatic choices.
+set -e
+[ "$(hostname)" = gpuh200 ] || { echo "h200-start is only for the H200 server (gpuh200)."; exit 1; }
+IMAGE=nvcr.io/nvidia/pytorch:26.02-py3
+NAME=drtc_lab
+
+if docker ps --format '{{.Names}}' | grep -qx "$NAME"; then
+    echo "Container $NAME is already running. Attach to its tmux window, or: docker exec -it $NAME bash"
+    exit 0
+fi
+
+# Guide step 2: GPU usage.
+echo "== nvidia-smi"
+nvidia-smi --query-gpu=index,name,utilization.gpu,memory.used,memory.total --format=csv
+nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader | sed 's/^/  process /'
+
+# Guide step 3: the device id. With MIG slices, pick a free one (low memory use) and pass it explicitly.
+echo "== nvidia-smi -L"
+nvidia-smi -L
+if [ -z "$DRTC_GPU" ]; then
+    if nvidia-smi -L | grep -q "MIG-"; then
+        echo "MIG slices exist: choose a free one (see nvidia-smi) and run: DRTC_GPU=MIG-... $0"
+        exit 1
+    fi
+    DRTC_GPU="$(nvidia-smi -L | grep -oE 'GPU-[0-9a-f-]+' | head -1)"   # MIG off: the whole GPU
+fi
+
+# Guide step 4: the image must already be on the server.
+docker image inspect "$IMAGE" >/dev/null 2>&1 || { echo "Image $IMAGE missing: docker pull $IMAGE (guide step 4)"; exit 1; }
+
+# Guide step 5: a free host port for Jupyter (container port 8888).
+if [ -z "$DRTC_PORT" ]; then
+    for p in $(seq 8890 8899); do ss -tln | grep -q ":$p " || { DRTC_PORT=$p; break; }; done
+fi
+[ -n "$DRTC_PORT" ] || { echo "No free port in 8890-8899; set DRTC_PORT"; exit 1; }
+
+echo "== starting $NAME on $DRTC_GPU, Jupyter at http://$(hostname -I | awk '{print $1}'):$DRTC_PORT"
+echo "   inside: cd /workspace/drtc_lab && lab/bin/h200-setup (first time), then jupyter-notebook"
+exec docker run -it --rm --name "$NAME" --gpus device="$DRTC_GPU" --shm-size=16g \
+    -v "$HOME":/workspace -p "$DRTC_PORT":8888 "$IMAGE"

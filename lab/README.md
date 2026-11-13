@@ -20,7 +20,7 @@ Config precedence: `_defaults.yaml` < `rig.yaml` < `models.yaml[model]` < experi
 
 Research plan: [PROPOSAL.md](PROPOSAL.md).
 
-On Windows, see [WINDOWS.md](WINDOWS.md): same tools, run as `python -m lab.tools.<cmd>`, with `lab/rig.windows.yaml` selected by `LAB_RIG`.
+H200 GPU server: [H200.md](H200.md). On Windows, see [WINDOWS.md](WINDOWS.md): same tools, run as `python -m lab.tools.<cmd>`, with `lab/rig.windows.yaml` selected by `LAB_RIG`.
 
 ## Commands
 
