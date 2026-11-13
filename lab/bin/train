@@ -5,6 +5,17 @@
 source "$(dirname "$0")/_env"
 # pi0 / pi05 entries run in .venv-pi (created on first use); --dry-run only reads the config.
 case " $* " in *" --dry-run "*) ;; *) use_model_venv "$1" ;; esac
+# Shared multi-GPU server: train on the least busy GPU (utilisation over ~3 s, then memory in use).
+# Set CUDA_VISIBLE_DEVICES yourself to choose; single-GPU machines are left alone.
+if [ -z "$CUDA_VISIBLE_DEVICES" ] && command -v nvidia-smi >/dev/null && [ "$(nvidia-smi -L 2>/dev/null | wc -l)" -gt 1 ]; then
+    CUDA_VISIBLE_DEVICES="$(for _ in 1 2 3; do
+            nvidia-smi --query-gpu=index,utilization.gpu,memory.used --format=csv,noheader,nounits; sleep 1
+        done | awk -F', *' '{util[$1] += $2; mem[$1] = $3} END {for (g in util) print g, util[g], mem[g]}' \
+        | sort -k2,2n -k3,3n | head -1 | cut -d' ' -f1)"
+    export CUDA_VISIBLE_DEVICES
+    echo "GPU $CUDA_VISIBLE_DEVICES (least busy; set CUDA_VISIBLE_DEVICES=<n> to choose)"
+    nvidia-smi --query-gpu=index,name,utilization.gpu,memory.used,memory.total --format=csv,noheader | sed 's/^/  /'
+fi
 mkdir -p logs
 log="logs/train_${1:-none}_$(date +%Y%m%d-%H%M%S).log"
 case " $* " in *" --dry-run "*) exec "$PY" -m lab.tools.train "$@" ;; esac
