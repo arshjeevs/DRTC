@@ -1,7 +1,8 @@
 # Sourced by lab/bin scripts: repo root, venv python, PYTHONPATH for `lab.tools`.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-PY="$REPO_ROOT/.venv/bin/python"
+# LAB_VENV picks another venv, e.g. .venv-pi for pi0 / pi05 (they need a patched transformers).
+PY="${LAB_VENV:-$REPO_ROOT/.venv}/bin/python"
 export PYTHONPATH="$REPO_ROOT${PYTHONPATH:+:$PYTHONPATH}"
 cd "$REPO_ROOT"
-[ -x "$PY" ] || { echo "Missing .venv in $REPO_ROOT (see lab/README.md)"; exit 1; }
+[ -x "$PY" ] || { echo "Missing venv: $PY (see lab/README.md)"; exit 1; }
 rig() { "$PY" -m lab.tools.config get "$1"; }

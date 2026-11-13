@@ -105,6 +105,17 @@ lab/bin/train smolvla_test_run_1                            # full run, pushes t
 - Any `lerobot-train` flag passes through and overrides the generated one.
 - Flags a model always needs go in its entry: `train.flags: {policy.dtype: bfloat16}`. Command-line flags still override them.
 
+### pi0 and pi05: separate venv
+
+pi0 and pi05 need a patched `transformers` build that conflicts with the one SmolVLA and X-VLA use ("An incorrect transformer version is used"). Give them their own venv, once, and select it with `LAB_VENV`:
+
+```bash
+uv venv --python 3.12 .venv-pi
+uv pip install --python .venv-pi/bin/python --torch-backend cu128 -e ".[pi,async]" "peft>=0.13.0,<1.0.0"
+LAB_VENV=$PWD/.venv-pi lab/bin/train pi05_train_new_1_lora
+```
+Use the `--torch-backend` that matches the machine (`cu128` on the GPU server, `cu126` on the laptop). To serve these models, start the server the same way: `LAB_VENV=$PWD/.venv-pi lab/bin/server`.
+
 ### Full fine-tuning or LoRA
 
 The entry's `finetune:` picks the method. The client sends the same field to the policy server, which loads the model accordingly, so nothing else changes between the two.
