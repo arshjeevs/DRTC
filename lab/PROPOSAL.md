@@ -92,7 +92,7 @@ All RQ3 models use the same recipe within a study (same steps, batch size and Lo
 
 ### 7.1 Dataset
 
-- **New dataset** `orangemoon599/so101_cubebox_v1` (being recorded; see the naming convention below): one task, "Pick the green cube and place it in the box", current camera layout (wrist + scene), 30 fps.
+- **New dataset** `orangemoon599/so101_cubebox_v1` (being recorded; see the naming convention below): one task, "Pick up the green cube and put it inside the box.", current camera layout (wrist + scene), 30 fps.
 - **Split:** episodes `0-44` for training, the remaining episodes held out for offline evaluation. Set once in `lab/models.yaml` (`_study.train_episodes`).
 - **Camera-ablated copies:** `lab/bin/ablate-cameras orangemoon599/so101_cubebox_v1` creates `_wrist` and `_scene` on the Hub.
 

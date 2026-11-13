@@ -289,8 +289,10 @@ _study:
   # lab/bin/ablate-cameras orangemoon599/so101_cubebox_v1  creates these two single-camera copies
   wrist_only: &study_ds_wrist orangemoon599/so101_cubebox_v1_wrist   # camera1 (Zebronics, wrist) only
   scene_only: &study_ds_scene orangemoon599/so101_cubebox_v1_scene   # camera2 (phone, scene) only
-  task: &study_task Pick the green cube and place it in the box
+  # Must be the dataset's exact sentence (meta/tasks.parquet): the robot sends this one at run time.
+  task: &study_task Pick up the green cube and put it inside the box.
   # Training episodes; the rest are held out for offline evaluation. "0-44" = 45 train / 5 held out of 50.
+  # Set this once recording is complete (ep10 / ep25 entries need at least 10 / 25 training episodes).
   train_episodes: &study_train "0-44"
   pi_cameras: &pi_rename {observation.images.camera2: observation.images.base_0_rgb, observation.images.camera1: observation.images.right_wrist_0_rgb}
   xvla_cameras: &xvla_rename {observation.images.camera2: observation.images.image, observation.images.camera1: observation.images.image2}
