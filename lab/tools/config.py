@@ -29,6 +29,8 @@ RESULTS_DIR = REPO_ROOT / "results"
 
 # Policies whose server-side inference accepts RTC inpainting kwargs (flow matching).
 RTC_POLICIES = {"smolvla", "pi0", "pi05"}
+# Policies whose dependencies conflict with the main .venv run from .venv-<name> (lab/bin/venv <name>).
+POLICY_VENVS = {"pi0": "pi", "pi05": "pi"}
 
 
 def load_yaml(path: Path) -> dict[str, Any]:
@@ -153,6 +155,12 @@ def compose(experiment_path: Path, model_override: str | None = None) -> dict[st
     return merged
 
 
+def venv_for(model_name: str) -> str:
+    """Side venv a registry model needs ('' = the main .venv)."""
+    entry = load_models().get(model_name)
+    return POLICY_VENVS.get(entry["policy_type"], "") if entry else ""
+
+
 def print_registry() -> None:
     print("models (lab/models.yaml):")
     for name, m in load_models().items():
@@ -168,7 +176,9 @@ def print_registry() -> None:
 if __name__ == "__main__":
     if len(sys.argv) == 3 and sys.argv[1] == "get":
         print(rig_get(sys.argv[2]))
+    elif len(sys.argv) == 3 and sys.argv[1] == "venv":
+        print(venv_for(sys.argv[2]))
     elif len(sys.argv) == 2 and sys.argv[1] == "list":
         print_registry()
     else:
-        sys.exit("usage: python -m lab.tools.config get <dotted.key> | list")
+        sys.exit("usage: python -m lab.tools.config get <dotted.key> | venv <model> | list")

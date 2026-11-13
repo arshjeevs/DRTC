@@ -1,0 +1,16 @@
+#!/bin/bash
+# Create or update a side venv for policies whose dependencies conflict with the main .venv:
+#   lab/bin/venv pi       .venv-pi for pi0 / pi05 (patched transformers build)
+# lab/bin/train and lab/bin/server <model> call this on first use. The PyTorch CUDA build is
+# detected from the GPU driver; override with TORCH_BACKEND=cu128 (or cu126, cpu, ...).
+source "$(dirname "$0")/_env"
+set -e
+case "$1" in
+    pi) extras=".[pi,async]" ;;
+    *)  echo "usage: lab/bin/venv pi"; exit 1 ;;
+esac
+dir="$REPO_ROOT/.venv-$1"
+echo "Setting up $dir with $extras (first install takes several minutes)"
+[ -x "$dir/bin/python" ] || uv venv --python 3.12 "$dir"
+uv pip install --python "$dir/bin/python" --torch-backend "${TORCH_BACKEND:-auto}" -e "$extras" "peft>=0.13.0,<1.0.0"
+"$dir/bin/python" -c "import torch; print('torch', torch.__version__, '| CUDA available:', torch.cuda.is_available())"

@@ -105,16 +105,19 @@ lab/bin/train smolvla_test_run_1                            # full run, pushes t
 - Any `lerobot-train` flag passes through and overrides the generated one.
 - Flags a model always needs go in its entry: `train.flags: {policy.dtype: bfloat16}`. Command-line flags still override them.
 
-### pi0 and pi05: separate venv
+### pi0 and pi05: separate venv (automatic)
 
-pi0 and pi05 need a patched `transformers` build that conflicts with the one SmolVLA and X-VLA use ("An incorrect transformer version is used"). Give them their own venv, once, and select it with `LAB_VENV`:
+pi0 and pi05 need a patched `transformers` build that conflicts with the one SmolVLA and X-VLA use. They run from a second venv, `.venv-pi`, and the tools choose it for you from the model's `policy_type`:
 
 ```bash
-uv venv --python 3.12 .venv-pi
-uv pip install --python .venv-pi/bin/python --torch-backend cu128 -e ".[pi,async]" "peft>=0.13.0,<1.0.0"
-LAB_VENV=$PWD/.venv-pi lab/bin/train pi05_train_new_1_lora
+lab/bin/train pi05_train_new_1_lora      # uses .venv-pi; creates it on first use (several minutes)
+lab/bin/server pi05_train_new_1_lora     # serve pi0 / pi05 models (any pi0 / pi05 entry name works)
+lab/bin/server                           # serve smolvla / act models from the main .venv
 ```
-Use the `--torch-backend` that matches the machine (`cu128` on the GPU server, `cu126` on the laptop). To serve these models, start the server the same way: `LAB_VENV=$PWD/.venv-pi lab/bin/server`.
+- `lab/bin/venv pi` creates or updates `.venv-pi` by hand. The CUDA build of PyTorch is detected from the GPU driver; override with `TORCH_BACKEND=cu128`.
+- One server process serves one venv's policies. If a run asks a main-venv server for a pi0/pi05 model, the server error says to restart it with the model's name.
+- `LAB_VENV=<path>` still forces a specific venv for any command.
+- Which policies need which venv: `POLICY_VENVS` in `lab/tools/config.py`.
 
 ### Full fine-tuning or LoRA
 

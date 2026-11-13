@@ -323,7 +323,15 @@ class PolicyServerDrtc(services_pb2_grpc.AsyncInferenceServicer):
 
         t_load_start = time.perf_counter()
         # "lora": base model from the adapter's base_model_name_or_path, then the adapter
-        self.policy = load_policy(policy_class, policy_specs.pretrained_name_or_path, policy_specs.finetune)
+        try:
+            self.policy = load_policy(policy_class, policy_specs.pretrained_name_or_path, policy_specs.finetune)
+        except ValueError as e:
+            if "incorrect transformer version" not in str(e):
+                raise
+            raise ValueError(
+                f"{policy_specs.policy_type} needs its own venv (patched transformers). Restart the server "
+                f"with the model's name, e.g. `lab/bin/server <{policy_specs.policy_type} model from models.yaml>`."
+            ) from e
         t_load_done = time.perf_counter()
         self.logger.info(
             f"Loaded {policy_specs.policy_type} ({policy_specs.finetune}) "

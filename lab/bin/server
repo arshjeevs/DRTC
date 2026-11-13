@@ -1,7 +1,10 @@
 #!/bin/bash
 # Start the DRTC policy server on the laptop GPU (logs in logs/). Models are chosen per run by the Pi.
+#   lab/bin/server              main .venv: smolvla, act, ...
+#   lab/bin/server <model>      the venv that model needs, e.g. lab/bin/server pi05_train_new_1_lora
 source "$(dirname "$0")/_env"
 set -e
+if [ -n "$1" ] && [ "${1#-}" = "$1" ]; then use_model_venv "$1"; shift; fi
 
 "$PY" -c "import torch, sys; sys.exit(not torch.cuda.is_available())" || { echo "CUDA unavailable"; exit 1; }
 for ac in /sys/class/power_supply/{AC,ADP}*/online; do

@@ -1,8 +1,21 @@
 # Sourced by lab/bin scripts: repo root, venv python, PYTHONPATH for `lab.tools`.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-# LAB_VENV picks another venv, e.g. .venv-pi for pi0 / pi05 (they need a patched transformers).
-PY="${LAB_VENV:-$REPO_ROOT/.venv}/bin/python"
+BASE_PY="$REPO_ROOT/.venv/bin/python"
+# LAB_VENV forces a venv; otherwise use_model_venv picks one per model (pi0 / pi05 -> .venv-pi).
+PY="${LAB_VENV:+$LAB_VENV/bin/python}"
+PY="${PY:-$BASE_PY}"
 export PYTHONPATH="$REPO_ROOT${PYTHONPATH:+:$PYTHONPATH}"
 cd "$REPO_ROOT"
 [ -x "$PY" ] || { echo "Missing venv: $PY (see lab/README.md)"; exit 1; }
 rig() { "$PY" -m lab.tools.config get "$1"; }
+
+# use_model_venv <model>: switch PY to the venv that model's policy needs, creating it on first use.
+use_model_venv() {
+    [ -n "$LAB_VENV" ] && return
+    local name
+    name="$("$BASE_PY" -m lab.tools.config venv "$1" 2>/dev/null)" || return
+    [ -z "$name" ] && return
+    [ -x "$REPO_ROOT/.venv-$name/bin/python" ] || "$REPO_ROOT/lab/bin/venv" "$name" || exit 1
+    PY="$REPO_ROOT/.venv-$name/bin/python"
+    echo "venv: .venv-$name (needed by $1)"
+}
