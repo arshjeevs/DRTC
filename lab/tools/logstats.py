@@ -6,7 +6,7 @@ updt_s = forward + backward + optimizer (GPU work), data_s = waiting for the nex
 augmentation, loading). Both are averages over the steps since the previous line.
 
 Usage:
-    python -m lab.tools.logstats <model name | log file>      (model: latest logs/train_<model>_*.log)
+    python -m lab.tools.logstats <model name | log file name | path>   (model: its latest log in logs/)
 """
 
 from __future__ import annotations
@@ -32,13 +32,23 @@ def number(text: str) -> float:
 
 
 def find_log(arg: str) -> Path:
-    path = Path(arg)
-    if path.is_file():
-        return path
-    logs = sorted((REPO_ROOT / "logs").glob(f"train_{arg}_*.log"))
+    """A log path, a file name in logs/, or a model name (its latest log; train_ prefix optional)."""
+    logs_dir = REPO_ROOT / "logs"
+    for path in (Path(arg), logs_dir / arg):
+        if path.is_file():
+            return path
+    model = arg.removesuffix(".log").removeprefix("train_")
+    # The date-time suffix keeps smolvla_x_full from also matching smolvla_x_full_short.
+    exact = re.compile(rf"^train_{re.escape(model)}_\d{{8}}-\d{{6}}\.log$")
+    logs = sorted((p for p in logs_dir.glob("train_*.log") if exact.match(p.name)), key=lambda p: p.name[-19:])
     if not logs:
-        sys.exit(f"No log file {arg!r} and no logs/train_{arg}_*.log")
-    return logs[-1]
+        sys.exit(f"No log {arg!r}: not a file, not in logs/, and no logs/train_{model}_<date-time>.log")
+    # Skip restarts that crashed before training: use the latest log with at least two step lines.
+    trained = [p for p in logs if sum(1 for line in p.read_text(errors="ignore").splitlines() if STEP.match(line)) >= 2]
+    if trained and trained[-1] != logs[-1]:
+        print(f"({len(logs) - 1 - logs.index(trained[-1])} newer log(s) of {model} have no training steps; "
+              f"using the latest one that does)")
+    return (trained or logs)[-1]
 
 
 def fmt_hours(seconds: float) -> str:
