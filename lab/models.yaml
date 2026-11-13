@@ -252,6 +252,22 @@ xvla_train_new_1_lora:
     flags: {policy.dtype: bfloat16, policy.action_mode: auto, rename_map: {observation.images.camera2: observation.images.image, observation.images.camera1: observation.images.image2}}
     lora: {r: 32, alpha: 64, dropout: 0.05, targets: vlm+expert}
 
+# ACT: small (~50M), trained from scratch (ImageNet ResNet18 backbone). No language input, no RTC.
+# Small enough for CPU inference on the Pi: the candidate edge-fallback policy.
+act_train_new_1_full:
+  policy_type: act
+  pretrained_name_or_path: orangemoon599/act_train_new_1_full
+  finetune: full
+  fps: 30
+  task: Pick the green cube and place it in the box
+  rtc_enabled: false
+  num_flow_matching_steps: null
+  train:
+    dataset: orangemoon599/train_new_1
+    steps: 40000
+    batch_size: 64
+    save_freq: 10000
+
 # Template for our own models:
 # smolvla_cube_v1:
 #   policy_type: smolvla
