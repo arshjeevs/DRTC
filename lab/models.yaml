@@ -298,6 +298,10 @@ _study:
   # the other 100 train. `episodes: N` in an entry trains on a random N of those 100 (nested subsets).
   # lab/bin/train refuses to start until the dataset has all 110 episodes.
   split: &study_split {total: 110, held_out: 10, seed: 0}
+  # Training length in epochs (passes over the training frames), so data subsets keep the same
+  # repetition: SmolVLA 25 (LeRobot's 20k x 64 recipe is ~45 for 100 episodes; 25 fits ~8 h at the
+  # measured 2.9 s/step), pi0 / pi05 / X-VLA 10 (large pretrained models; community LoRA runs ~5-35),
+  # ACT 100 (trained from scratch). lab/bin/train converts to steps.
   pi_cameras: &pi_rename {observation.images.camera2: observation.images.base_0_rgb, observation.images.camera1: observation.images.right_wrist_0_rgb}
   xvla_cameras: &xvla_rename {observation.images.camera2: observation.images.image, observation.images.camera1: observation.images.image2}
 
@@ -313,7 +317,7 @@ smolvla_cubebox_v1_full:
     dataset: *study_ds
     split: *study_split
     from: lerobot/smolvla_base
-    steps: 20000
+    epochs: 25
     batch_size: 64
 
 smolvla_cubebox_v1_lora:
@@ -327,11 +331,11 @@ smolvla_cubebox_v1_lora:
     dataset: *study_ds
     split: *study_split
     from: lerobot/smolvla_base
-    steps: 20000
+    epochs: 25
     batch_size: 64
     lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
 
-# --- Data efficiency (item 15): same recipe and steps, random 10 / 25 / 50 of the 100 training episodes ---
+# --- Data efficiency (item 15): same recipe and epochs, random 10 / 25 / 50 of the 100 training episodes ---
 smolvla_cubebox_v1_lora_ep10:
   policy_type: smolvla
   pretrained_name_or_path: orangemoon599/smolvla_cubebox_v1_lora_ep10
@@ -344,7 +348,7 @@ smolvla_cubebox_v1_lora_ep10:
     split: *study_split
     episodes: 10
     from: lerobot/smolvla_base
-    steps: 20000
+    epochs: 25
     batch_size: 64
     lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
 
@@ -360,7 +364,7 @@ smolvla_cubebox_v1_lora_ep25:
     split: *study_split
     episodes: 25
     from: lerobot/smolvla_base
-    steps: 20000
+    epochs: 25
     batch_size: 64
     lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
 
@@ -376,7 +380,7 @@ smolvla_cubebox_v1_lora_ep50:
     split: *study_split
     episodes: 50
     from: lerobot/smolvla_base
-    steps: 20000
+    epochs: 25
     batch_size: 64
     lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
 
@@ -392,7 +396,7 @@ smolvla_cubebox_v1_lora_scene:
     dataset: *study_ds_scene
     split: *study_split
     from: lerobot/smolvla_base
-    steps: 20000
+    epochs: 25
     batch_size: 64
     lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
 
@@ -405,7 +409,7 @@ act_cubebox_v1_full:
   task: *study_task
   rtc_enabled: false
   num_flow_matching_steps: null
-  train: {dataset: *study_ds, split: *study_split, steps: 40000, batch_size: 64, save_freq: 10000}
+  train: {dataset: *study_ds, split: *study_split, epochs: 100, batch_size: 64, save_freq: 10000}
 
 xvla_cubebox_v1_lora:
   policy_type: xvla
@@ -419,7 +423,7 @@ xvla_cubebox_v1_lora:
     dataset: *study_ds
     split: *study_split
     from: lerobot/xvla-base
-    steps: 20000
+    epochs: 10
     batch_size: 32
     flags: {policy.dtype: bfloat16, policy.action_mode: auto, rename_map: *xvla_rename}
     lora: {r: 32, alpha: 64, dropout: 0.05, targets: vlm+expert}
@@ -435,7 +439,7 @@ pi0_cubebox_v1_lora:           # H200 / A100; served from a server GPU (too big 
     dataset: *study_ds
     split: *study_split
     from: lerobot/pi0_base@26b99b9439acb1e352439e34ee9c67af0d76efa3
-    steps: 6000
+    epochs: 10
     batch_size: 32
     save_freq: 2000
     flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true, rename_map: *pi_rename}
@@ -452,7 +456,7 @@ pi05_cubebox_v1_lora:          # H200 / A100; served from a server GPU (too big 
     dataset: *study_ds
     split: *study_split
     from: lerobot/pi05_base@a538eb273274eb30f126a118f39dbc0ee212c883
-    steps: 6000
+    epochs: 10
     batch_size: 32
     save_freq: 2000
     flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true, rename_map: *pi_rename}

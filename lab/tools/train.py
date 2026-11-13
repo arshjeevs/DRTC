@@ -279,6 +279,8 @@ def main() -> None:
                                         train["epochs"], int(flags["--batch_size"]))
         flags["--steps"] = steps
         print(f"epochs: {train['epochs']} x {frames} frames / batch {flags['--batch_size']} = {steps} steps", flush=True)
+        if "--val_episodes" in flags and "--val_freq" not in overrides:
+            flags["--val_freq"] = max(50, steps // 20)  # ~20 validation points however long the run is
 
     cmd = ["lerobot-train", *(f"{key}={value}" for key, value in flags.items())]
     print(" \\\n    ".join(shlex.quote(part) for part in cmd), flush=True)
