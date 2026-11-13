@@ -299,9 +299,9 @@ _study:
   # lab/bin/train refuses to start until the dataset has all 110 episodes.
   split: &study_split {total: 110, held_out: 10, seed: 0}
   # Training length in epochs (passes over the training frames), so data subsets keep the same
-  # repetition: SmolVLA 25 (LeRobot's 20k x 64 recipe is ~45 for 100 episodes; 25 fits ~8 h at the
-  # measured 2.9 s/step), pi0 / pi05 / X-VLA 10 (large pretrained models; community LoRA runs ~5-35),
-  # ACT 100 (trained from scratch). lab/bin/train converts to steps.
+  # repetition: SmolVLA 45 (= LeRobot's official 20k steps x batch 64 for 100 episodes),
+  # pi0 / pi05 / X-VLA 10 (large pretrained models; community LoRA runs ~5-35), ACT 100 (trained
+  # from scratch). lab/bin/train converts to steps.
   pi_cameras: &pi_rename {observation.images.camera2: observation.images.base_0_rgb, observation.images.camera1: observation.images.right_wrist_0_rgb}
   xvla_cameras: &xvla_rename {observation.images.camera2: observation.images.image, observation.images.camera1: observation.images.image2}
 
@@ -317,7 +317,7 @@ smolvla_cubebox_v1_full:
     dataset: *study_ds
     split: *study_split
     from: lerobot/smolvla_base
-    epochs: 25
+    epochs: 45
     batch_size: 64
 
 smolvla_cubebox_v1_lora:
@@ -331,7 +331,7 @@ smolvla_cubebox_v1_lora:
     dataset: *study_ds
     split: *study_split
     from: lerobot/smolvla_base
-    epochs: 25
+    epochs: 45
     batch_size: 64
     lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
 
@@ -348,7 +348,7 @@ smolvla_cubebox_v1_lora_ep10:
     split: *study_split
     episodes: 10
     from: lerobot/smolvla_base
-    epochs: 25
+    epochs: 45
     batch_size: 64
     lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
 
@@ -364,7 +364,7 @@ smolvla_cubebox_v1_lora_ep25:
     split: *study_split
     episodes: 25
     from: lerobot/smolvla_base
-    epochs: 25
+    epochs: 45
     batch_size: 64
     lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
 
@@ -380,7 +380,7 @@ smolvla_cubebox_v1_lora_ep50:
     split: *study_split
     episodes: 50
     from: lerobot/smolvla_base
-    epochs: 25
+    epochs: 45
     batch_size: 64
     lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
 
@@ -396,7 +396,7 @@ smolvla_cubebox_v1_lora_scene:
     dataset: *study_ds_scene
     split: *study_split
     from: lerobot/smolvla_base
-    epochs: 25
+    epochs: 45
     batch_size: 64
     lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
 

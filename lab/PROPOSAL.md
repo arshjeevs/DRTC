@@ -86,7 +86,7 @@ Items are numbered as in the planning discussion.
 | 13 | **Model comparison** | `smolvla_cubebox_v1_lora`, `act_cubebox_v1_full`, `xvla_cubebox_v1_lora`, `pi0_cubebox_v1_lora`, `pi05_cubebox_v1_lora` |
 | 12 | **Action filtering** | Existing Butterworth filter settings, 2–3 configurations on one model |
 
-All RQ3 models use the same recipe within a study (same epochs, batch size and LoRA settings) so only the studied factor changes. Training length is set in epochs (passes over the training frames), so the data-efficiency runs keep the same repetition per demonstration: SmolVLA 25 epochs (LeRobot's 20k-step x batch-64 recipe is about 45 epochs for 100 episodes; 25 fits an ~8 h budget at the measured 2.9 s/step), π0 / π0.5 / X-VLA 10 epochs (large pretrained models; community LoRA fine-tunes use roughly 5-35), ACT 100 epochs (trained from scratch). Validation curves show whether these are too short or too long.
+All RQ3 models use the same recipe within a study (same epochs, batch size and LoRA settings) so only the studied factor changes. Training length is set in epochs (passes over the training frames), so the data-efficiency runs keep the same repetition per demonstration: SmolVLA 45 epochs (matches LeRobot's official 20k-step x batch-64 recipe for 100 episodes), π0 / π0.5 / X-VLA 10 epochs (large pretrained models; community LoRA fine-tunes use roughly 5-35), ACT 100 epochs (trained from scratch). Validation curves show whether these are too short or too long.
 
 ## 7. Experimental design
 
