@@ -1,0 +1,5 @@
+#!/bin/bash
+# Summarise a training log: time per step (GPU vs data loading), bottleneck, run length, loss trends.
+#   lab/bin/logstats <model name | log file>      (model: latest logs/train_<model>_*.log)
+source "$(dirname "$0")/_env"
+exec "$PY" -m lab.tools.logstats "$@"
