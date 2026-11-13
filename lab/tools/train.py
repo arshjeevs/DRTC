@@ -78,6 +78,17 @@ def push_checkpoint(out: Path, name: str, target: str) -> None:
     print("done", flush=True)
 
 
+def parse_episodes(spec) -> list[int]:
+    """[0, 1, 5], "0-44" or "0-9,20-29" -> episode indices."""
+    if isinstance(spec, list):
+        return [int(i) for i in spec]
+    episodes = []
+    for part in str(spec).replace(" ", "").split(","):
+        first, _, last = part.partition("-")
+        episodes += range(int(first), int(last or first) + 1)
+    return episodes
+
+
 def flag_value(value):
     """YAML value -> lerobot-train flag text (true/false; dicts such as rename_map as JSON)."""
     if isinstance(value, bool):
@@ -174,6 +185,8 @@ def main() -> None:
             **WANDB,
             # LeRobot picks torchcodec whenever it is installed, but it cannot load with FFmpeg 8.
             "--dataset.video_backend": "pyav",
+            # Train on these episodes only (held-out split, data-efficiency subsets).
+            **({"--dataset.episodes": json.dumps(parse_episodes(train["episodes"]))} if "episodes" in train else {}),
             # Model-specific lerobot-train flags from the entry, e.g. {policy.dtype: bfloat16}
             **{f"--{key}": flag_value(value) for key, value in train.get("flags", {}).items()},
         }

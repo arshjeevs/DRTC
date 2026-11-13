@@ -1,0 +1,16 @@
+#!/bin/bash
+# Camera-ablation copies of a dataset, pushed to the Hub (the original is not modified):
+#   lab/bin/ablate-cameras <hf_user>/<dataset>
+#     <dataset>_wrist   camera1 (wrist) only
+#     <dataset>_scene   camera2 (scene) only
+source "$(dirname "$0")/_env"
+set -e
+repo="$1"
+[ -n "$repo" ] || { echo "usage: lab/bin/ablate-cameras <hf_user>/<dataset>"; exit 1; }
+make_copy() {  # make_copy <suffix> <camera to remove>
+    echo "== ${repo}_$1 (removing $2)"
+    "$PY" -m lerobot.scripts.lerobot_edit_dataset --repo_id "$repo" --new_repo_id "${repo}_$1" \
+        --operation.type remove_feature --operation.feature_names "['observation.images.$2']" --push_to_hub true
+}
+make_copy wrist camera2
+make_copy scene camera1

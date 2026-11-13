@@ -120,7 +120,8 @@ def experiment_id(path: Path) -> str:
 
 
 def load_models() -> dict[str, dict[str, Any]]:
-    return load_yaml(MODELS_PATH)
+    """Registry entries; top-level keys starting with "_" hold shared YAML anchors, not models."""
+    return {k: v for k, v in load_yaml(MODELS_PATH).items() if not k.startswith("_")}
 
 
 def compose(experiment_path: Path, model_override: str | None = None) -> dict[str, Any]:

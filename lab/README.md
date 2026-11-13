@@ -18,6 +18,8 @@ results/                     (gitignored)
 
 Config precedence: `_defaults.yaml` < `rig.yaml` < `models.yaml[model]` < experiment file.
 
+Research plan: [PROPOSAL.md](PROPOSAL.md).
+
 On Windows, see [WINDOWS.md](WINDOWS.md): same tools, run as `python -m lab.tools.<cmd>`, with `lab/rig.windows.yaml` selected by `LAB_RIG`.
 
 ## Commands
@@ -103,6 +105,7 @@ lab/bin/train smolvla_test_run_1                            # full run, pushes t
 - Stopped early on purpose (Ctrl+C) and want to use what you have? `lab/bin/train <model> --push` uploads the latest checkpoint (or `--push 005000` for a specific one) to the model's Hub id. Training more later with `--resume` and pushing again replaces it.
 - Out of GPU memory? Add `--batch_size=4`.
 - Any `lerobot-train` flag passes through and overrides the generated one.
+- `train.episodes: "0-44"` trains on those episodes only (held-out split, data-efficiency subsets). `lab/bin/ablate-cameras <dataset>` makes single-camera copies for camera ablations.
 - Flags a model always needs go in its entry: `train.flags: {policy.dtype: bfloat16}`. Command-line flags still override them.
 
 ### pi0 and pi05: separate venv (automatic)
