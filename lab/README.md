@@ -101,11 +101,12 @@ lab/bin/train smolvla_test_run_1                            # full run, pushes t
 - Checkpoints go to `outputs/train/<model>/checkpoints/` every `save_freq` steps, and logs to `logs/train_<model>_*.log`.
 - Interrupted? Run `lab/bin/train <model> --resume`.
 - Finished, and want more steps? `--resume` only runs up to the run's saved target, so raise it: `lab/bin/train <model> --resume --steps=30000`. The learning-rate schedule is rebuilt for the new total, so the LR rises again partway through the cosine curve.
-- Every run logs to wandb (project `drtc-smolvla`; checkpoints are not uploaded to wandb). Log in once with `.venv/bin/wandb login`, or pass `--wandb.enable=false`.
+- Every run logs to wandb (project `drtc`; checkpoints are not uploaded to wandb). Log in once with `.venv/bin/wandb login`, or pass `--wandb.enable=false`.
 - Stopped early on purpose (Ctrl+C) and want to use what you have? `lab/bin/train <model> --push` uploads the latest checkpoint (or `--push 005000` for a specific one) to the model's Hub id. Training more later with `--resume` and pushing again replaces it.
 - Out of GPU memory? Add `--batch_size=4`.
 - Any `lerobot-train` flag passes through and overrides the generated one.
-- `train.episodes: "0-44"` trains on those episodes only (held-out split, data-efficiency subsets). `lab/bin/ablate-cameras <dataset>` makes single-camera copies for camera ablations.
+- `train.split: {total, held_out, seed}` holds out random episodes (same for every model) and trains on the rest; `episodes: N` then trains on a random N of them (nested subsets). The held-out episodes are the validation set: `eval/val_loss` is logged to wandb every 1,000 steps and `eval/val_action_mse` after the last step. Training refuses to start until the dataset has `total` episodes. Without `split`, `train.episodes: "0-44"` picks explicit episodes. `lab/bin/ablate-cameras <dataset> [scene] [wrist]` makes single-camera copies for camera ablations.
+- wandb project: `drtc`. For ACT, compare `eval/val_loss` with `train/l1_loss` (its training `loss` also contains the KL term).
 - Flags a model always needs go in its entry: `train.flags: {policy.dtype: bfloat16}`. Command-line flags still override them.
 
 ### pi0 and pi05: separate venv (automatic)

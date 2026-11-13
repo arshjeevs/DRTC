@@ -146,7 +146,8 @@ class ACTPolicy(PreTrainedPolicy):
         ).mean()
 
         loss_dict = {"l1_loss": l1_loss.item()}
-        if self.config.use_vae:
+        # In eval mode (validation) the VAE encoder is skipped and there is no latent: L1 loss only.
+        if self.config.use_vae and mu_hat is not None:
             # Calculate Dₖₗ(latent_pdf || standard_normal). Note: After computing the KL-divergence for
             # each dimension independently, we sum over the latent dimension to get the total
             # KL-divergence per batch element, then take the mean over the batch.

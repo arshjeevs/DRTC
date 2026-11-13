@@ -81,8 +81,8 @@ Items are numbered as in the planning discussion.
 | # | Study | Models (`lab/models.yaml`) |
 |---|---|---|
 | 14 | **Full vs. LoRA fine-tuning** | `smolvla_cubebox_v1_full`, `smolvla_cubebox_v1_lora` |
-| 15 | **Data efficiency** (10 / 25 / 45 episodes) | `smolvla_cubebox_v1_lora_ep10`, `_ep25`, `smolvla_cubebox_v1_lora` |
-| 16 | **Camera ablation** (wrist / scene / both) | `smolvla_cubebox_v1_lora_wrist`, `_scene`, `smolvla_cubebox_v1_lora` |
+| 15 | **Data efficiency** (10 / 25 / 50 / 100 episodes) | `smolvla_cubebox_v1_lora_ep10`, `_ep25`, `_ep50`, `smolvla_cubebox_v1_lora` |
+| 16 | **Camera ablation** (scene only / both) | `smolvla_cubebox_v1_lora_scene`, `smolvla_cubebox_v1_lora` |
 | 13 | **Model comparison** | `smolvla_cubebox_v1_lora`, `act_cubebox_v1_full`, `xvla_cubebox_v1_lora`, `pi05_cubebox_v1_lora` |
 | 12 | **Action filtering** | Existing Butterworth filter settings, 2–3 configurations on one model |
 
@@ -93,8 +93,9 @@ All RQ3 models use the same recipe within a study (same steps, batch size and Lo
 ### 7.1 Dataset
 
 - **New dataset** `orangemoon599/so101_cubebox_v1` (being recorded; see the naming convention below): one task, "Pick up the green cube and put it inside the box.", current camera layout (wrist + scene), 30 fps.
-- **Split:** episodes `0-44` for training, the remaining episodes held out for offline evaluation. Set once in `lab/models.yaml` (`_study.train_episodes`).
-- **Camera-ablated copies:** `lab/bin/ablate-cameras orangemoon599/so101_cubebox_v1` creates `_wrist` and `_scene` on the Hub.
+- **Size and split:** 110 episodes. 10 picked at random (fixed seed) are held out as the validation set; the other 100 train. Data-efficiency subsets are random 10 / 25 / 50 of those 100, nested inside each other. Set once in `lab/models.yaml` (`_study.split`); `lab/bin/train` refuses to start until the dataset has all 110 episodes. Random selection spreads drift during recording (operator getting faster, lighting, cube-placement habits) evenly over the sets.
+- **Shuffling:** training batches are random frames from all training episodes, reshuffled every epoch (LeRobot default).
+- **Camera-ablated copy:** `lab/bin/ablate-cameras orangemoon599/so101_cubebox_v1 scene` creates `so101_cubebox_v1_scene` (scene camera only) on the Hub. A wrist-only model is not part of the study: with this way of collecting data, the wrist view alone is not expected to be informative enough.
 
 ### 7.2 Naming convention
 
@@ -102,7 +103,7 @@ All new datasets and models live under the `orangemoon599` Hub account. Older da
 
 | What | Pattern | Example |
 |---|---|---|
-| Dataset | `so101_<task>_v<N>[_<variant>]`; bump `vN` when the setup changes | `so101_cubebox_v1`, `so101_cubebox_v1_wrist` |
+| Dataset | `so101_<task>_v<N>[_<variant>]`; bump `vN` when the setup changes | `so101_cubebox_v1`, `so101_cubebox_v1_scene` |
 | Model (registry entry) | `<policy>_<task>_v<N>_<full\|lora>[_<variant>]` | `smolvla_cubebox_v1_lora_ep10` |
 | Model (Hub repo) | `orangemoon599/<registry entry>`; one entry, one repo | `orangemoon599/smolvla_cubebox_v1_lora` |
 | Results | `results/<experiment>/<registry entry>/` | `results/replication/baseline/smolvla_cubebox_v1_lora/` |
@@ -111,7 +112,7 @@ Model variants: `ep10` (episode subset), `wrist` / `scene` (camera), `r16` (LoRA
 
 ### 7.3 Evaluation
 
-**Offline (no robot):** action-prediction error of each model on the held-out episodes. Cheap, runs on the GPU servers, ranks all models before robot time is spent. **[to build]**
+**Validation (no robot):** during training, the loss on fixed batches from the held-out episodes is logged to wandb (project `drtc`) as `eval/val_loss` every 1,000 steps, next to the training loss; it shows overfitting and lets runs be compared. After the last step, the error of the predicted action chunks on the held-out episodes is logged as `eval/val_action_mse`, which ranks all models before robot time is spent. Validation measures how closely a model imitates unseen demonstrations, not task success, so it complements robot trials rather than replacing them.
 
 **On the robot:**
 - **Success definition** (fixed before trials): the cube ends inside the box and the gripper is open, within the trial duration.
@@ -150,7 +151,7 @@ Model variants: `ep10` (episode subset), `wrist` / `scene` (camera), `r16` (LoRA
 | `smolvla_cubebox_v1_lora` | 13, 14, 15, 16 | A100 | Shared reference model |
 | `smolvla_cubebox_v1_lora_ep10` | 15 | A100 | |
 | `smolvla_cubebox_v1_lora_ep25` | 15 | A100 | |
-| `smolvla_cubebox_v1_lora_wrist` | 16 | H200 | Needs `_wrist` dataset first |
+| `smolvla_cubebox_v1_lora_ep50` | 15 | A100 | |
 | `smolvla_cubebox_v1_lora_scene` | 16 | H200 | Needs `_scene` dataset first |
 | `act_cubebox_v1_full` | 13, fallback (1) | A100 | |
 | `xvla_cubebox_v1_lora` | 13 | H200 | Server cannot serve X-VLA yet **[to build]** |
@@ -190,9 +191,9 @@ Nothing shown in the minor is repeated; its results become the baselines of the 
 
 ### Next (minor)
 - [ ] Record `orangemoon599/so101_cubebox_v1`
-- [ ] `lab/bin/ablate-cameras orangemoon599/so101_cubebox_v1`
+- [ ] `lab/bin/ablate-cameras orangemoon599/so101_cubebox_v1 scene`
 - [ ] Launch training runs on H200 / A100
-- [ ] Offline evaluation script (held-out action error) **[to build]**
+- [x] Validation on held-out episodes, logged to wandb
 - [ ] Inference benchmark script (items 8, 18) **[to build]**
 - [ ] Robot trials: replication + full vs. LoRA (+ filtering)
 - [ ] Results analysis script (success table with confidence intervals, latency / stall figures) **[to build]**
@@ -226,4 +227,3 @@ Nothing shown in the minor is repeated; its results become the baselines of the 
 - **[open]** Whether the minor includes early results of 13, 15 and 16, or keeps them for the major.
 - **[open]** Robot client for the minor: laptop or Pi.
 - **[open]** Whether the robot can reach the A100 / H200 (needed for π0.5 robot trials).
-- **[open]** Number of held-out episodes (default: 5 of 50).

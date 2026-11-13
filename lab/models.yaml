@@ -22,7 +22,9 @@
 #     from         checkpoint to fine-tune (e.g. lerobot/smolvla_base); omit to train policy_type from scratch
 #     steps, batch_size, save_freq
 #     flags        extra lerobot-train flags for this model, e.g. {policy.dtype: bfloat16}
-#     episodes     (optional) train on these episodes only: "0-44", "0-9,20-29" or [0, 1, 2]
+#     split        (optional) {total, held_out, seed}: seeded random held-out episodes, used for validation
+#     episodes     with split: a number N (random N of the training episodes); without: explicit
+#                  episodes "0-44", "0-9,20-29" or [0, 1, 2]
 #     lora         (finetune: lora) r (32), alpha (32), dropout (0.05), targets: expert (default) | vlm+expert
 #                  (presets exist for smolvla, pi0, pi05, xvla)
 
@@ -281,23 +283,23 @@ act_train_new_1_full:
     save_freq: 10000
 
 # ===================================================================================================
-# Study on so101_cubebox_v1 (lab/PROPOSAL.md). Dataset, task and held-out split are set ONCE here;
-# every entry below refers to them.
+# Study on so101_cubebox_v1 (lab/PROPOSAL.md). Dataset, task and split are set ONCE here; every entry
+# below refers to them.
 # ===================================================================================================
 _study:
   dataset: &study_ds orangemoon599/so101_cubebox_v1
-  # lab/bin/ablate-cameras orangemoon599/so101_cubebox_v1  creates these two single-camera copies
-  wrist_only: &study_ds_wrist orangemoon599/so101_cubebox_v1_wrist   # camera1 (Zebronics, wrist) only
+  # lab/bin/ablate-cameras orangemoon599/so101_cubebox_v1 scene  creates this single-camera copy
   scene_only: &study_ds_scene orangemoon599/so101_cubebox_v1_scene   # camera2 (phone, scene) only
   # Must be the dataset's exact sentence (meta/tasks.parquet): the robot sends this one at run time.
   task: &study_task Pick up the green cube and put it inside the box.
-  # Training episodes; the rest are held out for offline evaluation. "0-44" = 45 train / 5 held out of 50.
-  # Set this once recording is complete (ep10 / ep25 entries need at least 10 / 25 training episodes).
-  train_episodes: &study_train "0-44"
+  # 110 episodes: 10 picked at random (seed 0) are held out for validation (eval/val_loss in wandb),
+  # the other 100 train. `episodes: N` in an entry trains on a random N of those 100 (nested subsets).
+  # lab/bin/train refuses to start until the dataset has all 110 episodes.
+  split: &study_split {total: 110, held_out: 10, seed: 0}
   pi_cameras: &pi_rename {observation.images.camera2: observation.images.base_0_rgb, observation.images.camera1: observation.images.right_wrist_0_rgb}
   xvla_cameras: &xvla_rename {observation.images.camera2: observation.images.image, observation.images.camera1: observation.images.image2}
 
-# --- SmolVLA: full vs LoRA (item 14) ---
+# --- SmolVLA: full vs LoRA (item 14); smolvla_cubebox_v1_lora is the reference for every study ---
 smolvla_cubebox_v1_full:
   policy_type: smolvla
   pretrained_name_or_path: orangemoon599/smolvla_cubebox_v1_full
@@ -305,7 +307,12 @@ smolvla_cubebox_v1_full:
   fps: 30
   task: *study_task
   rtc_enabled: true
-  train: {dataset: *study_ds, episodes: *study_train, from: lerobot/smolvla_base, steps: 20000, batch_size: 64}
+  train:
+    dataset: *study_ds
+    split: *study_split
+    from: lerobot/smolvla_base
+    steps: 20000
+    batch_size: 64
 
 smolvla_cubebox_v1_lora:
   policy_type: smolvla
@@ -315,10 +322,14 @@ smolvla_cubebox_v1_lora:
   task: *study_task
   rtc_enabled: true
   train:
-    {dataset: *study_ds, episodes: *study_train, from: lerobot/smolvla_base, steps: 20000, batch_size: 64,
-     lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}}
+    dataset: *study_ds
+    split: *study_split
+    from: lerobot/smolvla_base
+    steps: 20000
+    batch_size: 64
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
 
-# --- Data efficiency (item 15): same recipe as smolvla_cubebox_v1_lora, fewer episodes, same steps ---
+# --- Data efficiency (item 15): same recipe and steps, random 10 / 25 / 50 of the 100 training episodes ---
 smolvla_cubebox_v1_lora_ep10:
   policy_type: smolvla
   pretrained_name_or_path: orangemoon599/smolvla_cubebox_v1_lora_ep10
@@ -327,8 +338,13 @@ smolvla_cubebox_v1_lora_ep10:
   task: *study_task
   rtc_enabled: true
   train:
-    {dataset: *study_ds, episodes: "0-9", from: lerobot/smolvla_base, steps: 20000, batch_size: 64,
-     lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}}
+    dataset: *study_ds
+    split: *study_split
+    episodes: 10
+    from: lerobot/smolvla_base
+    steps: 20000
+    batch_size: 64
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
 
 smolvla_cubebox_v1_lora_ep25:
   policy_type: smolvla
@@ -338,21 +354,31 @@ smolvla_cubebox_v1_lora_ep25:
   task: *study_task
   rtc_enabled: true
   train:
-    {dataset: *study_ds, episodes: "0-24", from: lerobot/smolvla_base, steps: 20000, batch_size: 64,
-     lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}}
+    dataset: *study_ds
+    split: *study_split
+    episodes: 25
+    from: lerobot/smolvla_base
+    steps: 20000
+    batch_size: 64
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
 
-# --- Camera ablation (item 16): same recipe, one camera removed from the data ---
-smolvla_cubebox_v1_lora_wrist:
+smolvla_cubebox_v1_lora_ep50:
   policy_type: smolvla
-  pretrained_name_or_path: orangemoon599/smolvla_cubebox_v1_lora_wrist
+  pretrained_name_or_path: orangemoon599/smolvla_cubebox_v1_lora_ep50
   finetune: lora
   fps: 30
   task: *study_task
   rtc_enabled: true
   train:
-    {dataset: *study_ds_wrist, episodes: *study_train, from: lerobot/smolvla_base, steps: 20000, batch_size: 64,
-     lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}}
+    dataset: *study_ds
+    split: *study_split
+    episodes: 50
+    from: lerobot/smolvla_base
+    steps: 20000
+    batch_size: 64
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
 
+# --- Camera ablation (item 16): same recipe, scene camera only (vs both in smolvla_cubebox_v1_lora) ---
 smolvla_cubebox_v1_lora_scene:
   policy_type: smolvla
   pretrained_name_or_path: orangemoon599/smolvla_cubebox_v1_lora_scene
@@ -361,8 +387,12 @@ smolvla_cubebox_v1_lora_scene:
   task: *study_task
   rtc_enabled: true
   train:
-    {dataset: *study_ds_scene, episodes: *study_train, from: lerobot/smolvla_base, steps: 20000, batch_size: 64,
-     lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}}
+    dataset: *study_ds_scene
+    split: *study_split
+    from: lerobot/smolvla_base
+    steps: 20000
+    batch_size: 64
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
 
 # --- Model comparison (item 13) ---
 act_cubebox_v1_full:
@@ -373,7 +403,7 @@ act_cubebox_v1_full:
   task: *study_task
   rtc_enabled: false
   num_flow_matching_steps: null
-  train: {dataset: *study_ds, episodes: *study_train, steps: 40000, batch_size: 64, save_freq: 10000}
+  train: {dataset: *study_ds, split: *study_split, steps: 40000, batch_size: 64, save_freq: 10000}
 
 xvla_cubebox_v1_lora:
   policy_type: xvla
@@ -385,7 +415,7 @@ xvla_cubebox_v1_lora:
   num_flow_matching_steps: null
   train:
     dataset: *study_ds
-    episodes: *study_train
+    split: *study_split
     from: lerobot/xvla-base
     steps: 20000
     batch_size: 32
@@ -401,7 +431,7 @@ pi05_cubebox_v1_lora:          # H200 / A100; served from a server GPU (too big 
   rtc_enabled: true
   train:
     dataset: *study_ds
-    episodes: *study_train
+    split: *study_split
     from: lerobot/pi05_base
     steps: 6000
     batch_size: 32

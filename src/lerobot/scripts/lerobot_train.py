@@ -16,6 +16,7 @@
 import logging
 import time
 from contextlib import nullcontext
+from copy import deepcopy
 from pprint import pformat
 from typing import Any
 
@@ -38,6 +39,7 @@ from lerobot.rl.wandb_utils import WandBLogger
 from lerobot.scripts.lerobot_eval import eval_policy_all
 from lerobot.utils.import_utils import register_third_party_plugins
 from lerobot.utils.logging_utils import AverageMeter, MetricsTracker
+from lerobot.utils.constants import ACTION
 from lerobot.utils.random_utils import set_seed
 from lerobot.utils.train_utils import (
     get_step_checkpoint_dir,
@@ -145,6 +147,53 @@ def update_policy(
     train_metrics.lr = optimizer.param_groups[0]["lr"]
     train_metrics.update_s = time.perf_counter() - start_time
     return train_metrics, output_dict
+
+
+def make_val_loader(cfg: TrainPipelineConfig, device: torch.device) -> torch.utils.data.DataLoader:
+    """Fixed batches from the held-out episodes, without training-time image augmentation."""
+    val_cfg = deepcopy(cfg)
+    val_cfg.dataset.episodes = cfg.val_episodes
+    val_cfg.dataset.image_transforms.enable = False
+    val_dataset = make_dataset(val_cfg)
+    num_frames = min(len(val_dataset), cfg.val_batches * cfg.batch_size)
+    indices = torch.randperm(len(val_dataset), generator=torch.Generator().manual_seed(0))[:num_frames]
+    logging.info(f"Validation: {num_frames} frames from held-out episodes {cfg.val_episodes}")
+    return torch.utils.data.DataLoader(
+        torch.utils.data.Subset(val_dataset, indices.tolist()),
+        batch_size=cfg.batch_size,
+        shuffle=False,
+        num_workers=cfg.num_workers,
+        pin_memory=device.type == "cuda",
+    )
+
+
+def validate(
+    policy: PreTrainedPolicy, val_loader, preprocessor, accelerator: Accelerator, actions: bool = False
+) -> dict[str, float]:
+    """Mean loss on the held-out batches (and, with `actions`, the error of predicted action chunks in
+    normalized units). The same frames and noise are used every call; training's RNG is untouched."""
+    device = accelerator.device
+    policy.eval()
+    losses, action_errors = [], []
+    with torch.random.fork_rng(devices=[device] if device.type == "cuda" else []), torch.no_grad():
+        torch.manual_seed(0)
+        for batch in val_loader:
+            batch = preprocessor(batch)
+            with accelerator.autocast():
+                loss, _ = policy.forward(batch)
+                losses.append(loss.item())
+                if actions:
+                    policy.reset()
+                    predicted = policy.predict_action_chunk(batch)
+                    horizon = min(predicted.shape[1], batch[ACTION].shape[1])
+                    error = (predicted[:, :horizon].float() - batch[ACTION][:, :horizon].float()) ** 2
+                    valid = ~batch["action_is_pad"][:, :horizon].unsqueeze(-1)
+                    action_errors.append(((error * valid).sum() / (valid.sum() * error.shape[-1])).item())
+    policy.train()
+    metrics = {"val_loss": sum(losses) / len(losses)}
+    if action_errors:
+        metrics["val_action_mse"] = sum(action_errors) / len(action_errors)
+    return metrics
 
 
 @parser.wrap()
@@ -354,6 +403,7 @@ def train(cfg: TrainPipelineConfig, accelerator: Accelerator | None = None):
         policy, optimizer, dataloader, lr_scheduler
     )
     dl_iter = cycle(dataloader)
+    val_loader = make_val_loader(cfg, device) if cfg.val_episodes and is_main_process else None
 
     policy.train()
 
@@ -445,6 +495,17 @@ def train(cfg: TrainPipelineConfig, accelerator: Accelerator | None = None):
 
             accelerator.wait_for_everyone()
 
+        if val_loader is not None and (step % cfg.val_freq == 0 or step == cfg.steps):
+            try:
+                val_metrics = validate(accelerator.unwrap_model(policy), val_loader, preprocessor, accelerator)
+            except Exception as e:  # noqa: BLE001  a validation bug must not end the training run
+                logging.warning(f"Validation failed, turning it off for this run: {e!r}")
+                val_loader = None
+            else:
+                logging.info(f"step:{format_big_number(step)} val_loss:{val_metrics['val_loss']:.4f}")
+                if wandb_logger:
+                    wandb_logger.log_dict(val_metrics, step, mode="eval")
+
         if cfg.env and is_eval_step:
             if is_main_process:
                 step_id = get_step_identifier(step, cfg.steps)
@@ -496,6 +557,15 @@ def train(cfg: TrainPipelineConfig, accelerator: Accelerator | None = None):
 
     if eval_env:
         close_envs(eval_env)
+
+    if val_loader is not None:
+        try:
+            final = validate(accelerator.unwrap_model(policy), val_loader, preprocessor, accelerator, actions=True)
+            logging.info(f"Held-out action MSE (normalized): {final['val_action_mse']:.4f}")
+            if wandb_logger:
+                wandb_logger.log_dict({"val_action_mse": final["val_action_mse"]}, step, mode="eval")
+        except Exception as e:  # noqa: BLE001  never lose a finished run to the final metric
+            logging.warning(f"Held-out action error skipped: {e!r}")
 
     if is_main_process:
         logging.info("End of training")

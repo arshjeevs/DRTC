@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import random
 import re
 import shlex
 import sys
@@ -40,7 +41,7 @@ from lerobot.policies import lora
 TRAIN_DIR = REPO_ROOT / "outputs/train"
 HUB_ID = re.compile(r"^[\w.-]+/[\w.-]+$")
 # Every run (new or resumed) logs to wandb; checkpoints stay local and go to the Hub, not to wandb.
-WANDB = {"--wandb.enable": "true", "--wandb.project": "drtc-smolvla", "--wandb.disable_artifact": "true"}
+WANDB = {"--wandb.enable": "true", "--wandb.project": "drtc", "--wandb.disable_artifact": "true"}
 
 
 def check_local_dataset(repo_id: str) -> None:
@@ -87,6 +88,42 @@ def parse_episodes(spec) -> list[int]:
         first, _, last = part.partition("-")
         episodes += range(int(first), int(last or first) + 1)
     return episodes
+
+
+def split_episodes(split: dict, count: int | None) -> tuple[list[int], list[int]]:
+    """Seeded random split -> (training episodes, held-out episodes).
+
+    `count` takes the first `count` of one fixed shuffle of the training episodes, so subsets are
+    nested (10 within 25 within 50) and every model sees the same held-out episodes.
+    """
+    order = random.Random(split["seed"]).sample(range(split["total"]), split["total"])
+    held_out, pool = order[:split["held_out"]], order[split["held_out"]:]
+    if count is not None and count > len(pool):
+        sys.exit(f"episodes: {count} > the {len(pool)} training episodes of the split")
+    return sorted(pool[:count] if count is not None else pool), sorted(held_out)
+
+
+def select_episodes(train: dict) -> tuple[list[int] | None, list[int] | None]:
+    """(training episodes, held-out episodes) from an entry's train: block; None = not set."""
+    if "split" in train:
+        count = train.get("episodes")
+        if count is not None and not isinstance(count, int):
+            sys.exit("with split:, episodes must be a number of episodes (a random subset of the training ones)")
+        return split_episodes(train["split"], count)
+    if "episodes" in train:
+        return parse_episodes(train["episodes"]), None
+    return None, None
+
+
+def check_episode_count(repo_id: str, root: str | None, split: dict) -> None:
+    """Refuse to train on a dataset that does not have every episode the split expects (yet)."""
+    from lerobot.datasets.lerobot_dataset import LeRobotDatasetMetadata
+
+    found = LeRobotDatasetMetadata(repo_id, root=root).total_episodes
+    if found < split["total"]:
+        sys.exit(f"{repo_id} has {found} episodes; the split expects {split['total']}. Recording not finished?")
+    if found > split["total"]:
+        print(f"note: {repo_id} has {found} episodes; episodes {split['total']}-{found - 1} are not used", flush=True)
 
 
 def flag_value(value):
@@ -188,14 +225,20 @@ def main() -> None:
             **WANDB,
             # LeRobot picks torchcodec whenever it is installed, but it cannot load with FFmpeg 8.
             "--dataset.video_backend": "pyav",
-            # Train on these episodes only (held-out split, data-efficiency subsets).
-            **({"--dataset.episodes": json.dumps(parse_episodes(train["episodes"]))} if "episodes" in train else {}),
             # Model-specific lerobot-train flags from the entry, e.g. {policy.dtype: bfloat16}
             **{f"--{key}": flag_value(value) for key, value in train.get("flags", {}).items()},
         }
+        # Training episodes (held-out split, data-efficiency subsets) and the held-out ones for validation.
+        episodes, held_out = select_episodes(train)
+        if episodes is not None:
+            flags["--dataset.episodes"] = json.dumps(episodes)
+        if held_out:
+            flags["--val_episodes"] = json.dumps(held_out)
     flags.update(overrides)
     if not args.resume and "--dataset.root" not in flags:
         check_local_dataset(flags["--dataset.repo_id"])
+    if not args.resume and "split" in train:
+        check_episode_count(flags["--dataset.repo_id"], flags.get("--dataset.root"), train["split"])
 
     cmd = ["lerobot-train", *(f"{key}={value}" for key, value in flags.items())]
     print(" \\\n    ".join(shlex.quote(part) for part in cmd), flush=True)
@@ -209,6 +252,9 @@ def main() -> None:
     else:
         print("finetune: full", flush=True)
     print(f"push to Hub: {target}" if push else "push to Hub: no (local only)", flush=True)
+    if not args.resume and "--val_episodes" in flags:
+        print(f"episodes: {len(json.loads(flags['--dataset.episodes']))} for training, "
+              f"held out for validation: {flags['--val_episodes']}", flush=True)
     if args.dry_run:
         return
 

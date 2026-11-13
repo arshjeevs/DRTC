@@ -75,6 +75,13 @@ class TrainPipelineConfig(HubMixin):
 
     # Rename map for the observation to override the image and state keys
     rename_map: dict[str, str] = field(default_factory=dict)
+
+    # Validation on held-out episodes of the training dataset (excluded from `dataset.episodes`).
+    # Every `val_freq` steps the loss on the same `val_batches` batches is logged as eval/val_loss;
+    # after the last step, the error of predicted action chunks is logged as eval/val_action_mse.
+    val_episodes: list[int] | None = None
+    val_freq: int = 1_000
+    val_batches: int = 10
     checkpoint_path: Path | None = field(init=False, default=None)
 
     def validate(self) -> None:
