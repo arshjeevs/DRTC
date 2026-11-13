@@ -1,0 +1,6 @@
+#!/bin/bash
+# Score a trained registry model on held-out episodes (no robot) -> results/offline/<model>.json
+#   lab/bin/eval-offline <model> [--episodes "45-49"] [--batches 20] [--batch-size 16]
+source "$(dirname "$0")/_env"
+use_model_venv "$1"
+exec "$PY" -m lab.tools.eval_offline "$@"

@@ -31,6 +31,10 @@ On Windows, see [WINDOWS.md](WINDOWS.md): same tools, run as `python -m lab.tool
 | `lab/bin/run <group/name> [--model M] [--trials N] [--note TEXT] [--no-label]` | Pi | Run a condition. Prompts for scene reset before and success after each trial |
 | `lab/bin/train <model> [--dry-run] [--no-push] [--resume] [--push [ckpt]] [--<lerobot flag>=value ...]` | laptop | Train a `models.yaml` entry that has a `train:` block and push it to its Hub id. See [Training](#training) |
 | `lab/bin/list` | any | Registered models and experiments |
+| `lab/bin/bench <model> [--device cpu] [--dtype bf16] [--compile] [--steps 10 8 4 2]` | any | Inference speed and memory of a model on this machine -> `results/benchmark/<host>/` |
+| `lab/bin/analyze [--since DATE] [--model M ...] [--experiment E ...] [--timeline RUN_ID]` | any | Success rates with 95% CIs, stalls, latency, estimator error; figures and benchmark table -> `results/summary/` |
+| `lab/bin/eval-offline <model> [--episodes "45-49"]` | GPU | Score a trained model on held-out episodes (no robot) -> `results/offline/` |
+| `lab/bin/logstats <model or log>` | any | Training speed (GPU vs data loading), bottleneck, run length, loss / validation trends |
 | `lab/bin/record <user>/<dataset> --task "..." [options] [--<lerobot flag>=value ...]` | laptop | Record demos with the leader arm. Rerun viewer opens when a display exists. See [Recording flags](#recording-flags) |
 | `lab/bin/calibrate follower\|leader` | where the arms are | Calibrate an arm with `rig.yaml`'s port and id. Backs up the old file. See [Recalibrating](#recalibrating) |
 | `lab/bin/preflight [record]` | Pi / laptop | `run` (default): follower, cameras, server, clock. `record`: both arms, cameras |

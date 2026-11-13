@@ -1,0 +1,6 @@
+#!/bin/bash
+# Inference benchmark for a registry model on this machine (pi0 / pi05 run in their venv):
+#   lab/bin/bench <model> [--device cuda|cpu] [--dtype fp32|bf16] [--compile] [--steps 10 8 4 2] [--runs 30]
+source "$(dirname "$0")/_env"
+use_model_venv "$1"
+exec "$PY" -m lab.tools.bench "$@"

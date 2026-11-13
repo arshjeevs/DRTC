@@ -1,0 +1,5 @@
+#!/bin/bash
+# Tables and figures from robot trials and benchmarks -> results/summary/
+#   lab/bin/analyze [--since 2026-11-15] [--model M ...] [--experiment E ...] [--timeline RUN_ID]
+source "$(dirname "$0")/_env"
+exec "$PY" -m lab.tools.analyze "$@"
