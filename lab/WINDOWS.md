@@ -64,7 +64,7 @@ Every new PowerShell window: `cd $HOME\Projects\drtc` and `.venv\Scripts\activat
 
 ```powershell
 hf auth login       # Hugging Face token with WRITE access (datasets and models are pushed)
-wandb login         # training logs go to wandb project drtc-smolvla
+wandb login         # training logs go to wandb project drtc
 ```
 
 ## 4. Point the tools at the Windows rig
