@@ -120,6 +120,7 @@ lab/bin/train smolvla_test_run_1_lora --lora.r=16 --lora.targets=vlm+expert   # 
 lab/bin/train smolvla_test_run_1 --finetune lora --no-push --output_dir=outputs/train/try_lora  # one-off, local only
 ```
 - LoRA settings (`train.lora:` or `--lora.<key>=`): `r` (32), `alpha` (32), `dropout` (0.05), `targets`: `expert` (default) or `vlm+expert` (adapts the VLM's language layers too; more GPU memory, since backprop then runs through the VLM).
+- LoRA target presets exist for `smolvla`, `pi0`, `pi05` and `xvla` (`src/lerobot/policies/lora.py`). `expert` adapts the action expert / policy transformer; `vlm+expert` also adapts the language backbone, never the vision tower. Other policies need `--lora.targets=<module-name regex>`.
 - Give each method its own entry and Hub id (as `smolvla_test_run_1` / `smolvla_test_run_1_lora`), so you can run the same experiment on both. `--finetune` that disagrees with the entry is refused unless `--no-push`: the server would load the pushed model the wrong way.
 - `--resume` and `--push` detect a LoRA checkpoint by its `adapter_config.json`. Pushing one method removes the other's weights from the Hub repo.
 - Testing a local LoRA checkpoint: set `pretrained_name_or_path: outputs/train/<run>/checkpoints/last/pretrained_model` with `finetune: lora`.

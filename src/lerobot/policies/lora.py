@@ -32,6 +32,9 @@ FINETUNE_METHODS = ("full", "lora")
 # Where adapters go, per policy type. `targets` are named presets of LoRA module regexes (matched
 # against full module names with re.fullmatch); `trainable` are small modules trained in full.
 _SMOLVLA_LAYERS = r"(self_attn\.(q|k|v|o)_proj|mlp\.(gate|up|down)_proj)"
+_GEMMA_LAYERS = _SMOLVLA_LAYERS  # same layer names in Gemma (pi0 / pi05)
+_XVLA_BLOCK = r"(attn\.(qkv|proj)|mlp\.(fc1|fc2))"
+_BART_LAYERS = r"((self_attn|encoder_attn)\.(q|k|v|out)_proj|fc1|fc2)"
 PRESETS = {
     "smolvla": {
         "targets": {
@@ -41,6 +44,31 @@ PRESETS = {
             "vlm+expert": rf".*\.(lm_expert|text_model)\.layers\.\d+\.{_SMOLVLA_LAYERS}",
         },
         "trainable": r"model\.(state_proj|action_in_proj|action_out_proj|action_time_mlp_in|action_time_mlp_out)\..*",
+    },
+    "pi0": {
+        "targets": {
+            "expert": rf".*\.gemma_expert\..*layers\.\d+\.{_GEMMA_LAYERS}",
+            # PaliGemma's language model too (not its vision tower), as openpi's LoRA configs do.
+            "vlm+expert": rf".*\.(gemma_expert|paligemma)\.(?!.*vision).*layers\.\d+\.{_GEMMA_LAYERS}",
+        },
+        "trainable": r"model\.(state_proj|action_in_proj|action_out_proj|action_time_mlp_in|action_time_mlp_out)\..*",
+    },
+    "pi05": {
+        "targets": {
+            "expert": rf".*\.gemma_expert\..*layers\.\d+\.{_GEMMA_LAYERS}",
+            "vlm+expert": rf".*\.(gemma_expert|paligemma)\.(?!.*vision).*layers\.\d+\.{_GEMMA_LAYERS}",
+        },
+        "trainable": r"model\.(action_in_proj|action_out_proj|time_mlp_in|time_mlp_out)\..*",
+    },
+    "xvla": {
+        "targets": {
+            # The policy transformer; "expert" keeps one preset name across policies.
+            "expert": rf".*\.transformer\.blocks\.\d+\.{_XVLA_BLOCK}",
+            # Florence-2's language encoder/decoder too (not its vision tower).
+            "vlm+expert": rf".*\.(transformer\.blocks\.\d+\.{_XVLA_BLOCK}|vlm\.language_model\..*layers\.\d+\.{_BART_LAYERS})",
+        },
+        # Soft prompts, action encoder/decoder, input projections, position embedding, final norm.
+        "trainable": r"model\.transformer\.(?!blocks\.).*",
     },
 }
 DEFAULTS = {"r": 32, "alpha": 32, "dropout": 0.05, "targets": "expert"}

@@ -16,6 +16,7 @@
 #     steps, batch_size, save_freq
 #     flags        extra lerobot-train flags for this model, e.g. {policy.dtype: bfloat16}
 #     lora         (finetune: lora) r (32), alpha (32), dropout (0.05), targets: expert (default) | vlm+expert
+#                  (presets exist for smolvla, pi0, pi05, xvla)
 
 jack_smolvla_cube:
   policy_type: smolvla
@@ -196,6 +197,57 @@ xvla_train_new_1_full:
     steps: 20000
     batch_size: 16
     flags: {policy.dtype: bfloat16, policy.action_mode: auto}
+
+# LoRA versions. targets: vlm+expert also adapts the language backbone (the point of LoRA on these
+# models); use targets: expert, or a smaller batch_size, if the GPU runs out of memory.
+pi05_train_new_1_lora:
+  policy_type: pi05
+  pretrained_name_or_path: orangemoon599/pi05_train_new_1_lora
+  finetune: lora
+  fps: 30
+  task: Pick the green cube and place it in the box
+  rtc_enabled: true
+  train:
+    dataset: orangemoon599/train_new_1
+    from: lerobot/pi05_base
+    steps: 6000
+    batch_size: 16
+    save_freq: 2000
+    flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true}
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: vlm+expert}
+
+pi0_train_new_1_lora:
+  policy_type: pi0
+  pretrained_name_or_path: orangemoon599/pi0_train_new_1_lora
+  finetune: lora
+  fps: 30
+  task: Pick the green cube and place it in the box
+  rtc_enabled: true
+  train:
+    dataset: orangemoon599/train_new_1
+    from: lerobot/pi0_base
+    steps: 6000
+    batch_size: 16
+    save_freq: 2000
+    flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true}
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: vlm+expert}
+
+xvla_train_new_1_lora:
+  policy_type: xvla
+  pretrained_name_or_path: orangemoon599/xvla_train_new_1_lora
+  finetune: lora
+  fps: 30
+  task: Pick the green cube and place it in the box
+  rtc_enabled: false
+  num_flow_matching_steps: null
+  train:
+    dataset: orangemoon599/train_new_1
+    from: lerobot/xvla-base
+    steps: 20000
+    batch_size: 16
+    save_freq: 5000
+    flags: {policy.dtype: bfloat16, policy.action_mode: auto}
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: vlm+expert}
 
 # Template for our own models:
 # smolvla_cube_v1:
