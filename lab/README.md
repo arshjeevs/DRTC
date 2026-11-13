@@ -105,7 +105,7 @@ lab/bin/train smolvla_test_run_1                            # full run, pushes t
 - Checkpoints go to `outputs/train/<model>/checkpoints/` every `save_freq` steps, and logs to `logs/train_<model>_*.log`.
 - Interrupted? Run `lab/bin/train <model> --resume`.
 - Finished, and want more steps? `--resume` only runs up to the run's saved target, so raise it: `lab/bin/train <model> --resume --steps=30000`. The learning-rate schedule is rebuilt for the new total, so the LR rises again partway through the cosine curve.
-- Every run logs to wandb (project `drtc`; checkpoints are not uploaded to wandb). Log in once with `.venv/bin/wandb login`, or pass `--wandb.enable=false`.
+- New runs log to wandb (project `drtc`; a `--resume` keeps the run's original wandb project and run; checkpoints are not uploaded to wandb). Log in once with `.venv/bin/wandb login`, or pass `--wandb.enable=false`.
 - Stopped early on purpose (Ctrl+C) and want to use what you have? `lab/bin/train <model> --push` uploads the latest checkpoint (or `--push 005000` for a specific one) to the model's Hub id. Training more later with `--resume` and pushing again replaces it.
 - Out of GPU memory? Add `--batch_size=4`.
 - Shared multi-GPU server: `lab/bin/train` picks the least busy GPU (prints the choice); set `CUDA_VISIBLE_DEVICES=<n>` to choose yourself.

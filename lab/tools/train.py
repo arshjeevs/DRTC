@@ -42,7 +42,7 @@ from lerobot.policies import lora
 
 TRAIN_DIR = REPO_ROOT / "outputs/train"
 HUB_ID = re.compile(r"^[\w.-]+/[\w.-]+$")
-# Every run (new or resumed) logs to wandb; checkpoints stay local and go to the Hub, not to wandb.
+# New runs log to wandb (resumed runs keep their own settings); checkpoints go to the Hub, not to wandb.
 WANDB = {"--wandb.enable": "true", "--wandb.project": "drtc", "--wandb.disable_artifact": "true"}
 
 
@@ -236,7 +236,9 @@ def main() -> None:
             sys.exit(f"{args.model!r} already finished: checkpoint at step {done}, target {goal}.\n"
                      f"To train further, raise the target, e.g. lab/bin/train {args.model} --resume --steps={done + 10_000}")
         print(f"resuming at step {done}, training to {goal}", flush=True)
-        flags = {"--config_path": str(config), "--resume": "true", **WANDB}
+        # No wandb flags: the run continues with its saved wandb settings (project and run id), so a run
+        # started in another project resumes there, and one trained without wandb stays without it.
+        flags = {"--config_path": str(config), "--resume": "true"}
     else:
         if finetune == "lora" and "from" not in train:
             sys.exit(f"finetune: lora needs a base checkpoint: set train.from for {args.model!r}")
