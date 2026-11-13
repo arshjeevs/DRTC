@@ -149,6 +149,37 @@ def update_policy(
     return train_metrics, output_dict
 
 
+class Uint8Frames(torch.utils.data.Dataset):
+    """Hands camera frames to the training process as uint8 instead of float32.
+
+    Decoded video frames are uint8 values divided by 255, so `round(x * 255)` recovers them exactly and
+    `uint8 / 255` in the training loop restores the same float32 tensor. Batches wait in shared memory
+    between the data-loading workers and the training process; uint8 needs 4x less of it, so more
+    workers and parallel runs fit in a container's --shm-size.
+    """
+
+    def __init__(self, dataset, camera_keys: list[str]):
+        self.dataset, self.camera_keys = dataset, camera_keys
+
+    def __len__(self) -> int:
+        return len(self.dataset)
+
+    def __getitem__(self, idx) -> dict:
+        item = self.dataset[idx]
+        for key in self.camera_keys:
+            if key in item and item[key].is_floating_point():
+                item[key] = (item[key] * 255).round_().to(torch.uint8)
+        return item
+
+
+def frames_to_float(batch: dict, camera_keys: list[str]) -> dict:
+    """Undo Uint8Frames: uint8 camera frames back to float32 in [0, 1] (on whatever device they are)."""
+    for key in camera_keys:
+        if key in batch and batch[key].dtype == torch.uint8:
+            batch[key] = batch[key].float().div_(255)
+    return batch
+
+
 def make_val_loader(cfg: TrainPipelineConfig, device: torch.device) -> torch.utils.data.DataLoader:
     """Fixed batches from the held-out episodes, without training-time image augmentation."""
     val_cfg = deepcopy(cfg)
@@ -386,8 +417,10 @@ def train(cfg: TrainPipelineConfig, accelerator: Accelerator | None = None):
         shuffle = True
         sampler = None
 
+    # Exact round trip only without image augmentation (augmented frames are no longer k/255 values).
+    camera_keys = list(dataset.meta.camera_keys) if not cfg.dataset.image_transforms.enable else []
     dataloader = torch.utils.data.DataLoader(
-        dataset,
+        Uint8Frames(dataset, camera_keys) if camera_keys and cfg.num_workers > 0 else dataset,
         num_workers=cfg.num_workers,
         batch_size=cfg.batch_size,
         shuffle=shuffle and not cfg.dataset.streaming,
@@ -433,7 +466,7 @@ def train(cfg: TrainPipelineConfig, accelerator: Accelerator | None = None):
 
     for _ in range(step, cfg.steps):
         start_time = time.perf_counter()
-        batch = next(dl_iter)
+        batch = frames_to_float(next(dl_iter), camera_keys)
         batch = preprocessor(batch)
         train_tracker.dataloading_s = time.perf_counter() - start_time
 
