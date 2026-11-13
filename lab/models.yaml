@@ -149,6 +149,9 @@ smolvla_train_new_1_lora:
     batch_size: 64
     lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
 
+# The base models name their cameras differently, so rename_map maps ours onto theirs: the phone
+# (camera2, scene) to the main view and the Zebronics (camera1, wrist) to a wrist view. The unused
+# third view is masked out by the model.
 # Larger VLAs on the same data. Batch sizes assume a 24 GB+ GPU: lower batch_size if it runs out of memory.
 # pi0 / pi05 need the patched transformers build (pip extra "pi"), in a venv separate from SmolVLA's.
 pi05_train_new_1_full:
@@ -165,7 +168,7 @@ pi05_train_new_1_full:
     batch_size: 32
     save_freq: 2000
     # train_expert_only freezes the PaliGemma VLM (as SmolVLA does); set false to train everything (40 GB+).
-    flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true, policy.train_expert_only: true}
+    flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true, policy.train_expert_only: true, rename_map: {observation.images.camera2: observation.images.base_0_rgb, observation.images.camera1: observation.images.right_wrist_0_rgb}}
 
 pi0_train_new_1_full:
   policy_type: pi0
@@ -180,7 +183,7 @@ pi0_train_new_1_full:
     steps: 6000
     batch_size: 32
     save_freq: 2000
-    flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true, policy.train_expert_only: true}
+    flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true, policy.train_expert_only: true, rename_map: {observation.images.camera2: observation.images.base_0_rgb, observation.images.camera1: observation.images.right_wrist_0_rgb}}
 
 # X-VLA trains here, but the policy server does not serve it yet (not in SUPPORTED_POLICIES).
 xvla_train_new_1_full:
@@ -196,7 +199,7 @@ xvla_train_new_1_full:
     from: lerobot/xvla-base
     steps: 20000
     batch_size: 16
-    flags: {policy.dtype: bfloat16, policy.action_mode: auto}
+    flags: {policy.dtype: bfloat16, policy.action_mode: auto, rename_map: {observation.images.camera2: observation.images.image, observation.images.camera1: observation.images.image2}}
 
 # LoRA versions. targets: vlm+expert also adapts the language backbone (the point of LoRA on these
 # models); use targets: expert, or a smaller batch_size, if the GPU runs out of memory.
@@ -213,7 +216,7 @@ pi05_train_new_1_lora:
     steps: 6000
     batch_size: 16
     save_freq: 2000
-    flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true}
+    flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true, rename_map: {observation.images.camera2: observation.images.base_0_rgb, observation.images.camera1: observation.images.right_wrist_0_rgb}}
     lora: {r: 32, alpha: 64, dropout: 0.05, targets: vlm+expert}
 
 pi0_train_new_1_lora:
@@ -229,7 +232,7 @@ pi0_train_new_1_lora:
     steps: 6000
     batch_size: 16
     save_freq: 2000
-    flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true}
+    flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true, rename_map: {observation.images.camera2: observation.images.base_0_rgb, observation.images.camera1: observation.images.right_wrist_0_rgb}}
     lora: {r: 32, alpha: 64, dropout: 0.05, targets: vlm+expert}
 
 xvla_train_new_1_lora:
@@ -246,7 +249,7 @@ xvla_train_new_1_lora:
     steps: 20000
     batch_size: 16
     save_freq: 5000
-    flags: {policy.dtype: bfloat16, policy.action_mode: auto}
+    flags: {policy.dtype: bfloat16, policy.action_mode: auto, rename_map: {observation.images.camera2: observation.images.image, observation.images.camera1: observation.images.image2}}
     lora: {r: 32, alpha: 64, dropout: 0.05, targets: vlm+expert}
 
 # Template for our own models:

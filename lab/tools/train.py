@@ -78,6 +78,13 @@ def push_checkpoint(out: Path, name: str, target: str) -> None:
     print("done", flush=True)
 
 
+def flag_value(value):
+    """YAML value -> lerobot-train flag text (true/false; dicts such as rename_map as JSON)."""
+    if isinstance(value, bool):
+        return str(value).lower()
+    return json.dumps(value) if isinstance(value, dict) else value
+
+
 def lora_make_policy(make_policy, spec: dict):
     """Wrap lerobot-train's make_policy: base policy + adapters (or, on resume, the saved adapters)."""
     def make(cfg, **kwargs):
@@ -168,8 +175,7 @@ def main() -> None:
             # LeRobot picks torchcodec whenever it is installed, but it cannot load with FFmpeg 8.
             "--dataset.video_backend": "pyav",
             # Model-specific lerobot-train flags from the entry, e.g. {policy.dtype: bfloat16}
-            **{f"--{key}": str(value).lower() if isinstance(value, bool) else value
-               for key, value in train.get("flags", {}).items()},
+            **{f"--{key}": flag_value(value) for key, value in train.get("flags", {}).items()},
         }
     flags.update(overrides)
     if not args.resume and "--dataset.root" not in flags:

@@ -348,14 +348,14 @@ class PolicyServerDrtc(services_pb2_grpc.AsyncInferenceServicer):
 
         # Load preprocessor and postprocessor
         device_override = {"device": self.device}
+        preprocessor_overrides = {"device_processor": device_override}
+        if policy_specs.rename_map:  # otherwise keep the camera renaming saved with the checkpoint
+            preprocessor_overrides["rename_observations_processor"] = {"rename_map": policy_specs.rename_map}
         t_pp_start = time.perf_counter()
         self.preprocessor, self.postprocessor = make_pre_post_processors(
             self.policy.config,
             pretrained_path=policy_specs.pretrained_name_or_path,
-            preprocessor_overrides={
-                "device_processor": device_override,
-                "rename_observations_processor": {"rename_map": policy_specs.rename_map},
-            },
+            preprocessor_overrides=preprocessor_overrides,
             postprocessor_overrides={"device_processor": device_override},
         )
         t_pp_done = time.perf_counter()
