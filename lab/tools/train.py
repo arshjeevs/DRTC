@@ -29,7 +29,6 @@ from __future__ import annotations
 import argparse
 import json
 import math
-import os
 import random
 import re
 import shlex
@@ -259,9 +258,6 @@ def main() -> None:
             "--batch_size": train.get("batch_size", 8),
             "--steps": train.get("steps", 20_000),  # replaced below when train.epochs is set
             "--save_freq": train.get("save_freq", 5_000),
-            # Video decoding needs several workers (LeRobot's default of 4 left SmolVLA waiting ~50% of
-            # each step on the A100 server): half the CPU cores, at most 16 (CPUs are shared too).
-            "--num_workers": train.get("num_workers", max(4, min(16, (os.cpu_count() or 8) // 2))),
             **WANDB,
             # LeRobot picks torchcodec whenever it is installed, but it cannot load with FFmpeg 8.
             "--dataset.video_backend": "pyav",
