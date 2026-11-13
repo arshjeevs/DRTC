@@ -167,6 +167,9 @@ def main() -> None:
             **WANDB,
             # LeRobot picks torchcodec whenever it is installed, but it cannot load with FFmpeg 8.
             "--dataset.video_backend": "pyav",
+            # Model-specific lerobot-train flags from the entry, e.g. {policy.dtype: bfloat16}
+            **{f"--{key}": str(value).lower() if isinstance(value, bool) else value
+               for key, value in train.get("flags", {}).items()},
         }
     flags.update(overrides)
     if not args.resume and "--dataset.root" not in flags:

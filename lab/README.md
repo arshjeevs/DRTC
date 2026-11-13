@@ -103,6 +103,7 @@ lab/bin/train smolvla_test_run_1                            # full run, pushes t
 - Stopped early on purpose (Ctrl+C) and want to use what you have? `lab/bin/train <model> --push` uploads the latest checkpoint (or `--push 005000` for a specific one) to the model's Hub id. Training more later with `--resume` and pushing again replaces it.
 - Out of GPU memory? Add `--batch_size=4`.
 - Any `lerobot-train` flag passes through and overrides the generated one.
+- Flags a model always needs go in its entry: `train.flags: {policy.dtype: bfloat16}`. Command-line flags still override them.
 
 ### Full fine-tuning or LoRA
 

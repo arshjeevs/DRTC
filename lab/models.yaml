@@ -14,6 +14,7 @@
 #     dataset      Hub dataset repo id
 #     from         checkpoint to fine-tune (e.g. lerobot/smolvla_base); omit to train policy_type from scratch
 #     steps, batch_size, save_freq
+#     flags        extra lerobot-train flags for this model, e.g. {policy.dtype: bfloat16}
 #     lora         (finetune: lora) r (32), alpha (32), dropout (0.05), targets: expert (default) | vlm+expert
 
 jack_smolvla_cube:
@@ -146,6 +147,55 @@ smolvla_train_new_1_lora:
     steps: 20000
     batch_size: 64
     lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
+
+# Larger VLAs on the same data. Batch sizes assume a 24 GB+ GPU: lower batch_size if it runs out of memory.
+# pi0 / pi05 need the patched transformers build (pip extra "pi"), in a venv separate from SmolVLA's.
+pi05_train_new_1_full:
+  policy_type: pi05
+  pretrained_name_or_path: orangemoon599/pi05_train_new_1_full
+  finetune: full
+  fps: 30
+  task: Pick the green cube and place it in the box
+  rtc_enabled: true
+  train:
+    dataset: orangemoon599/train_new_1
+    from: lerobot/pi05_base
+    steps: 6000
+    batch_size: 32
+    save_freq: 2000
+    # train_expert_only freezes the PaliGemma VLM (as SmolVLA does); set false to train everything (40 GB+).
+    flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true, policy.train_expert_only: true}
+
+pi0_train_new_1_full:
+  policy_type: pi0
+  pretrained_name_or_path: orangemoon599/pi0_train_new_1_full
+  finetune: full
+  fps: 30
+  task: Pick the green cube and place it in the box
+  rtc_enabled: true
+  train:
+    dataset: orangemoon599/train_new_1
+    from: lerobot/pi0_base
+    steps: 6000
+    batch_size: 32
+    save_freq: 2000
+    flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true, policy.train_expert_only: true}
+
+# X-VLA trains here, but the policy server does not serve it yet (not in SUPPORTED_POLICIES).
+xvla_train_new_1_full:
+  policy_type: xvla
+  pretrained_name_or_path: orangemoon599/xvla_train_new_1_full
+  finetune: full
+  fps: 30
+  task: Pick the green cube and place it in the box
+  rtc_enabled: false
+  num_flow_matching_steps: null
+  train:
+    dataset: orangemoon599/train_new_1
+    from: lerobot/xvla-base
+    steps: 20000
+    batch_size: 16
+    flags: {policy.dtype: bfloat16, policy.action_mode: auto}
 
 # Template for our own models:
 # smolvla_cube_v1:
