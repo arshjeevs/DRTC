@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import random
 import re
 import shlex
@@ -126,6 +127,33 @@ def check_episode_count(repo_id: str, root: str | None, split: dict) -> None:
         print(f"note: {repo_id} has {found} episodes; episodes {split['total']}-{found - 1} are not used", flush=True)
 
 
+def resolve_base(source: str, download: bool) -> tuple[str, str]:
+    """`repo` or `repo@revision` -> (what --policy.path loads, the repo id recorded as the LoRA base).
+
+    A pinned revision is downloaded and loaded from its local snapshot (lerobot-train has no revision
+    flag). Pin pi0 / pi05 to the commit before the Hub added processor steps this fork does not have.
+    """
+    repo, _, revision = source.partition("@")
+    if not revision:
+        return source, source
+    if not download:
+        return f"<{repo} at {revision[:10]}, downloaded at start>", repo
+    from huggingface_hub import snapshot_download
+
+    return snapshot_download(repo, revision=revision), repo
+
+
+def epochs_to_steps(repo_id: str, root: str | None, episodes: list[int] | None, epochs: float,
+                    batch_size: int) -> tuple[int, int]:
+    """Training steps for `epochs` passes over the training frames -> (steps, frames)."""
+    from lerobot.datasets.lerobot_dataset import LeRobotDatasetMetadata
+
+    meta = LeRobotDatasetMetadata(repo_id, root=root)
+    lengths = dict(zip(meta.episodes["episode_index"], meta.episodes["length"]))
+    frames = sum(lengths[e] for e in episodes) if episodes is not None else meta.total_frames
+    return max(1, math.ceil(epochs * frames / batch_size)), frames
+
+
 def flag_value(value):
     """YAML value -> lerobot-train flag text (true/false; dicts such as rename_map as JSON)."""
     if isinstance(value, bool):
@@ -133,8 +161,11 @@ def flag_value(value):
     return json.dumps(value) if isinstance(value, dict) else value
 
 
-def lora_make_policy(make_policy, spec: dict):
-    """Wrap lerobot-train's make_policy: base policy + adapters (or, on resume, the saved adapters)."""
+def lora_make_policy(make_policy, spec: dict, base_id: str | None = None):
+    """Wrap lerobot-train's make_policy: base policy + adapters (or, on resume, the saved adapters).
+
+    `base_id` is recorded as the adapter's base when the base was loaded from a local snapshot.
+    """
     def make(cfg, **kwargs):
         checkpoint = cfg.pretrained_path
         if checkpoint and lora.is_adapter(checkpoint):  # --resume: rebuild base, then load adapters
@@ -147,7 +178,7 @@ def lora_make_policy(make_policy, spec: dict):
             lora.apply_lora(policy, saved, base)
             lora.load_adapter_weights(policy, weights)
             return policy
-        return lora.apply_lora(make_policy(cfg, **kwargs), spec, checkpoint)
+        return lora.apply_lora(make_policy(cfg, **kwargs), spec, base_id or checkpoint)
     return make
 
 
@@ -210,7 +241,10 @@ def main() -> None:
             sys.exit(f"finetune: lora needs a base checkpoint: set train.from for {args.model!r}")
         if out.exists():
             sys.exit(f"{out} exists. Continue it with --resume, or delete it to start over.")
-        base = {"--policy.path": train["from"]} if "from" in train else {"--policy.type": entry["policy_type"]}
+        if "epochs" in train and "steps" in train:
+            sys.exit(f"{args.model!r}: set train.steps or train.epochs, not both")
+        base_path, base_id = resolve_base(train["from"], download=not args.dry_run) if "from" in train else (None, None)
+        base = {"--policy.path": base_path} if base_path else {"--policy.type": entry["policy_type"]}
         flags = {
             "--dataset.repo_id": train["dataset"],
             **base,
@@ -220,7 +254,7 @@ def main() -> None:
             "--output_dir": str(out),
             "--job_name": args.model,
             "--batch_size": train.get("batch_size", 8),
-            "--steps": train.get("steps", 20_000),
+            "--steps": train.get("steps", 20_000),  # replaced below when train.epochs is set
             "--save_freq": train.get("save_freq", 5_000),
             **WANDB,
             # LeRobot picks torchcodec whenever it is installed, but it cannot load with FFmpeg 8.
@@ -239,6 +273,12 @@ def main() -> None:
         check_local_dataset(flags["--dataset.repo_id"])
     if not args.resume and "split" in train:
         check_episode_count(flags["--dataset.repo_id"], flags.get("--dataset.root"), train["split"])
+    if not args.resume and "epochs" in train and "--steps" not in overrides:
+        episodes = json.loads(flags["--dataset.episodes"]) if "--dataset.episodes" in flags else None
+        steps, frames = epochs_to_steps(flags["--dataset.repo_id"], flags.get("--dataset.root"), episodes,
+                                        train["epochs"], int(flags["--batch_size"]))
+        flags["--steps"] = steps
+        print(f"epochs: {train['epochs']} x {frames} frames / batch {flags['--batch_size']} = {steps} steps", flush=True)
 
     cmd = ["lerobot-train", *(f"{key}={value}" for key, value in flags.items())]
     print(" \\\n    ".join(shlex.quote(part) for part in cmd), flush=True)
@@ -261,7 +301,7 @@ def main() -> None:
     from lerobot.scripts import lerobot_train
 
     if spec:  # on --resume the saved adapter settings win (lora_make_policy)
-        lerobot_train.make_policy = lora_make_policy(lerobot_train.make_policy, spec)
+        lerobot_train.make_policy = lora_make_policy(lerobot_train.make_policy, spec, None if args.resume else base_id)
     sys.argv = cmd
     lerobot_train.main()
     if push:

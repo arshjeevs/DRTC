@@ -83,7 +83,7 @@ Items are numbered as in the planning discussion.
 | 14 | **Full vs. LoRA fine-tuning** | `smolvla_cubebox_v1_full`, `smolvla_cubebox_v1_lora` |
 | 15 | **Data efficiency** (10 / 25 / 50 / 100 episodes) | `smolvla_cubebox_v1_lora_ep10`, `_ep25`, `_ep50`, `smolvla_cubebox_v1_lora` |
 | 16 | **Camera ablation** (scene only / both) | `smolvla_cubebox_v1_lora_scene`, `smolvla_cubebox_v1_lora` |
-| 13 | **Model comparison** | `smolvla_cubebox_v1_lora`, `act_cubebox_v1_full`, `xvla_cubebox_v1_lora`, `pi05_cubebox_v1_lora` |
+| 13 | **Model comparison** | `smolvla_cubebox_v1_lora`, `act_cubebox_v1_full`, `xvla_cubebox_v1_lora`, `pi0_cubebox_v1_lora`, `pi05_cubebox_v1_lora` |
 | 12 | **Action filtering** | Existing Butterworth filter settings, 2–3 configurations on one model |
 
 All RQ3 models use the same recipe within a study (same steps, batch size and LoRA settings) so only the studied factor changes. The data-efficiency runs keep the number of training steps fixed.
@@ -155,7 +155,8 @@ Model variants: `ep10` (episode subset), `wrist` / `scene` (camera), `r16` (LoRA
 | `smolvla_cubebox_v1_lora_scene` | 16 | H200 | Needs `_scene` dataset first |
 | `act_cubebox_v1_full` | 13, fallback (1) | A100 | |
 | `xvla_cubebox_v1_lora` | 13 | H200 | Server cannot serve X-VLA yet **[to build]** |
-| `pi05_cubebox_v1_lora` | 13 | H200 | Separate venv, created automatically |
+| `pi0_cubebox_v1_lora` | 13 | H200 | Separate venv, created automatically; base pinned to a Hub commit this fork supports |
+| `pi05_cubebox_v1_lora` | 13 | H200 | Separate venv, created automatically; base pinned to a Hub commit this fork supports |
 
 ## 9. Minor and major presentation split
 

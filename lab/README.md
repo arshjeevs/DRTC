@@ -106,6 +106,8 @@ lab/bin/train smolvla_test_run_1                            # full run, pushes t
 - Out of GPU memory? Add `--batch_size=4`.
 - Any `lerobot-train` flag passes through and overrides the generated one.
 - `train.split: {total, held_out, seed}` holds out random episodes (same for every model) and trains on the rest; `episodes: N` then trains on a random N of them (nested subsets). The held-out episodes are the validation set: `eval/val_loss` is logged to wandb every 1,000 steps and `eval/val_action_mse` after the last step. Training refuses to start until the dataset has `total` episodes. Without `split`, `train.episodes: "0-44"` picks explicit episodes. `lab/bin/ablate-cameras <dataset> [scene] [wrist]` makes single-camera copies for camera ablations.
+- `train.epochs: N` (instead of `steps`) trains for N passes over the training frames; the dry-run prints the resulting steps.
+- `train.from: repo@<commit>` trains from a pinned Hub version (used for `lerobot/pi0_base` and `lerobot/pi05_base`, whose latest versions need processor steps this fork lacks).
 - wandb project: `drtc`. For ACT, compare `eval/val_loss` with `train/l1_loss` (its training `loss` also contains the KL term).
 - Flags a model always needs go in its entry: `train.flags: {policy.dtype: bfloat16}`. Command-line flags still override them.
 

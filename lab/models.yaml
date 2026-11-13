@@ -20,7 +20,9 @@
 #   train        (optional) what lab/bin/train trains; the result is pushed to pretrained_name_or_path
 #     dataset      Hub dataset repo id
 #     from         checkpoint to fine-tune (e.g. lerobot/smolvla_base); omit to train policy_type from scratch
-#     steps, batch_size, save_freq
+#                  repo@<commit> pins a Hub version: pi0 / pi05 base repos later gained processor
+#                  steps this LeRobot fork lacks; the pinned commits have the same weights and config
+#     steps, batch_size, save_freq   (or epochs: N instead of steps: passes over the training frames)
 #     flags        extra lerobot-train flags for this model, e.g. {policy.dtype: bfloat16}
 #     split        (optional) {total, held_out, seed}: seeded random held-out episodes, used for validation
 #     episodes     with split: a number N (random N of the training episodes); without: explicit
@@ -177,7 +179,7 @@ pi05_train_new_1_full:
   rtc_enabled: true
   train:
     dataset: orangemoon599/train_new_1
-    from: lerobot/pi05_base
+    from: lerobot/pi05_base@a538eb273274eb30f126a118f39dbc0ee212c883
     steps: 6000
     batch_size: 32
     save_freq: 2000
@@ -193,7 +195,7 @@ pi0_train_new_1_full:
   rtc_enabled: true
   train:
     dataset: orangemoon599/train_new_1
-    from: lerobot/pi0_base
+    from: lerobot/pi0_base@26b99b9439acb1e352439e34ee9c67af0d76efa3
     steps: 6000
     batch_size: 32
     save_freq: 2000
@@ -226,7 +228,7 @@ pi05_train_new_1_lora:
   rtc_enabled: true
   train:
     dataset: orangemoon599/train_new_1
-    from: lerobot/pi05_base
+    from: lerobot/pi05_base@a538eb273274eb30f126a118f39dbc0ee212c883
     steps: 6000
     batch_size: 16
     save_freq: 2000
@@ -242,7 +244,7 @@ pi0_train_new_1_lora:
   rtc_enabled: true
   train:
     dataset: orangemoon599/train_new_1
-    from: lerobot/pi0_base
+    from: lerobot/pi0_base@26b99b9439acb1e352439e34ee9c67af0d76efa3
     steps: 6000
     batch_size: 16
     save_freq: 2000
@@ -422,6 +424,23 @@ xvla_cubebox_v1_lora:
     flags: {policy.dtype: bfloat16, policy.action_mode: auto, rename_map: *xvla_rename}
     lora: {r: 32, alpha: 64, dropout: 0.05, targets: vlm+expert}
 
+pi0_cubebox_v1_lora:           # H200 / A100; served from a server GPU (too big for the 8 GB laptop)
+  policy_type: pi0
+  pretrained_name_or_path: orangemoon599/pi0_cubebox_v1_lora
+  finetune: lora
+  fps: 30
+  task: *study_task
+  rtc_enabled: true
+  train:
+    dataset: *study_ds
+    split: *study_split
+    from: lerobot/pi0_base@26b99b9439acb1e352439e34ee9c67af0d76efa3
+    steps: 6000
+    batch_size: 32
+    save_freq: 2000
+    flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true, rename_map: *pi_rename}
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: vlm+expert}
+
 pi05_cubebox_v1_lora:          # H200 / A100; served from a server GPU (too big for the 8 GB laptop)
   policy_type: pi05
   pretrained_name_or_path: orangemoon599/pi05_cubebox_v1_lora
@@ -432,7 +451,7 @@ pi05_cubebox_v1_lora:          # H200 / A100; served from a server GPU (too big 
   train:
     dataset: *study_ds
     split: *study_split
-    from: lerobot/pi05_base
+    from: lerobot/pi05_base@a538eb273274eb30f126a118f39dbc0ee212c883
     steps: 6000
     batch_size: 32
     save_freq: 2000
