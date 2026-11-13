@@ -4,6 +4,13 @@
 # pretrained_name_or_path is resolved ON THE LAPTOP (server): a Hugging Face repo id, or a local
 # checkpoint path relative to the laptop repo root, e.g. outputs/train/<run>/checkpoints/last/pretrained_model
 #
+# Naming (checked by lab/bin/list and lab/bin/train; entries in _legacy are exempt):
+#   dataset   orangemoon599/so101_<task>_v<N>[_<variant>]   e.g. so101_cubebox_v1, so101_cubebox_v1_wrist
+#             bump vN whenever the setup changes (camera layout, scene, task wording)
+#   model     <policy>_<task>_v<N>_<full|lora>[_<variant>]   e.g. smolvla_cubebox_v1_lora_ep10
+#             variants: ep10 (episode subset), wrist / scene (camera), r16 (LoRA rank), s40k (steps)
+#   Hub repo  orangemoon599/<model name>: one entry, one repo, never shared
+#
 # Per model:
 #   fps          control rate = fps of the dataset the model was trained on
 #   task         default language instruction: the exact sentence used when recording
@@ -18,6 +25,10 @@
 #     episodes     (optional) train on these episodes only: "0-44", "0-9,20-29" or [0, 1, 2]
 #     lora         (finetune: lora) r (32), alpha (32), dropout (0.05), targets: expert (default) | vlm+expert
 #                  (presets exist for smolvla, pi0, pi05, xvla)
+
+# Entries from before the naming convention (datasets and Hub repos left as they are). Exempt from
+# the naming check; new entries go below the study header.
+_legacy: [jack_smolvla_cube, smolvla_train_1_lora_0, smolvla_train_1_lora_1, smolvla_train_5_full, smolvla_train_5_lora, smolvla_train_6_full, smolvla_train_6_lora, smolvla_train_5_train_6_full, smolvla_train_5_train_6_lora, smolvla_train_new_1_lora, pi05_train_new_1_full, pi0_train_new_1_full, xvla_train_new_1_full, pi05_train_new_1_lora, pi0_train_new_1_lora, xvla_train_new_1_lora, act_train_new_1_full]
 
 jack_smolvla_cube:
   policy_type: smolvla
@@ -270,15 +281,14 @@ act_train_new_1_full:
     save_freq: 10000
 
 # ===================================================================================================
-# Study on the new dataset (lab/PROPOSAL.md). Set the dataset name, task and held-out split ONCE here;
-# every entry below refers to them. Entry names use the dataset's short name (train_new_2): if the
-# dataset is called something else, rename with  sed -i 's/train_new_2/<name>/g' lab/models.yaml
+# Study on so101_cubebox_v1 (lab/PROPOSAL.md). Dataset, task and held-out split are set ONCE here;
+# every entry below refers to them.
 # ===================================================================================================
 _study:
-  dataset: &study_ds orangemoon599/train_new_2
-  # lab/bin/ablate-cameras orangemoon599/train_new_2  creates these two single-camera copies
-  wrist_only: &study_ds_wrist orangemoon599/train_new_2_wrist   # camera1 (Zebronics, wrist) only
-  scene_only: &study_ds_scene orangemoon599/train_new_2_scene   # camera2 (phone, scene) only
+  dataset: &study_ds orangemoon599/so101_cubebox_v1
+  # lab/bin/ablate-cameras orangemoon599/so101_cubebox_v1  creates these two single-camera copies
+  wrist_only: &study_ds_wrist orangemoon599/so101_cubebox_v1_wrist   # camera1 (Zebronics, wrist) only
+  scene_only: &study_ds_scene orangemoon599/so101_cubebox_v1_scene   # camera2 (phone, scene) only
   task: &study_task Pick the green cube and place it in the box
   # Training episodes; the rest are held out for offline evaluation. "0-44" = 45 train / 5 held out of 50.
   train_episodes: &study_train "0-44"
@@ -286,18 +296,18 @@ _study:
   xvla_cameras: &xvla_rename {observation.images.camera2: observation.images.image, observation.images.camera1: observation.images.image2}
 
 # --- SmolVLA: full vs LoRA (item 14) ---
-smolvla_train_new_2_full:
+smolvla_cubebox_v1_full:
   policy_type: smolvla
-  pretrained_name_or_path: orangemoon599/smolvla_train_new_2_full
+  pretrained_name_or_path: orangemoon599/smolvla_cubebox_v1_full
   finetune: full
   fps: 30
   task: *study_task
   rtc_enabled: true
   train: {dataset: *study_ds, episodes: *study_train, from: lerobot/smolvla_base, steps: 20000, batch_size: 64}
 
-smolvla_train_new_2_lora:
+smolvla_cubebox_v1_lora:
   policy_type: smolvla
-  pretrained_name_or_path: orangemoon599/smolvla_train_new_2_lora
+  pretrained_name_or_path: orangemoon599/smolvla_cubebox_v1_lora
   finetune: lora
   fps: 30
   task: *study_task
@@ -306,10 +316,10 @@ smolvla_train_new_2_lora:
     {dataset: *study_ds, episodes: *study_train, from: lerobot/smolvla_base, steps: 20000, batch_size: 64,
      lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}}
 
-# --- Data efficiency (item 15): same recipe as smolvla_train_new_2_lora, fewer episodes, same steps ---
-smolvla_train_new_2_lora_10ep:
+# --- Data efficiency (item 15): same recipe as smolvla_cubebox_v1_lora, fewer episodes, same steps ---
+smolvla_cubebox_v1_lora_ep10:
   policy_type: smolvla
-  pretrained_name_or_path: orangemoon599/smolvla_train_new_2_lora_10ep
+  pretrained_name_or_path: orangemoon599/smolvla_cubebox_v1_lora_ep10
   finetune: lora
   fps: 30
   task: *study_task
@@ -318,9 +328,9 @@ smolvla_train_new_2_lora_10ep:
     {dataset: *study_ds, episodes: "0-9", from: lerobot/smolvla_base, steps: 20000, batch_size: 64,
      lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}}
 
-smolvla_train_new_2_lora_25ep:
+smolvla_cubebox_v1_lora_ep25:
   policy_type: smolvla
-  pretrained_name_or_path: orangemoon599/smolvla_train_new_2_lora_25ep
+  pretrained_name_or_path: orangemoon599/smolvla_cubebox_v1_lora_ep25
   finetune: lora
   fps: 30
   task: *study_task
@@ -330,9 +340,9 @@ smolvla_train_new_2_lora_25ep:
      lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}}
 
 # --- Camera ablation (item 16): same recipe, one camera removed from the data ---
-smolvla_train_new_2_lora_wrist:
+smolvla_cubebox_v1_lora_wrist:
   policy_type: smolvla
-  pretrained_name_or_path: orangemoon599/smolvla_train_new_2_lora_wrist
+  pretrained_name_or_path: orangemoon599/smolvla_cubebox_v1_lora_wrist
   finetune: lora
   fps: 30
   task: *study_task
@@ -341,9 +351,9 @@ smolvla_train_new_2_lora_wrist:
     {dataset: *study_ds_wrist, episodes: *study_train, from: lerobot/smolvla_base, steps: 20000, batch_size: 64,
      lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}}
 
-smolvla_train_new_2_lora_scene:
+smolvla_cubebox_v1_lora_scene:
   policy_type: smolvla
-  pretrained_name_or_path: orangemoon599/smolvla_train_new_2_lora_scene
+  pretrained_name_or_path: orangemoon599/smolvla_cubebox_v1_lora_scene
   finetune: lora
   fps: 30
   task: *study_task
@@ -353,9 +363,9 @@ smolvla_train_new_2_lora_scene:
      lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}}
 
 # --- Model comparison (item 13) ---
-act_train_new_2_full:
+act_cubebox_v1_full:
   policy_type: act
-  pretrained_name_or_path: orangemoon599/act_train_new_2_full
+  pretrained_name_or_path: orangemoon599/act_cubebox_v1_full
   finetune: full
   fps: 30
   task: *study_task
@@ -363,9 +373,9 @@ act_train_new_2_full:
   num_flow_matching_steps: null
   train: {dataset: *study_ds, episodes: *study_train, steps: 40000, batch_size: 64, save_freq: 10000}
 
-xvla_train_new_2_lora:
+xvla_cubebox_v1_lora:
   policy_type: xvla
-  pretrained_name_or_path: orangemoon599/xvla_train_new_2_lora
+  pretrained_name_or_path: orangemoon599/xvla_cubebox_v1_lora
   finetune: lora
   fps: 30
   task: *study_task
@@ -380,9 +390,9 @@ xvla_train_new_2_lora:
     flags: {policy.dtype: bfloat16, policy.action_mode: auto, rename_map: *xvla_rename}
     lora: {r: 32, alpha: 64, dropout: 0.05, targets: vlm+expert}
 
-pi05_train_new_2_lora:          # H200 / A100; served from a server GPU (too big for the 8 GB laptop)
+pi05_cubebox_v1_lora:          # H200 / A100; served from a server GPU (too big for the 8 GB laptop)
   policy_type: pi05
-  pretrained_name_or_path: orangemoon599/pi05_train_new_2_lora
+  pretrained_name_or_path: orangemoon599/pi05_cubebox_v1_lora
   finetune: lora
   fps: 30
   task: *study_task

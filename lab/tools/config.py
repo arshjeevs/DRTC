@@ -156,6 +156,54 @@ def compose(experiment_path: Path, model_override: str | None = None) -> dict[st
     return merged
 
 
+# Naming convention (lab/models.yaml header, lab/PROPOSAL.md 7.2). Entries listed in _legacy are exempt.
+HUB_ACCOUNT = "orangemoon599"
+ROBOT = "so101"
+DATASET_NAME = re.compile(rf"^{ROBOT}_(?P<base>[a-z0-9]+_v\d+)(?:_(?P<variant>[a-z0-9]+))?$")
+MODEL_NAME = re.compile(r"^(?P<policy>[a-z0-9]+)_(?P<base>[a-z0-9]+_v\d+)_(?P<method>full|lora)(?P<variants>(?:_[a-z0-9]+)*)$")
+
+
+def legacy_models() -> set[str]:
+    return set(load_yaml(MODELS_PATH).get("_legacy") or [])
+
+
+def naming_problems(name: str, entry: dict[str, Any], all_models: dict[str, dict[str, Any]]) -> list[str]:
+    """Ways a (non-legacy) registry entry breaks the naming convention; [] if it follows it."""
+    problems = []
+    target = str(entry.get("pretrained_name_or_path", ""))
+    m = MODEL_NAME.match(name)
+    if not m:
+        problems.append(f"name should be <policy>_<task>_v<N>_<full|lora>[_<variant>], e.g. smolvla_cubebox_v1_lora")
+    else:
+        if m["policy"] != entry.get("policy_type"):
+            problems.append(f"name starts with {m['policy']!r} but policy_type is {entry.get('policy_type')!r}")
+        if m["method"] != entry.get("finetune", "full"):
+            problems.append(f"name says {m['method']!r} but finetune is {entry.get('finetune', 'full')!r}")
+    if "/" in target and not target.startswith(("outputs/", "/", ".")) and target != f"{HUB_ACCOUNT}/{name}":
+        problems.append(f"pretrained_name_or_path should be {HUB_ACCOUNT}/{name} (is {target})")
+    others = [other for other, e in all_models.items() if other != name and e.get("pretrained_name_or_path") == target]
+    if others:
+        problems.append(f"shares its Hub repo {target} with {', '.join(others)}")
+    dataset = str((entry.get("train") or {}).get("dataset", ""))
+    if dataset:
+        account, _, ds_name = dataset.partition("/")
+        d = DATASET_NAME.match(ds_name)
+        if account != HUB_ACCOUNT or not d:
+            problems.append(f"dataset should be {HUB_ACCOUNT}/{ROBOT}_<task>_v<N>[_<variant>] (is {dataset})")
+        elif m and d["base"] != m["base"]:
+            problems.append(f"name says {m['base']!r} but the dataset is {d['base']!r}")
+        elif m and d["variant"] and d["variant"] not in m["variants"].split("_"):
+            problems.append(f"dataset variant {d['variant']!r} missing from the name (add _{d['variant']})")
+    return problems
+
+
+def check_naming() -> dict[str, list[str]]:
+    """{entry: problems} for every non-legacy registry entry that breaks the convention."""
+    models, legacy = load_models(), legacy_models()
+    found = {name: naming_problems(name, entry, models) for name, entry in models.items() if name not in legacy}
+    return {name: problems for name, problems in found.items() if problems}
+
+
 def venv_for(model_name: str) -> str:
     """Side venv a registry model needs ('' = the main .venv)."""
     entry = load_models().get(model_name)
@@ -166,6 +214,8 @@ def print_registry() -> None:
     print("models (lab/models.yaml):")
     for name, m in load_models().items():
         print(f"  {name:28s} {m['policy_type']:8s} {m.get('fps', '?')} fps  {m['pretrained_name_or_path']}")
+    for name, problems in check_naming().items():
+        print(f"  NAMING {name}: " + "; ".join(problems))
     print("experiments (lab/experiments):")
     for path in sorted(EXPERIMENTS_DIR.rglob("*.yaml")):
         if path.name.startswith("_"):

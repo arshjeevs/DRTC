@@ -33,7 +33,7 @@ import shlex
 import sys
 from pathlib import Path
 
-from lab.tools.config import REPO_ROOT, load_models
+from lab.tools.config import REPO_ROOT, legacy_models, load_models, naming_problems
 from lab.tools.passthrough import parse_passthrough
 from lerobot.policies import lora
 
@@ -133,6 +133,9 @@ def main() -> None:
     train = entry.get("train")
     if not train:
         sys.exit(f"{args.model!r} has no train: block in lab/models.yaml")
+    if args.model not in legacy_models() and (problems := naming_problems(args.model, entry, models)):
+        sys.exit(f"{args.model!r} breaks the naming convention (lab/models.yaml header):\n  - "
+                 + "\n  - ".join(problems))
 
     out = TRAIN_DIR / args.model
     target = entry["pretrained_name_or_path"]

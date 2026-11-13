@@ -80,10 +80,10 @@ Items are numbered as in the planning discussion.
 
 | # | Study | Models (`lab/models.yaml`) |
 |---|---|---|
-| 14 | **Full vs. LoRA fine-tuning** | `smolvla_train_new_2_full`, `smolvla_train_new_2_lora` |
-| 15 | **Data efficiency** (10 / 25 / 45 episodes) | `smolvla_train_new_2_lora_10ep`, `_25ep`, `smolvla_train_new_2_lora` |
-| 16 | **Camera ablation** (wrist / scene / both) | `smolvla_train_new_2_lora_wrist`, `_scene`, `smolvla_train_new_2_lora` |
-| 13 | **Model comparison** | `smolvla_train_new_2_lora`, `act_train_new_2_full`, `xvla_train_new_2_lora`, `pi05_train_new_2_lora` |
+| 14 | **Full vs. LoRA fine-tuning** | `smolvla_cubebox_v1_full`, `smolvla_cubebox_v1_lora` |
+| 15 | **Data efficiency** (10 / 25 / 45 episodes) | `smolvla_cubebox_v1_lora_ep10`, `_ep25`, `smolvla_cubebox_v1_lora` |
+| 16 | **Camera ablation** (wrist / scene / both) | `smolvla_cubebox_v1_lora_wrist`, `_scene`, `smolvla_cubebox_v1_lora` |
+| 13 | **Model comparison** | `smolvla_cubebox_v1_lora`, `act_cubebox_v1_full`, `xvla_cubebox_v1_lora`, `pi05_cubebox_v1_lora` |
 | 12 | **Action filtering** | Existing Butterworth filter settings, 2–3 configurations on one model |
 
 All RQ3 models use the same recipe within a study (same steps, batch size and LoRA settings) so only the studied factor changes. The data-efficiency runs keep the number of training steps fixed.
@@ -92,11 +92,24 @@ All RQ3 models use the same recipe within a study (same steps, batch size and Lo
 
 ### 7.1 Dataset
 
-- **New dataset** `orangemoon599/train_new_2` (being recorded): one task, "Pick the green cube and place it in the box", current camera layout (wrist + scene), 30 fps.
+- **New dataset** `orangemoon599/so101_cubebox_v1` (being recorded; see the naming convention below): one task, "Pick the green cube and place it in the box", current camera layout (wrist + scene), 30 fps.
 - **Split:** episodes `0-44` for training, the remaining episodes held out for offline evaluation. Set once in `lab/models.yaml` (`_study.train_episodes`).
-- **Camera-ablated copies:** `lab/bin/ablate-cameras orangemoon599/train_new_2` creates `_wrist` and `_scene` on the Hub.
+- **Camera-ablated copies:** `lab/bin/ablate-cameras orangemoon599/so101_cubebox_v1` creates `_wrist` and `_scene` on the Hub.
 
-### 7.2 Evaluation
+### 7.2 Naming convention
+
+All new datasets and models live under the `orangemoon599` Hub account. Older datasets and models keep their names (`_legacy` in `lab/models.yaml`).
+
+| What | Pattern | Example |
+|---|---|---|
+| Dataset | `so101_<task>_v<N>[_<variant>]`; bump `vN` when the setup changes | `so101_cubebox_v1`, `so101_cubebox_v1_wrist` |
+| Model (registry entry) | `<policy>_<task>_v<N>_<full\|lora>[_<variant>]` | `smolvla_cubebox_v1_lora_ep10` |
+| Model (Hub repo) | `orangemoon599/<registry entry>`; one entry, one repo | `orangemoon599/smolvla_cubebox_v1_lora` |
+| Results | `results/<experiment>/<registry entry>/` | `results/replication/baseline/smolvla_cubebox_v1_lora/` |
+
+Model variants: `ep10` (episode subset), `wrist` / `scene` (camera), `r16` (LoRA rank), `s40k` (steps). `lab/bin/list` and `lab/bin/train` check new entries against these rules.
+
+### 7.3 Evaluation
 
 **Offline (no robot):** action-prediction error of each model on the held-out episodes. Cheap, runs on the GPU servers, ranks all models before robot time is spent. **[to build]**
 
@@ -107,7 +120,7 @@ All RQ3 models use the same recipe within a study (same steps, batch size and Lo
 - **Trial counts:** 10 per condition for headline results; 5 for exploratory comparisons. **[open]**
 - **Statistics:** success rates with Wilson 95% confidence intervals; latency and stall metrics as median and interquartile range over trials.
 
-### 7.3 Metrics
+### 7.4 Metrics
 
 | Metric | Source |
 |---|---|
@@ -133,15 +146,15 @@ All RQ3 models use the same recipe within a study (same steps, batch size and Lo
 
 | Model entry | Study | Server | Notes |
 |---|---|---|---|
-| `smolvla_train_new_2_full` | 13, 14 | A100 | |
-| `smolvla_train_new_2_lora` | 13, 14, 15, 16 | A100 | Shared reference model |
-| `smolvla_train_new_2_lora_10ep` | 15 | A100 | |
-| `smolvla_train_new_2_lora_25ep` | 15 | A100 | |
-| `smolvla_train_new_2_lora_wrist` | 16 | H200 | Needs `_wrist` dataset first |
-| `smolvla_train_new_2_lora_scene` | 16 | H200 | Needs `_scene` dataset first |
-| `act_train_new_2_full` | 13, fallback (1) | A100 | |
-| `xvla_train_new_2_lora` | 13 | H200 | Server cannot serve X-VLA yet **[to build]** |
-| `pi05_train_new_2_lora` | 13 | H200 | Separate venv, created automatically |
+| `smolvla_cubebox_v1_full` | 13, 14 | A100 | |
+| `smolvla_cubebox_v1_lora` | 13, 14, 15, 16 | A100 | Shared reference model |
+| `smolvla_cubebox_v1_lora_ep10` | 15 | A100 | |
+| `smolvla_cubebox_v1_lora_ep25` | 15 | A100 | |
+| `smolvla_cubebox_v1_lora_wrist` | 16 | H200 | Needs `_wrist` dataset first |
+| `smolvla_cubebox_v1_lora_scene` | 16 | H200 | Needs `_scene` dataset first |
+| `act_cubebox_v1_full` | 13, fallback (1) | A100 | |
+| `xvla_cubebox_v1_lora` | 13 | H200 | Server cannot serve X-VLA yet **[to build]** |
+| `pi05_cubebox_v1_lora` | 13 | H200 | Separate venv, created automatically |
 
 ## 9. Minor and major presentation split
 
@@ -176,8 +189,8 @@ Nothing shown in the minor is repeated; its results become the baselines of the 
 - [x] Training entries for all study models (`lab/models.yaml`)
 
 ### Next (minor)
-- [ ] Record `orangemoon599/train_new_2`
-- [ ] `lab/bin/ablate-cameras orangemoon599/train_new_2`
+- [ ] Record `orangemoon599/so101_cubebox_v1`
+- [ ] `lab/bin/ablate-cameras orangemoon599/so101_cubebox_v1`
 - [ ] Launch training runs on H200 / A100
 - [ ] Offline evaluation script (held-out action error) **[to build]**
 - [ ] Inference benchmark script (items 8, 18) **[to build]**
