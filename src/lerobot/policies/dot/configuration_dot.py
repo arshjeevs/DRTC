@@ -67,7 +67,7 @@ class DOTConfig(PreTrainedConfig):
     vision_backbone: str = "resnet18"
     pretrained_backbone_weights: str | None = "ResNet18_Weights.IMAGENET1K_V1"
     pre_norm: bool = True
-    lora_rank: int = 20  # LoRA on every backbone conv: keeps the pretrained ResNet from overfitting
+    lora_rank: int = 20  # LoRA on every backbone conv: keeps the pretrained ResNet from overfitting (0: none)
     merge_lora: bool = False  # merge the backbone LoRA into the conv weights when loading
 
     dim_model: int = 128

@@ -7,6 +7,11 @@ replaced by:
 
 The base weights come from `base_model_name_or_path` at load time, so the folder stays small (~21 MB
 for SmolVLA at r=32, against ~900 MB for a full checkpoint).
+
+Base `None`: the policy is built from its config (policies trained from scratch, whose only pretrained
+part is e.g. an ImageNet ResNet loaded by the constructor; GR00T, which loads its base itself). Every
+randomly initialised module is then in `trainable`, and the buffers (BatchNorm statistics) are saved
+too, so config + adapter file rebuild the trained policy exactly.
 `load_policy(..., finetune="lora")` rebuilds the policy with the adapters live, as in training. They are
 not merged: SmolVLA's weights are bf16, and folding a small LoRA update into them rounds it away.
 """
@@ -35,6 +40,10 @@ _SMOLVLA_LAYERS = r"(self_attn\.(q|k|v|o)_proj|mlp\.(gate|up|down)_proj)"
 _GEMMA_LAYERS = _SMOLVLA_LAYERS  # same layer names in Gemma (pi0 / pi05)
 _XVLA_BLOCK = r"(attn\.(qkv|proj)|mlp\.(fc1|fc2))"
 _BART_LAYERS = r"((self_attn|encoder_attn)\.(q|k|v|out)_proj|fc1|fc2)"
+# ResNet convolutions: torchvision names (DOT) and the children-index names of Diffusion Policy's encoder
+# (backbone.0 = conv1, backbone.4-7 = layer1-4).
+_RESNET_CONVS = r"(conv1|layer\d\.\d+\.(conv\d|downsample\.0))"
+_RESNET_SEQ_CONVS = r"(0|[4-7]\.\d+\.(conv\d|downsample\.0))"
 PRESETS = {
     "smolvla": {
         "targets": {
@@ -59,6 +68,38 @@ PRESETS = {
             "vlm+expert": rf".*\.(gemma_expert|paligemma)\.(?!.*vision).*layers\.\d+\.{_GEMMA_LAYERS}",
         },
         "trainable": r"model\.(action_in_proj|action_out_proj|time_mlp_in|time_mlp_out)\..*",
+    },
+    "pi0_fast": {
+        # PaliGemma only (FAST decodes action tokens with the language model): its language layers,
+        # not the vision tower. "vlm+expert" is the same set, so entries can share settings with pi0/pi05.
+        "targets": {
+            "vlm": rf".*\.paligemma\.(?!.*vision).*layers\.\d+\.{_GEMMA_LAYERS}",
+            "vlm+expert": rf".*\.paligemma\.(?!.*vision).*layers\.\d+\.{_GEMMA_LAYERS}",
+        },
+    },
+    # Trained from scratch except an ImageNet ResNet: LoRA on the ResNet convolutions, everything else
+    # (randomly initialised) trained in full. DOT's own recipe (its author's fix for backbone overfitting).
+    "dot": {
+        "targets": {"backbone": rf"model\.projections\.images\.{_RESNET_CONVS}"},
+        "trainable": r"model\.(?!projections\.images\.(?!fc\.)).*",
+    },
+    "diffusion": {
+        "targets": {"backbone": rf"diffusion\.rgb_encoder\.(\d+\.)?backbone\.{_RESNET_SEQ_CONVS}"},
+        "trainable": r"diffusion\.(?!rgb_encoder\.(\d+\.)?backbone\.).*",
+    },
+    "sfp": {
+        "targets": {"backbone": rf"sfp_model\.rgb_encoder\.(\d+\.)?backbone\.{_RESNET_SEQ_CONVS}"},
+        "trainable": r"sfp_model\.(?!rgb_encoder\.(\d+\.)?backbone\.).*",
+    },
+    # GR00T N1.5: the VLM (Eagle) stays frozen as in NVIDIA's recipe; LoRA on the action head's DiT and
+    # VL self-attention blocks; its small embodiment encoders/decoders and output layers train in full.
+    "groot": {
+        "targets": {
+            "expert": r"_groot_model\.action_head\.(model|vl_self_attention)\.transformer_blocks\.\d+\."
+                      r"(attn1\.(to_q|to_k|to_v|to_out\.0)|ff\.net\.(0\.proj|2))",
+        },
+        "trainable": r"_groot_model\.action_head\.(state_encoder|action_encoder|action_decoder|position_embedding"
+                     r"|future_tokens|vlln|model\.(timestep_encoder|proj_out_1|proj_out_2))\..*",
     },
     "xvla": {
         "targets": {
@@ -130,6 +171,10 @@ def _save_adapter(self, save_directory: Path) -> None:
     config["target_modules"] = spec["target_modules"]
     (save_directory / ADAPTER_CONFIG).write_text(json.dumps(config, indent=2, default=str))
     tensors = {name: p.detach().cpu().contiguous() for name, p in self.named_parameters() if p.requires_grad}
+    if base is None:  # built from config: keep the buffers (e.g. BatchNorm running statistics) as well
+        parameters = dict(self.named_parameters())
+        tensors.update({name: t.detach().cpu().contiguous() for name, t in self.state_dict().items()
+                        if name not in parameters})
     save_file(tensors, str(save_directory / ADAPTER_WEIGHTS))
 
 
@@ -182,7 +227,10 @@ def load_policy(policy_class, path: str, finetune: str = "full", **kwargs):
     spec, base, weights = read_adapter(path)
     # The fine-tuned config (this dataset's features), with the base model's weights underneath.
     config = PreTrainedConfig.from_pretrained(path)
-    policy = policy_class.from_pretrained(base, config=config, **kwargs)
+    if base:
+        policy = policy_class.from_pretrained(base, config=config, **kwargs)
+    else:  # built from its config (see the module docstring)
+        policy = policy_class(config)
     _inject(policy, spec, base)
     load_adapter_weights(policy, weights)
     policy.to(config.device).eval()

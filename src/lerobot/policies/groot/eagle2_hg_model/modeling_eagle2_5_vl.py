@@ -48,6 +48,14 @@ EAGLE2_5_VL_START_DOCSTRING = r"""
     "The bare Eagle2_5_VL Model outputting raw hidden-states without any specific head on top.",
     EAGLE2_5_VL_START_DOCSTRING,
 )
+
+def _attention_implementation() -> str:
+    """FlashAttention-2 when the flash-attn package is installed, otherwise PyTorch SDPA (same result;
+    on recent GPUs SDPA runs a flash kernel too). Avoids building flash-attn just to load GR00T."""
+    import importlib.util
+
+    return "flash_attention_2" if importlib.util.find_spec("flash_attn") is not None else "sdpa"
+
 class Eagle25VLPreTrainedModel(PreTrainedModel):
     config_class = Eagle25VLConfig
     base_model_prefix = "model"
@@ -104,7 +112,7 @@ class Eagle25VLForConditionalGeneration(Eagle25VLPreTrainedModel, GenerationMixi
             self.vision_model = vision_model
         else:
             if config.vision_config.model_type == "siglip_vision_model":
-                config.vision_config._attn_implementation = "flash_attention_2"
+                config.vision_config._attn_implementation = _attention_implementation()
                 self.vision_model = SiglipVisionModel(config.vision_config)
             else:
                 raise NotImplementedError(f"{config.vision_config.model_type} is not implemented.")
@@ -112,13 +120,15 @@ class Eagle25VLForConditionalGeneration(Eagle25VLPreTrainedModel, GenerationMixi
         if language_model is not None:
             self.language_model = language_model
         else:
+            if config.text_config._attn_implementation == "flash_attention_2":
+                config.text_config._attn_implementation = _attention_implementation()
             if config.text_config.architectures[0] == "LlamaForCausalLM":
                 self.language_model = LlamaForCausalLM(config.text_config)
             elif config.text_config.architectures[0] == "Phi3ForCausalLM":
                 raise NotImplementedError("Phi3 is not implemented.")
                 # self.language_model = Phi3ForCausalLM(config.text_config)
             elif config.text_config.architectures[0] == "Qwen2ForCausalLM":
-                assert config.text_config._attn_implementation == "flash_attention_2", (
+                assert config.text_config._attn_implementation in ("flash_attention_2", "sdpa"), (
                     f"Qwen2 must use flash_attention_2 but got {config.text_config._attn_implementation}"
                 )
                 self.language_model = Qwen2ForCausalLM(config.text_config)

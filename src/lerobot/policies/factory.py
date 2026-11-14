@@ -31,6 +31,8 @@ from lerobot.envs.configs import EnvConfig
 from lerobot.envs.utils import env_to_policy_features
 from lerobot.policies.act.configuration_act import ACTConfig
 from lerobot.policies.dot.configuration_dot import DOTConfig
+from lerobot.policies.pi0_fast.configuration_pi0_fast import PI0FastConfig
+from lerobot.policies.sfp.configuration_sfp import SFPConfig
 from lerobot.policies.diffusion.configuration_diffusion import DiffusionConfig
 from lerobot.policies.groot.configuration_groot import GrootConfig
 from lerobot.policies.pi0.configuration_pi0 import PI0Config
@@ -136,6 +138,10 @@ def get_policy_class(name: str) -> type[PreTrainedPolicy]:
         from lerobot.policies.dot.modeling_dot import DOTPolicy
 
         return DOTPolicy
+    elif name == "sfp":
+        from lerobot.policies.sfp.modeling_sfp import SFPPolicy
+
+        return SFPPolicy
     elif name == "vqbet":
         from lerobot.policies.vqbet.modeling_vqbet import VQBeTPolicy
 
@@ -148,6 +154,10 @@ def get_policy_class(name: str) -> type[PreTrainedPolicy]:
         from lerobot.policies.pi05.modeling_pi05 import PI05Policy
 
         return PI05Policy
+    elif name == "pi0_fast":
+        from lerobot.policies.pi0_fast.modeling_pi0_fast import PI0FastPolicy
+
+        return PI0FastPolicy
     elif name == "sac":
         from lerobot.policies.sac.modeling_sac import SACPolicy
 
@@ -210,12 +220,16 @@ def make_policy_config(policy_type: str, **kwargs) -> PreTrainedConfig:
         return ACTConfig(**kwargs)
     elif policy_type == "dot":
         return DOTConfig(**kwargs)
+    elif policy_type == "sfp":
+        return SFPConfig(**kwargs)
     elif policy_type == "vqbet":
         return VQBeTConfig(**kwargs)
     elif policy_type == "pi0":
         return PI0Config(**kwargs)
     elif policy_type == "pi05":
         return PI05Config(**kwargs)
+    elif policy_type == "pi0_fast":
+        return PI0FastConfig(**kwargs)
     elif policy_type == "sac":
         return SACConfig(**kwargs)
     elif policy_type == "smolvla":
@@ -375,6 +389,14 @@ def make_pre_post_processors(
             dataset_stats=kwargs.get("dataset_stats"),
         )
 
+    elif isinstance(policy_cfg, SFPConfig):
+        from lerobot.policies.sfp.processor_sfp import make_sfp_pre_post_processors
+
+        processors = make_sfp_pre_post_processors(
+            config=policy_cfg,
+            dataset_stats=kwargs.get("dataset_stats"),
+        )
+
     elif isinstance(policy_cfg, VQBeTConfig):
         from lerobot.policies.vqbet.processor_vqbet import make_vqbet_pre_post_processors
 
@@ -395,6 +417,14 @@ def make_pre_post_processors(
         from lerobot.policies.pi05.processor_pi05 import make_pi05_pre_post_processors
 
         processors = make_pi05_pre_post_processors(
+            config=policy_cfg,
+            dataset_stats=kwargs.get("dataset_stats"),
+        )
+
+    elif isinstance(policy_cfg, PI0FastConfig):
+        from lerobot.policies.pi0_fast.processor_pi0_fast import make_pi0_fast_pre_post_processors
+
+        processors = make_pi0_fast_pre_post_processors(
             config=policy_cfg,
             dataset_stats=kwargs.get("dataset_stats"),
         )

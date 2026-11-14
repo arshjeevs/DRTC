@@ -30,7 +30,7 @@ RESULTS_DIR = REPO_ROOT / "results"
 # Policies whose server-side inference accepts RTC inpainting kwargs (flow matching).
 RTC_POLICIES = {"smolvla", "pi0", "pi05"}
 # Policies whose dependencies conflict with the main .venv run from .venv-<name> (lab/bin/venv <name>).
-POLICY_VENVS = {"pi0": "pi", "pi05": "pi"}
+POLICY_VENVS = {"pi0": "pi", "pi05": "pi", "pi0_fast": "pi", "groot": "groot"}
 
 
 def load_yaml(path: Path) -> dict[str, Any]:
@@ -175,7 +175,7 @@ def naming_problems(name: str, entry: dict[str, Any], all_models: dict[str, dict
     if not m:
         problems.append(f"name should be <policy>_<task>_v<N>_<full|lora>[_<variant>], e.g. smolvla_cubebox_v1_lora")
     else:
-        if m["policy"] != entry.get("policy_type"):
+        if m["policy"] != str(entry.get("policy_type", "")).replace("_", ""):  # pi0_fast -> pi0fast_...
             problems.append(f"name starts with {m['policy']!r} but policy_type is {entry.get('policy_type')!r}")
         if m["method"] != entry.get("finetune", "full"):
             problems.append(f"name says {m['method']!r} but finetune is {entry.get('finetune', 'full')!r}")

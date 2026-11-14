@@ -16,6 +16,7 @@
 .env
 .venv
 .venv-pi
+.venv-groot
 env/
 venv/
 env.bak/

@@ -32,6 +32,7 @@ import math
 import random
 import re
 import shlex
+import shutil
 import sys
 from pathlib import Path
 
@@ -77,7 +78,38 @@ def push_checkpoint(out: Path, name: str, target: str) -> None:
     stale = ["model.safetensors"] if kind == "lora" else [lora.ADAPTER_CONFIG, lora.ADAPTER_WEIGHTS]
     api.upload_folder(repo_id=target, folder_path=folder, delete_patterns=stale,
                       commit_message=f"{out.name}: {kind} checkpoint {step}")
+    # Optimizer, scheduler, RNG and step: lets `--resume` continue this run on another machine.
+    state = folder.parent / "training_state"
+    if state.is_dir():
+        api.upload_folder(repo_id=target, folder_path=state, path_in_repo="training_state",
+                          commit_message=f"{out.name}: training state at step {step}")
     print("done", flush=True)
+
+
+def fetch_checkpoint(out: Path, target: str) -> bool:
+    """Download the last pushed checkpoint and its training state from the Hub into
+    out/checkpoints/<step>/ (+ `last`), so --resume works on a machine that did not train the model."""
+    from huggingface_hub import snapshot_download
+
+    if not HUB_ID.match(target) or target.startswith("outputs/"):
+        return False
+    try:
+        local = Path(snapshot_download(target))
+    except Exception as e:  # noqa: BLE001 (missing repo, no network: report and let the caller exit)
+        print(f"could not download {target}: {e}", flush=True)
+        return False
+    if not (local / "training_state/training_step.json").is_file() or not (local / "train_config.json").is_file():
+        print(f"{target} has no training state (pushed before resumable pushes existed)", flush=True)
+        return False
+    step = json.loads((local / "training_state/training_step.json").read_text())["step"]
+    checkpoint = out / "checkpoints" / f"{step:06d}"
+    shutil.copytree(local / "training_state", checkpoint / "training_state", dirs_exist_ok=True)
+    shutil.copytree(local, checkpoint / "pretrained_model", dirs_exist_ok=True,
+                    ignore=shutil.ignore_patterns("training_state", ".gitattributes", "README.md"))
+    (out / "checkpoints/last").unlink(missing_ok=True)
+    (out / "checkpoints/last").symlink_to(checkpoint.name)
+    print(f"downloaded {target} at step {step} -> {checkpoint}", flush=True)
+    return True
 
 
 def parse_episodes(spec) -> list[int]:
@@ -222,27 +254,36 @@ def main() -> None:
     if lora_flags and finetune != "lora":
         sys.exit(f"--lora.* flags given, but {args.model!r} trains with finetune: {finetune}")
 
+    more_epochs = overrides.pop("--epochs", None)  # total epochs: new runs, or the new target on --resume
+    if more_epochs is not None and "--steps" in overrides:
+        sys.exit("give --epochs or --steps, not both")
+
     if args.resume:
         last = out / "checkpoints/last/pretrained_model"
         config = last / "train_config.json"
-        if not config.is_file():
-            sys.exit(f"Nothing to resume: {config} not found")
+        if not config.is_file() and not (push and fetch_checkpoint(out, target)):
+            sys.exit(f"Nothing to resume: {config} not found (locally or on the Hub)")
         saved = "lora" if (last / lora.ADAPTER_CONFIG).is_file() else "full"
         if saved != finetune:
             sys.exit(f"{last} is a {saved} checkpoint, but {args.model!r} is finetune: {finetune}")
         # --resume runs up to the run's saved step target; a finished run needs a larger --steps.
         done = json.loads((last.parent / "training_state/training_step.json").read_text())["step"]
-        goal = int(overrides.get("--steps", json.loads(config.read_text())["steps"]))
+        saved_cfg = json.loads(config.read_text())
+        if more_epochs is not None:
+            data = saved_cfg["dataset"]
+            overrides["--steps"], _ = epochs_to_steps(data["repo_id"], data.get("root"), data.get("episodes"),
+                                                      float(more_epochs), int(saved_cfg["batch_size"]))
+        goal = int(overrides.get("--steps", saved_cfg["steps"]))
         if done >= goal:
             sys.exit(f"{args.model!r} already finished: checkpoint at step {done}, target {goal}.\n"
-                     f"To train further, raise the target, e.g. lab/bin/train {args.model} --resume --steps={done + 10_000}")
+                     f"To train further, raise the target: lab/bin/train {args.model} --resume --epochs=<total epochs>"
+                     f" (or --steps={done + 10_000})")
         print(f"resuming at step {done}, training to {goal}", flush=True)
         # No wandb flags: the run continues with its saved wandb settings (project and run id), so a run
         # started in another project resumes there, and one trained without wandb stays without it.
-        flags = {"--config_path": str(config), "--resume": "true"}
+        # output_dir: the saved config holds the path on the machine that started the run.
+        flags = {"--config_path": str(config), "--resume": "true", "--output_dir": str(out)}
     else:
-        if finetune == "lora" and "from" not in train:
-            sys.exit(f"finetune: lora needs a base checkpoint: set train.from for {args.model!r}")
         if out.exists():
             sys.exit(f"{out} exists. Continue it with --resume, or delete it to start over.")
         if "epochs" in train and "steps" in train:
@@ -277,6 +318,9 @@ def main() -> None:
         check_local_dataset(flags["--dataset.repo_id"])
     if not args.resume and "split" in train:
         check_episode_count(flags["--dataset.repo_id"], flags.get("--dataset.root"), train["split"])
+    if more_epochs is not None and not args.resume:
+        train = {**train, "epochs": float(more_epochs)}
+        train.pop("steps", None)
     if not args.resume and "epochs" in train and "--steps" not in overrides:
         episodes = json.loads(flags["--dataset.episodes"]) if "--dataset.episodes" in flags else None
         steps, frames = epochs_to_steps(flags["--dataset.repo_id"], flags.get("--dataset.root"), episodes,

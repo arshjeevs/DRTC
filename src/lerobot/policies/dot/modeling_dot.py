@@ -68,7 +68,10 @@ class DOT(nn.Module):
             )
             backbone.fc = nn.Linear(backbone.fc.in_features, self.config.dim_model)
 
-            self.projections["images"] = add_lora_to_backbone(backbone, rank=config.lora_rank)
+            # lora_rank 0: a plain backbone (all trainable; LoRA can then come from finetune: lora).
+            self.projections["images"] = (
+                add_lora_to_backbone(backbone, rank=config.lora_rank) if config.lora_rank > 0 else backbone
+            )
             self.n_features += len(self.image_names) * self.config.n_obs_steps
 
         if self.config.robot_state_feature:

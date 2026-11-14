@@ -463,10 +463,33 @@ pi05_cubebox_v1_lora:          # H200 / A100; served from a server GPU (too big 
     flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true, rename_map: *pi_rename}
     lora: {r: 32, alpha: 64, dropout: 0.05, targets: vlm+expert}
 
-# DOT (github.com/IliaLarchenko/dot_policy): 14M-parameter decoder-only transformer, trained from
-# scratch like ACT; the ImageNet ResNet18 trains through LoRA (built into the model, so `full` here).
+# --- New architectures (major project). LoRA, one shared setup: models trained from scratch (DOT,
+# Diffusion Policy, Streaming Flow Policy) put LoRA on their only pretrained part, the ImageNet ResNet18,
+# and train the rest in full (DOT's recipe; built from config, no base checkpoint). Pretrained models
+# (GR00T, pi0-FAST) put it on the model as pi0 does. Each fits ~2-5 h alone on the H200 (lab/H200.md);
+# train further later with: lab/bin/train <model> --resume --epochs=<new total>.
+
+# DOT (github.com/IliaLarchenko/dot_policy): 14M-parameter decoder-only transformer.
 # The author's real-task recipe: ~50 epochs at batch 12, LR 3e-5 -> 1e-5 (defaults in configuration_dot.py).
 # Each sample decodes a ~0.7 s video window (look-back frame), ~3x ACT's data loading: use --num_workers=8.
+dot_cubebox_v1_lora:
+  policy_type: dot
+  pretrained_name_or_path: orangemoon599/dot_cubebox_v1_lora
+  finetune: lora
+  fps: 30
+  task: *study_task
+  rtc_enabled: false
+  num_flow_matching_steps: null
+  train:
+    dataset: *study_ds
+    split: *study_split
+    epochs: 50
+    batch_size: 12
+    save_freq: 10000
+    flags: {policy.lora_rank: 0}   # the model's own backbone LoRA off: the LoRA pipeline adds it
+    lora: {r: 20, alpha: 20, dropout: 0.0, targets: backbone}
+
+# Ablation from the DOT report: the same with the ResNet trained in full (the author saw it overfit).
 dot_cubebox_v1_full:
   policy_type: dot
   pretrained_name_or_path: orangemoon599/dot_cubebox_v1_full
@@ -475,16 +498,42 @@ dot_cubebox_v1_full:
   task: *study_task
   rtc_enabled: false
   num_flow_matching_steps: null
-  train: {dataset: *study_ds, split: *study_split, epochs: 50, batch_size: 12, save_freq: 10000}
+  train:
+    dataset: *study_ds
+    split: *study_split
+    epochs: 50
+    batch_size: 12
+    save_freq: 10000
+    flags: {policy.lora_rank: 0}
+
+# pi0-FAST (Physical Intelligence; LeRobot v0.4.4 code): PaliGemma 3B decoding FAST action tokens one by one
+# (autoregressive: inference time grows with the chunk's token count, unlike pi0's flow matching).
+# Base pinned before the processor changes our LeRobot can't load (same weights as the latest revision).
+pi0fast_cubebox_v1_lora:       # H200 / A100; served from a server GPU
+  policy_type: pi0_fast
+  pretrained_name_or_path: orangemoon599/pi0fast_cubebox_v1_lora
+  finetune: lora
+  fps: 30
+  task: *study_task
+  rtc_enabled: false
+  train:
+    dataset: *study_ds
+    split: *study_split
+    from: lerobot/pi0fast-base@80f748308df08d1b3a6b480cabe039a35b2e6685
+    epochs: 10
+    batch_size: 32
+    save_freq: 2000
+    flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true, rename_map: *pi_rename}
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: vlm}
 
 # Diffusion Policy (Chi et al. 2023; in LeRobot): ResNet18 + 1D U-Net, trained from scratch like ACT.
 # DDIM, so the number of denoising steps can be changed at inference: the latency dial (10 here; 100 =
 # DDPM-like). Frames 600x800 -> 240x320 -> random 216x288 crop (LeRobot's 84x84 default is for 96x96 sim).
 # horizon 32 / 16 executed actions at 30 fps (~0.5 s); 2 observation steps.
-diffusion_cubebox_v1_full:
+diffusion_cubebox_v1_lora:
   policy_type: diffusion
-  pretrained_name_or_path: orangemoon599/diffusion_cubebox_v1_full
-  finetune: full
+  pretrained_name_or_path: orangemoon599/diffusion_cubebox_v1_lora
+  finetune: lora
   fps: 30
   task: *study_task
   rtc_enabled: false
@@ -505,6 +554,54 @@ diffusion_cubebox_v1_full:
       policy.drop_n_last_frames: 15
       policy.noise_scheduler_type: DDIM
       policy.num_inference_steps: 10
+    lora: {r: 20, alpha: 20, dropout: 0.0, targets: backbone}
+
+# Streaming Flow Policy (Jiang et al. 2025, arXiv:2505.21851; LeRobot code from Liyux3/lerobot_MLP-SFP):
+# learns a velocity field over the action trajectory and Euler-integrates it from the current state, one
+# step per emitted action (no denoising loop). Same encoder, frames, history and chunk as
+# diffusion_cubebox_v1_lora, so the two differ only in how actions are generated.
+sfp_cubebox_v1_lora:
+  policy_type: sfp
+  pretrained_name_or_path: orangemoon599/sfp_cubebox_v1_lora
+  finetune: lora
+  fps: 30
+  task: *study_task
+  rtc_enabled: false
+  num_flow_matching_steps: null
+  train:
+    dataset: *study_ds
+    split: *study_split
+    epochs: 100
+    batch_size: 64
+    save_freq: 10000
+    flags:
+      policy.resize_shape: [240, 320]
+      policy.crop_shape: [216, 288]
+      policy.n_obs_steps: 2
+      policy.horizon: 33
+      policy.n_action_steps: 16
+    lora: {r: 20, alpha: 20, dropout: 0.0, targets: backbone}
+
+# GR00T N1.5 (NVIDIA, 3B; in LeRobot): Eagle 2.5 VLM + flow-matching DiT action head. NVIDIA's fine-tune
+# recipe keeps the VLM frozen; here LoRA on the action head's transformers, its encoders/decoders in full.
+# Chunks are at most 16 actions (the pretrained action head). Own venv (.venv-groot, made on first use);
+# no flash-attn needed (falls back to PyTorch SDPA). H200 / A100.
+groot_cubebox_v1_lora:
+  policy_type: groot
+  pretrained_name_or_path: orangemoon599/groot_cubebox_v1_lora
+  finetune: lora
+  fps: 30
+  task: *study_task
+  rtc_enabled: false
+  num_flow_matching_steps: null
+  train:
+    dataset: *study_ds
+    split: *study_split
+    epochs: 10
+    batch_size: 32
+    save_freq: 2000
+    flags: {policy.chunk_size: 16, policy.n_action_steps: 16}
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
 
 # Template for our own models:
 # smolvla_cube_v1:

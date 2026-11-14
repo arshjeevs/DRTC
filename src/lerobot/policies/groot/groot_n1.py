@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import importlib.util
 import numpy as np
 import torch
 import torch.nn as nn
@@ -82,6 +83,12 @@ class EagleBackbone(nn.Module):
             print(f"[GROOT] Warning: failed to prepare Eagle cache for backbone: {exc}")
 
         config = AutoConfig.from_pretrained(str(cache_dir), trust_remote_code=True)
+        if importlib.util.find_spec("flash_attn") is None:
+            # Eagle's config asks for FlashAttention-2; without the flash-attn package use PyTorch SDPA
+            # (same attention; recent GPUs run a flash kernel through it too).
+            for cfg in (config, getattr(config, "text_config", None), getattr(config, "vision_config", None)):
+                if cfg is not None and getattr(cfg, "_attn_implementation", None) in (None, "flash_attention_2"):
+                    cfg._attn_implementation = "sdpa"
         self.eagle_model = AutoModel.from_config(config, trust_remote_code=True)
 
         if project_to_dim is not None:
