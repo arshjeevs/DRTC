@@ -210,6 +210,7 @@ xvla_train_new_1_full:
   task: Pick the green cube and place it in the box
   rtc_enabled: false
   num_flow_matching_steps: null
+  actions_per_chunk: 30          # X-VLA's chunk_size is 30 (the run default asks for 50)
   train:
     dataset: orangemoon599/train_new_1
     from: lerobot/xvla-base
@@ -259,6 +260,7 @@ xvla_train_new_1_lora:
   task: Pick the green cube and place it in the box
   rtc_enabled: false
   num_flow_matching_steps: null
+  actions_per_chunk: 30          # X-VLA's chunk_size is 30 (the run default asks for 50)
   train:
     dataset: orangemoon599/train_new_1
     from: lerobot/xvla-base
