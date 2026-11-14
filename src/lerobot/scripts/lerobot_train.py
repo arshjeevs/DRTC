@@ -21,6 +21,7 @@ from pprint import pformat
 from typing import Any
 
 import torch
+import torchvision
 from accelerate import Accelerator
 from termcolor import colored
 from torch.optim import Optimizer
@@ -156,10 +157,13 @@ class Uint8Frames(torch.utils.data.Dataset):
     `uint8 / 255` in the training loop restores the same float32 tensor. Batches wait in shared memory
     between the data-loading workers and the training process; uint8 needs 4x less of it, so more
     workers and parallel runs fit in a container's --shm-size.
+
+    `size` (height, width): also resize the frames here, for policies that resize them anyway
+    (`policy.dataloader_frame_size`, e.g. DOT); then the round trip is exact up to that resize.
     """
 
-    def __init__(self, dataset, camera_keys: list[str]):
-        self.dataset, self.camera_keys = dataset, camera_keys
+    def __init__(self, dataset, camera_keys: list[str], size: tuple[int, int] | None = None):
+        self.dataset, self.camera_keys, self.size = dataset, camera_keys, size
 
     def __len__(self) -> int:
         return len(self.dataset)
@@ -168,7 +172,10 @@ class Uint8Frames(torch.utils.data.Dataset):
         item = self.dataset[idx]
         for key in self.camera_keys:
             if key in item and item[key].is_floating_point():
-                item[key] = (item[key] * 255).round_().to(torch.uint8)
+                frames = item[key]
+                if self.size is not None and tuple(frames.shape[-2:]) != tuple(self.size):
+                    frames = torchvision.transforms.functional.resize(frames, list(self.size), antialias=True)
+                item[key] = (frames * 255).round_().clamp_(0, 255).to(torch.uint8)
         return item
 
 
@@ -180,6 +187,10 @@ def frames_to_float(batch: dict, camera_keys: list[str]) -> dict:
     return batch
 
 
+def uint8_batch_keys(batch: dict) -> list[str]:
+    return [k for k, v in batch.items() if isinstance(v, torch.Tensor) and v.dtype == torch.uint8]
+
+
 def make_val_loader(cfg: TrainPipelineConfig, device: torch.device) -> torch.utils.data.DataLoader:
     """Fixed batches from the held-out episodes, without training-time image augmentation."""
     val_cfg = deepcopy(cfg)
@@ -189,8 +200,12 @@ def make_val_loader(cfg: TrainPipelineConfig, device: torch.device) -> torch.uti
     num_frames = min(len(val_dataset), cfg.val_batches * cfg.batch_size)
     indices = torch.randperm(len(val_dataset), generator=torch.Generator().manual_seed(0))[:num_frames]
     logging.info(f"Validation: {num_frames} frames from held-out episodes {cfg.val_episodes}")
+    val_frames = torch.utils.data.Subset(val_dataset, indices.tolist())
+    size = getattr(cfg.policy, "dataloader_frame_size", None)
+    if cfg.num_workers > 0 or size:
+        val_frames = Uint8Frames(val_frames, list(val_dataset.meta.camera_keys), size)
     return torch.utils.data.DataLoader(
-        torch.utils.data.Subset(val_dataset, indices.tolist()),
+        val_frames,
         batch_size=cfg.batch_size,
         shuffle=False,
         num_workers=cfg.num_workers,
@@ -209,16 +224,21 @@ def validate(
     with torch.random.fork_rng(devices=[device] if device.type == "cuda" else []), torch.no_grad():
         torch.manual_seed(0)
         for batch in val_loader:
-            batch = preprocessor(batch)
+            batch = preprocessor(frames_to_float(batch, uint8_batch_keys(batch)))
             with accelerator.autocast():
                 loss, _ = policy.forward(batch)
                 losses.append(loss.item())
                 if actions:
                     policy.reset()
                     predicted = policy.predict_action_chunk(batch)
-                    horizon = min(predicted.shape[1], batch[ACTION].shape[1])
-                    error = (predicted[:, :horizon].float() - batch[ACTION][:, :horizon].float()) ** 2
-                    valid = ~batch["action_is_pad"][:, :horizon].unsqueeze(-1)
+                    # Policies whose batches also hold past actions (DOT) say where the chunk starts.
+                    if hasattr(policy, "chunk_targets"):
+                        target, is_pad = policy.chunk_targets(batch)
+                    else:
+                        target, is_pad = batch[ACTION], batch["action_is_pad"]
+                    horizon = min(predicted.shape[1], target.shape[1])
+                    error = (predicted[:, :horizon].float() - target[:, :horizon].float()) ** 2
+                    valid = ~is_pad[:, :horizon].unsqueeze(-1)
                     action_errors.append(((error * valid).sum() / (valid.sum() * error.shape[-1])).item())
     policy.train()
     metrics = {"val_loss": sum(losses) / len(losses)}
@@ -419,8 +439,9 @@ def train(cfg: TrainPipelineConfig, accelerator: Accelerator | None = None):
 
     # Exact round trip only without image augmentation (augmented frames are no longer k/255 values).
     camera_keys = list(dataset.meta.camera_keys) if not cfg.dataset.image_transforms.enable else []
+    frame_size = getattr(cfg.policy, "dataloader_frame_size", None)
     dataloader = torch.utils.data.DataLoader(
-        Uint8Frames(dataset, camera_keys) if camera_keys and cfg.num_workers > 0 else dataset,
+        Uint8Frames(dataset, camera_keys, frame_size) if camera_keys and (cfg.num_workers > 0 or frame_size) else dataset,
         num_workers=cfg.num_workers,
         batch_size=cfg.batch_size,
         shuffle=shuffle and not cfg.dataset.streaming,

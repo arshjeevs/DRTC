@@ -463,6 +463,20 @@ pi05_cubebox_v1_lora:          # H200 / A100; served from a server GPU (too big 
     flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true, rename_map: *pi_rename}
     lora: {r: 32, alpha: 64, dropout: 0.05, targets: vlm+expert}
 
+# DOT (github.com/IliaLarchenko/dot_policy): 14M-parameter decoder-only transformer, trained from
+# scratch like ACT; the ImageNet ResNet18 trains through LoRA (built into the model, so `full` here).
+# The author's real-task recipe: ~50 epochs at batch 12, LR 3e-5 -> 1e-5 (defaults in configuration_dot.py).
+# Each sample decodes a ~0.7 s video window (look-back frame), ~3x ACT's data loading: use --num_workers=8.
+dot_cubebox_v1_full:
+  policy_type: dot
+  pretrained_name_or_path: orangemoon599/dot_cubebox_v1_full
+  finetune: full
+  fps: 30
+  task: *study_task
+  rtc_enabled: false
+  num_flow_matching_steps: null
+  train: {dataset: *study_ds, split: *study_split, epochs: 50, batch_size: 12, save_freq: 10000}
+
 # Template for our own models:
 # smolvla_cube_v1:
 #   policy_type: smolvla
