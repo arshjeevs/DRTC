@@ -158,6 +158,8 @@ def flag_value(value):
     """YAML value -> lerobot-train flag text (true/false; dicts such as rename_map as JSON)."""
     if isinstance(value, bool):
         return str(value).lower()
+    if isinstance(value, list):  # tuples such as policy.resize_shape: [240, 320] -> "[240,320]"
+        return json.dumps(value, separators=(",", ":"))
     return json.dumps(value) if isinstance(value, dict) else value
 
 

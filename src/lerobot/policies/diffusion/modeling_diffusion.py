@@ -91,13 +91,39 @@ class DiffusionPolicy(PreTrainedPolicy):
             self._queues[OBS_ENV_STATE] = deque(maxlen=self.config.n_obs_steps)
 
     @torch.no_grad()
-    def predict_action_chunk(self, batch: dict[str, Tensor], noise: Tensor | None = None) -> Tensor:
-        """Predict a chunk of actions given environment observations."""
+    def predict_action_chunk(self, batch: dict[str, Tensor], noise: Tensor | None = None, **kwargs) -> Tensor:
+        """Predict a chunk of actions given environment observations.
+
+        - A training-format batch (observations already carry n_obs_steps) is used as it is (validation).
+        - A single observation (the DRTC server) is added to the observation queue first, so each call
+          counts as one step; the queue then holds the latest n_obs_steps observations.
+        - Called from select_action (queue already updated): the queue as it is.
+        """
+        if OBS_STATE in batch and batch[OBS_STATE].dim() == 3:
+            batch = dict(batch)
+            if self.config.image_features:
+                batch[OBS_IMAGES] = torch.stack([batch[key] for key in self.config.image_features], dim=-4)
+            batch = {k: batch[k] for k in (OBS_STATE, OBS_IMAGES, OBS_ENV_STATE) if k in batch}
+            return self.diffusion.generate_actions(batch, noise=noise)
+
+        if not kwargs.get("_queues_ready", False):
+            if self._queues is None:
+                self.reset()
+            batch = {k: v for k, v in batch.items() if k != ACTION}
+            if self.config.image_features:
+                batch[OBS_IMAGES] = torch.stack([batch[key] for key in self.config.image_features], dim=-4)
+            self._queues = populate_queues(self._queues, batch)
         # stack n latest observations from the queue
         batch = {k: torch.stack(list(self._queues[k]), dim=1) for k in batch if k in self._queues}
         actions = self.diffusion.generate_actions(batch, noise=noise)
 
         return actions
+
+    def chunk_targets(self, batch: dict[str, Tensor]) -> tuple[Tensor, Tensor]:
+        """Ground truth aligned with predict_action_chunk on a training-format batch (the first
+        n_obs_steps - 1 actions belong to past observations)."""
+        start = self.config.n_obs_steps - 1
+        return batch[ACTION][:, start:], batch["action_is_pad"][:, start:]
 
     @torch.no_grad()
     def select_action(self, batch: dict[str, Tensor], noise: Tensor | None = None) -> Tensor:
@@ -132,7 +158,7 @@ class DiffusionPolicy(PreTrainedPolicy):
         self._queues = populate_queues(self._queues, batch)
 
         if len(self._queues[ACTION]) == 0:
-            actions = self.predict_action_chunk(batch, noise=noise)
+            actions = self.predict_action_chunk(batch, noise=noise, _queues_ready=True)
             self._queues[ACTION].extend(actions.transpose(0, 1))
 
         action = self._queues[ACTION].popleft()
@@ -483,7 +509,11 @@ class DiffusionRgbEncoder(nn.Module):
 
         # Note: we have a check in the config class to make sure all images have the same shape.
         images_shape = next(iter(config.image_features.values())).shape
-        dummy_shape_h_w = config.crop_shape if config.crop_shape is not None else images_shape[1:]
+        self.resize_shape = tuple(config.resize_shape) if config.resize_shape is not None else None
+        if config.crop_shape is not None:
+            dummy_shape_h_w = config.crop_shape
+        else:
+            dummy_shape_h_w = self.resize_shape if self.resize_shape is not None else images_shape[1:]
         dummy_shape = (1, images_shape[0], *dummy_shape_h_w)
         feature_map_shape = get_output_shape(self.backbone, dummy_shape)[1:]
 
@@ -499,7 +529,9 @@ class DiffusionRgbEncoder(nn.Module):
         Returns:
             (B, D) image feature.
         """
-        # Preprocess: maybe crop (if it was set up in the __init__).
+        # Preprocess: maybe resize (no-op when the data loader already did), then maybe crop.
+        if self.resize_shape is not None and tuple(x.shape[-2:]) != self.resize_shape:
+            x = torchvision.transforms.functional.resize(x, list(self.resize_shape), antialias=True)
         if self.do_crop:
             if self.training:  # noqa: SIM108
                 x = self.maybe_random_crop(x)

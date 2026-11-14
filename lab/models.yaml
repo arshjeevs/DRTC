@@ -477,6 +477,35 @@ dot_cubebox_v1_full:
   num_flow_matching_steps: null
   train: {dataset: *study_ds, split: *study_split, epochs: 50, batch_size: 12, save_freq: 10000}
 
+# Diffusion Policy (Chi et al. 2023; in LeRobot): ResNet18 + 1D U-Net, trained from scratch like ACT.
+# DDIM, so the number of denoising steps can be changed at inference: the latency dial (10 here; 100 =
+# DDPM-like). Frames 600x800 -> 240x320 -> random 216x288 crop (LeRobot's 84x84 default is for 96x96 sim).
+# horizon 32 / 16 executed actions at 30 fps (~0.5 s); 2 observation steps.
+diffusion_cubebox_v1_full:
+  policy_type: diffusion
+  pretrained_name_or_path: orangemoon599/diffusion_cubebox_v1_full
+  finetune: full
+  fps: 30
+  task: *study_task
+  rtc_enabled: false
+  num_flow_matching_steps: null
+  train:
+    dataset: *study_ds
+    split: *study_split
+    epochs: 100
+    batch_size: 64
+    save_freq: 10000
+    flags:
+      policy.resize_shape: [240, 320]
+      policy.crop_shape: [216, 288]
+      policy.pretrained_backbone_weights: ResNet18_Weights.IMAGENET1K_V1
+      policy.use_group_norm: false
+      policy.horizon: 32
+      policy.n_action_steps: 16
+      policy.drop_n_last_frames: 15
+      policy.noise_scheduler_type: DDIM
+      policy.num_inference_steps: 10
+
 # Template for our own models:
 # smolvla_cube_v1:
 #   policy_type: smolvla

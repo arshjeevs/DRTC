@@ -123,6 +123,9 @@ class DiffusionConfig(PreTrainedConfig):
     # Architecture / modeling.
     # Vision backbone.
     vision_backbone: str = "resnet18"
+    # (H, W) every camera frame is resized to before cropping (None: use frames as they are). Large camera
+    # frames need it: crop_shape alone would cut a small patch out of them.
+    resize_shape: tuple[int, int] | None = None
     crop_shape: tuple[int, int] | None = (84, 84)
     crop_is_random: bool = True
     pretrained_backbone_weights: str | None = None
@@ -203,13 +206,19 @@ class DiffusionConfig(PreTrainedConfig):
             num_warmup_steps=self.scheduler_warmup_steps,
         )
 
+    @property
+    def dataloader_frame_size(self) -> tuple[int, int] | None:
+        """lerobot_train resizes camera frames to this in the data-loading workers."""
+        return tuple(self.resize_shape) if self.resize_shape is not None else None
+
     def validate_features(self) -> None:
         if len(self.image_features) == 0 and self.env_state_feature is None:
             raise ValueError("You must provide at least one image or the environment state among the inputs.")
 
         if self.crop_shape is not None:
             for key, image_ft in self.image_features.items():
-                if self.crop_shape[0] > image_ft.shape[1] or self.crop_shape[1] > image_ft.shape[2]:
+                h, w = self.resize_shape if self.resize_shape is not None else image_ft.shape[1:]
+                if self.crop_shape[0] > h or self.crop_shape[1] > w:
                     raise ValueError(
                         f"`crop_shape` should fit within the images shapes. Got {self.crop_shape} "
                         f"for `crop_shape` and {image_ft.shape} for "

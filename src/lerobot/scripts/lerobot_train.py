@@ -187,6 +187,24 @@ def frames_to_float(batch: dict, camera_keys: list[str]) -> dict:
     return batch
 
 
+def episode_bounds(dataset) -> tuple[list[int], list[int]]:
+    """Row positions [from, to) of each episode inside `dataset`. A dataset made from some episodes
+    (dataset.episodes) is numbered from 0 in episode order, so the metadata's absolute indices would
+    point past its end (EpisodeAwareSampler, used by Diffusion Policy / VQ-BeT)."""
+    starts = list(dataset.meta.episodes["dataset_from_index"])
+    ends = list(dataset.meta.episodes["dataset_to_index"])
+    if dataset.episodes is None:
+        return starts, ends
+    froms, tos, position = [], [], 0
+    for episode in sorted(dataset.episodes):
+        froms.append(position)
+        position += ends[episode] - starts[episode]
+        tos.append(position)
+    if position != len(dataset):
+        raise RuntimeError(f"Episode lengths add up to {position} frames, but the dataset has {len(dataset)}")
+    return froms, tos
+
+
 def uint8_batch_keys(batch: dict) -> list[str]:
     return [k for k, v in batch.items() if isinstance(v, torch.Tensor) and v.dtype == torch.uint8]
 
@@ -426,10 +444,10 @@ def train(cfg: TrainPipelineConfig, accelerator: Accelerator | None = None):
     # create dataloader for offline training
     if hasattr(cfg.policy, "drop_n_last_frames"):
         shuffle = False
+        froms, tos = episode_bounds(dataset)
         sampler = EpisodeAwareSampler(
-            dataset.meta.episodes["dataset_from_index"],
-            dataset.meta.episodes["dataset_to_index"],
-            episode_indices_to_use=dataset.episodes,
+            froms,
+            tos,
             drop_n_last_frames=cfg.policy.drop_n_last_frames,
             shuffle=True,
         )
