@@ -29,7 +29,7 @@ H200 GPU server: [H200.md](H200.md). On Windows, see [WINDOWS.md](WINDOWS.md): s
 | `lab/bin/server` | laptop | Policy server on the GPU. Loads whichever model each run asks for |
 | `lab/bin/tunnel h200` | laptop | Forward the Pi's server connection to `lab/bin/server` running on the H200 ([H200.md](H200.md#serving-models-from-the-h200)) |
 | `lab/bin/session [record]` | Pi / laptop | tmux: `phonecam` window + `work` window running preflight. Re-run to re-attach |
-| `lab/bin/run <group/name> [--model M] [--trials N] [--note TEXT] [--no-label]` | Pi | Run a condition. Prompts for scene reset before and success after each trial |
+| `lab/bin/run <group/name> [--model M] [--trials N] [--duration SECONDS] [--note TEXT] [--no-label]` | Pi | Run a condition. Prompts for scene reset before and success after each trial. `--duration` overrides the trial length (default 25 s) and is added to the note |
 | `lab/bin/train <model> [--dry-run] [--no-push] [--resume] [--push [ckpt]] [--<lerobot flag>=value ...]` | laptop | Train a `models.yaml` entry that has a `train:` block and push it to its Hub id. See [Training](#training) |
 | `lab/bin/list` | any | Registered models and experiments |
 | `lab/bin/bench <model> [--device cpu] [--dtype bf16] [--compile] [--steps 10 8 4 2]` | any | Inference speed and memory of a model on this machine -> `results/benchmark/<host>/` |

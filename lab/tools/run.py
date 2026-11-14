@@ -105,6 +105,8 @@ def main() -> None:
     parser.add_argument("--trials", type=int, default=1)
     parser.add_argument("--no-label", action="store_true", help="Skip the success prompt after each trial")
     parser.add_argument("--note", default="", help="Free-text note stored with every trial")
+    parser.add_argument("--duration", type=float, metavar="SECONDS",
+                        help="Trial length (overrides the experiment's duration_s; default 25 s from _defaults.yaml)")
     args = parser.parse_args()
 
     if not logging.getLogger().handlers:
@@ -113,6 +115,12 @@ def main() -> None:
     exp_path = resolve_experiment_path(args.experiment)
     exp_id = experiment_id(exp_path)
     resolved = compose(exp_path, args.model)
+    if args.duration is not None:
+        if args.duration <= 0:
+            raise SystemExit("--duration must be > 0 seconds")
+        resolved["duration_s"] = args.duration  # saved in each trial's config.yaml
+        # In the note too, so index.csv shows which trials of this condition ran at another length.
+        args.note = f"duration={args.duration:g}s" + (f"; {args.note}" if args.note else "")
     rig = load_rig()
     host, port = rig["server"]["host"], int(rig["server"]["port"])
 
