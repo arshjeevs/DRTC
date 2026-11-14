@@ -617,6 +617,39 @@ groot_cubebox_v1_lora:
     flags: {policy.chunk_size: 16, policy.n_action_steps: 16}
     lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
 
+# MolmoAct2 (Allen AI, arXiv:2605.02881; https://huggingface.co/docs/lerobot/en/molmoact2): Molmo2-ER VLM +
+# flow-matching action expert conditioned on the VLM's per-layer key/values; up to 30 actions per chunk.
+# Fine-tuned from lerobot/MolmoAct2-SO100_101-LeRobot: already trained on SO-100/101 arms, in LeRobot format,
+# with the SO101 joint-calibration correction (joint_signs / joint_offsets) built into its processor.
+# NOT TRAINABLE YET: lerobot.policies.molmoact2 is in upstream LeRobot, not in this one (0.4.3); it has to be
+# ported first (like DOT / pi0-FAST), probably in its own venv (upstream `molmoact2` extra).
+# - The VLM is LoRA-trained by the policy itself (checkpoint: rank 64, alpha 16; the docs advise not to override
+#   policy.train_mode_vlm when loading this way), the action expert in full. The saved checkpoint is the whole
+#   model, so for the lab it is `finetune: full` (no lab LoRA adapter).
+# - ~22 GB per checkpoint: few saves (save_freq), and delete outputs/train/<model> once it is on the Hub.
+# - Normalization: quantiles (q01/q99), which our dataset's stats.json already has.
+# - Cameras: the checkpoint has cam0 / cam1 (two external views); ours are scene (camera2) and wrist (camera1).
+molmoact2_cubebox_v1_full:     # H200 / A100; served from a server GPU
+  policy_type: molmoact2
+  pretrained_name_or_path: orangemoon599/molmoact2_cubebox_v1_full
+  finetune: full
+  fps: 30
+  task: *study_task
+  rtc_enabled: false
+  num_flow_matching_steps: null
+  actions_per_chunk: 30          # the checkpoint's chunk_size (run default asks for 50)
+  train:
+    dataset: *study_ds
+    split: *study_split
+    from: lerobot/MolmoAct2-SO100_101-LeRobot@a4ab68081b84bb0659d96f454edbce6abbe8a1cd
+    epochs: 10                     # docs: batch 16-32 for datasets under ~200 demos
+    batch_size: 32
+    save_freq: 4000                # 22 GB each: checkpoints at 4000, 8000 and the end
+    flags:
+      policy.dtype: bfloat16       # bf16 VLM matrices, fp32 action expert
+      policy.gradient_checkpointing: true
+      rename_map: {observation.images.camera2: observation.images.cam0, observation.images.camera1: observation.images.cam1}
+
 # Template for our own models:
 # smolvla_cube_v1:
 #   policy_type: smolvla
