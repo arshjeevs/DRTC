@@ -1,0 +1,4 @@
+# Method A: latency-adaptive playback (client; src/lerobot/async_inference/playback.py)
+description: Adaptive playback slows execution while few actions are queued, so the queue lasts until the next chunk
+model: groot_cubebox_v1_lora
+playback_mode: adaptive

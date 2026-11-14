@@ -145,6 +145,7 @@ class ExperimentTick:
     chunk_overlap_count: int | None  # Number of overlapping actions compared
     chunk_mean_l2: float | None  # Mean L2 distance across overlapping actions
     chunk_max_l2: float | None  # Max L2 distance across overlapping actions
+    playback_rate: float = 1.0  # Actions advanced this tick (1 = fixed playback; < 1 = slowed down)
 
 
 @dataclass
@@ -221,6 +222,7 @@ class ExperimentMetricsWriter:
         "chunk_overlap_count",
         "chunk_mean_l2",
         "chunk_max_l2",
+        "playback_rate",
     ]
 
     def __init__(
@@ -288,6 +290,7 @@ class ExperimentMetricsWriter:
         chunk_overlap_count: int | None = None,
         chunk_mean_l2: float | None = None,
         chunk_max_l2: float | None = None,
+        playback_rate: float = 1.0,
     ) -> None:
         """Record a single tick of experiment data."""
         tick = ExperimentTick(
@@ -308,6 +311,7 @@ class ExperimentMetricsWriter:
             chunk_overlap_count=chunk_overlap_count,
             chunk_mean_l2=chunk_mean_l2,
             chunk_max_l2=chunk_max_l2,
+            playback_rate=playback_rate,
         )
         self._ticks.append(tick)
 
@@ -468,6 +472,7 @@ class ExperimentMetricsWriter:
             "chunk_max_l2": tick.chunk_max_l2
             if tick.chunk_max_l2 is not None
             else "",
+            "playback_rate": tick.playback_rate,
         }
 
     def _auto_flush_ticks(self) -> None:

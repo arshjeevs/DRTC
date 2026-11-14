@@ -343,7 +343,12 @@ class FlowmatchingActionHead(nn.Module):
         return BatchFeature(data=output_dict)
 
     @torch.no_grad()
-    def get_action(self, backbone_output: BatchFeature, action_input: BatchFeature) -> BatchFeature:
+    def get_action(
+        self, backbone_output: BatchFeature, action_input: BatchFeature, velocity_guidance=None
+    ) -> BatchFeature:
+        """velocity_guidance(actions, t, num_steps, velocity_fn) -> velocity, optional (lab addition):
+        replaces the plain velocity at each Euler step, e.g. RTC prefix inpainting or smoothness
+        guidance (GrootPolicy.predict_action_chunk). t runs 0 (noise) -> 1 (clean) here."""
         backbone_output = self.process_backbone_output(backbone_output)
 
         # Get vision and language embeddings.
@@ -370,28 +375,34 @@ class FlowmatchingActionHead(nn.Module):
             t_cont = t / float(num_steps)  # e.g. goes 0, 1/N, 2/N, ...
             t_discretized = int(t_cont * self.num_timestep_buckets)
 
-            # Embed noised action trajectory.
             timesteps_tensor = torch.full(size=(batch_size,), fill_value=t_discretized, device=device)
-            action_features = self.action_encoder(actions, timesteps_tensor, embodiment_id)
-            # Maybe add position embedding.
-            if self.config.add_pos_embed:
-                pos_ids = torch.arange(action_features.shape[1], dtype=torch.long, device=device)
-                pos_embs = self.position_embedding(pos_ids).unsqueeze(0)
-                action_features = action_features + pos_embs
 
-            # Join vision, language, state and action embedding along sequence dimension.
-            future_tokens = self.future_tokens.weight.unsqueeze(0).expand(vl_embs.shape[0], -1, -1)
-            sa_embs = torch.cat((state_features, future_tokens, action_features), dim=1)
+            def velocity(x, timesteps_tensor=timesteps_tensor):
+                # Embed noised action trajectory.
+                action_features = self.action_encoder(x, timesteps_tensor, embodiment_id)
+                # Maybe add position embedding.
+                if self.config.add_pos_embed:
+                    pos_ids = torch.arange(action_features.shape[1], dtype=torch.long, device=device)
+                    pos_embs = self.position_embedding(pos_ids).unsqueeze(0)
+                    action_features = action_features + pos_embs
 
-            # Run model forward.
-            model_output = self.model(
-                hidden_states=sa_embs,
-                encoder_hidden_states=vl_embs,
-                timestep=timesteps_tensor,
-            )
-            pred = self.action_decoder(model_output, embodiment_id)
+                # Join vision, language, state and action embedding along sequence dimension.
+                future_tokens = self.future_tokens.weight.unsqueeze(0).expand(vl_embs.shape[0], -1, -1)
+                sa_embs = torch.cat((state_features, future_tokens, action_features), dim=1)
 
-            pred_velocity = pred[:, -self.action_horizon :]
+                # Run model forward.
+                model_output = self.model(
+                    hidden_states=sa_embs,
+                    encoder_hidden_states=vl_embs,
+                    timestep=timesteps_tensor,
+                )
+                pred = self.action_decoder(model_output, embodiment_id)
+                return pred[:, -self.action_horizon :]
+
+            if velocity_guidance is None:
+                pred_velocity = velocity(actions)
+            else:
+                pred_velocity = velocity_guidance(actions, t_cont, num_steps, velocity).to(actions.dtype)
 
             # Update actions using euler integration.
             actions = actions + dt * pred_velocity

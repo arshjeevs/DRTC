@@ -51,6 +51,43 @@ class AsyncRTCConfig:
     max_guidance_weight: float | None = None  # None = use num_flow_matching_steps (Alex Soare opt)
     sigma_d: float = 1.0  # Prior variance (0.2 = stronger guidance, 1.0 = original RTC)
     full_trajectory_alignment: bool = False  # Skip gradient for faster/smoother transitions
+    # Smoothness guidance (lab addition; see smoothness_step): jerk-descent step size on the predicted
+    # clean chunk at every denoising step, in (0, 2); 0 = off. Works with or without RTC.
+    smoothness_weight: float = 0.0
+    action_dims: int | None = None  # guide only the first N action dims (rest is the model's padding)
+
+
+# Largest eigenvalue bound of D3^T D3 (third-difference operator, stencil 1,-3,3,-1): (1+3+3+1)^2.
+_JERK_LIPSCHITZ = 64.0
+
+
+def jerk_gradient(x: Tensor) -> Tensor:
+    """D3^T D3 x along time for x (B, T, A): the gradient of 0.5 * sum ||third difference||^2."""
+    g = torch.zeros_like(x)
+    if x.shape[1] < 4:
+        return g
+    j = x[:, 3:] - 3 * x[:, 2:-1] + 3 * x[:, 1:-2] - x[:, :-3]
+    g[:, 3:] += j
+    g[:, 2:-1] -= 3 * j
+    g[:, 1:-2] += 3 * j
+    g[:, :-3] -= j
+    return g
+
+
+def smoothness_step(x1: Tensor, weight: float, frozen: int = 0, action_dims: int | None = None) -> Tensor:
+    """How much to move the predicted clean chunk x1 (B, T, A) to lower its jerk: -(weight / L) * D3^T D3 x1.
+
+    One gradient-descent step on 0.5 * ||D3 x1||^2 with step weight / L (L bounds the operator's
+    eigenvalues, so 0 < weight < 2 is stable). The first `frozen` actions (RTC's hard-masked prefix,
+    already committed to the robot) are not moved; they still count in the jerk, so the fresh part is
+    pulled to join them smoothly. Padding dims beyond `action_dims` are left alone.
+    """
+    delta = -(weight / _JERK_LIPSCHITZ) * jerk_gradient(x1.float()).to(x1.dtype)
+    if frozen > 0:
+        delta[:, : min(frozen, delta.shape[1])] = 0
+    if action_dims is not None and action_dims < delta.shape[2]:
+        delta[:, :, action_dims:] = 0
+    return delta
 
 
 class AsyncRTCProcessor:
@@ -98,6 +135,35 @@ class AsyncRTCProcessor:
         Returns:
             Guided velocity tensor.
         """
+        v = self._rtc_denoise_step(
+            x_t, prev_chunk_left_over, inference_delay, time, original_denoise_step_partial,
+            overlap_end, num_flow_matching_steps, execution_horizon,
+        )
+        if self.cfg.smoothness_weight <= 0:
+            return v
+        # x1 = x_t - time * v (clean-chunk estimate). Moving x1 by delta means v -> v - delta / time.
+        time_tensor = torch.as_tensor(time, device=x_t.device, dtype=torch.float32)
+        if float(time_tensor) <= 0:
+            return v
+        squeeze = x_t.ndim < 3
+        x_b, v_b = (x_t.unsqueeze(0), v.unsqueeze(0)) if squeeze else (x_t, v)
+        x1 = x_b - time_tensor.to(x_b.dtype) * v_b
+        frozen = int(inference_delay) if (inference_delay is not None and prev_chunk_left_over is not None) else 0
+        delta = smoothness_step(x1, self.cfg.smoothness_weight, frozen, self.cfg.action_dims)
+        out = v_b - delta / time_tensor.to(v_b.dtype)
+        return out.squeeze(0) if squeeze else out
+
+    def _rtc_denoise_step(
+        self,
+        x_t: Tensor,
+        prev_chunk_left_over: Tensor | None,
+        inference_delay: int | None,
+        time: float | Tensor,
+        original_denoise_step_partial: Callable[[Tensor], Tensor],
+        overlap_end: int | None,
+        num_flow_matching_steps: int | None,
+        execution_horizon: int | None,
+    ) -> Tensor:
         # No guidance if disabled or missing prefix / delay.
         if not self.cfg.enabled or prev_chunk_left_over is None or inference_delay is None:
             return original_denoise_step_partial(x_t)
@@ -176,6 +242,9 @@ class AsyncRTCProcessor:
                 x1_t_for_loss = self._postprocess(x1_t_for_loss)
 
             err = (prev - x1_t_for_loss) * weights
+            if self.cfg.action_dims is not None and self.cfg.action_dims < err.shape[-1]:
+                err = err.clone()
+                err[..., self.cfg.action_dims :] = 0  # zero-padded dims: nothing to inpaint
 
             # Compute correction term
             # If full_trajectory_alignment is enabled, skip gradient and use error directly.

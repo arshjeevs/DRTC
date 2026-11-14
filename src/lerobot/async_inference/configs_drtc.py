@@ -150,6 +150,36 @@ class RobotClientDrtcConfig:
         },
     )
 
+    # Smoothness guidance (lab addition): jerk penalty inside the policy's flow-matching denoising loop
+    smoothness_guidance: float = field(
+        default=0.0,
+        metadata={
+            "help": "Jerk-descent step on the predicted chunk at every denoising step, in [0, 2); 0 = off. "
+            "Flow-matching policies (SmolVLA, pi0, pi05, GR00T); with RTC, the frozen prefix is kept."
+        },
+    )
+
+    # Latency-adaptive playback (lab addition): slow execution down while few actions are queued
+    playback_mode: str = field(
+        default="fixed",
+        metadata={
+            "help": "fixed: one action per control tick. adaptive: advance through the schedule at a rate in "
+            "[playback_min_rate, 1], interpolating between actions, so the queued actions last until the next "
+            "chunk is expected (latency estimate) instead of running out and stalling."
+        },
+    )
+    playback_min_rate: float = field(
+        default=0.5, metadata={"help": "Slowest adaptive playback rate (actions per tick)"}
+    )
+    playback_margin_steps: float = field(
+        default=4.0,
+        metadata={"help": "Extra ticks of margin on the expected chunk arrival (covers round-trip jitter; "
+                  "4 kept simulated stalls at start-up level with 0-2 ticks of jitter)"},
+    )
+    playback_rate_slew: float = field(
+        default=0.05, metadata={"help": "Largest change of the playback rate per tick (keeps speed changes smooth)"}
+    )
+
     # Diagnostic metrics (console output; avg/max only)
     metrics_diagnostic_enabled: bool = field(
         default=True,
@@ -399,6 +429,14 @@ class RobotClientDrtcConfig:
             raise ValueError(f"rtc_max_guidance_weight must be positive or None, got {self.rtc_max_guidance_weight}")
         if self.rtc_sigma_d <= 0:
             raise ValueError(f"rtc_sigma_d must be positive, got {self.rtc_sigma_d}")
+        if not 0 <= self.smoothness_guidance < 2:
+            raise ValueError(f"smoothness_guidance must be in [0, 2), got {self.smoothness_guidance}")
+        if self.playback_mode not in ("fixed", "adaptive"):
+            raise ValueError(f"playback_mode must be 'fixed' or 'adaptive', got {self.playback_mode}")
+        if not 0 < self.playback_min_rate <= 1:
+            raise ValueError(f"playback_min_rate must be in (0, 1], got {self.playback_min_rate}")
+        if self.playback_margin_steps < 0 or self.playback_rate_slew <= 0:
+            raise ValueError("playback_margin_steps must be >= 0 and playback_rate_slew > 0")
         if self.num_flow_matching_steps is not None and self.num_flow_matching_steps <= 0:
             raise ValueError(f"num_flow_matching_steps must be positive or None, got {self.num_flow_matching_steps}")
         if self.action_filter_mode not in ("none", "adaptive_lowpass", "hold_stable", "butterworth"):

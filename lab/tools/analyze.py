@@ -6,10 +6,14 @@ Per trial (one metrics CSV, one row per control tick):
     latency_ms         median / p95 measured round-trip latency (observation sent -> chunk received)
     estimate_error_ms  median (latency estimate - measured latency); > 0 = estimator is conservative
     chunk_l2           median disagreement between consecutive chunks where they overlap
+    jerk               RMS jerk of the commanded joint positions (k deg/s^3), on the 30 Hz control grid with the
+                       last command held during stalls, so stop-start motion counts (from <run>.trajectory.json)
+    max_step_deg       largest change of any joint command between two control ticks (deg): visible jumps
+    playback_rate      mean actions advanced per tick (1 = fixed playback; < 1 = adaptive playback slowed down)
 Per experiment x model: trials, labelled trials, success rate with a Wilson 95% interval, and the median
 of each trial metric over trials.
 
-Writes results/summary/{summary.csv, summary.md, success.png, stalls.png, latency.png, benchmark.md}.
+Writes results/summary/{summary.csv, summary.md, success.png, stalls.png, jerk.png, latency.png, benchmark.md}.
 `--since` drops older trials (e.g. pre-validation runs); `--timeline <run_id>` plots one trial.
 
 Usage:
@@ -40,6 +44,26 @@ def wilson(successes: int, n: int, z: float = 1.96) -> tuple[float, float]:
     return (max(0.0, centre - half), min(1.0, centre + half))
 
 
+def motion_metrics(trajectory: Path, fps: float = 30.0) -> dict:
+    """Jerk and largest per-tick jump of the commands actually sent to the robot."""
+    import numpy as np
+
+    empty = {"jerk": math.nan, "max_step_deg": math.nan}
+    if not trajectory.is_file():
+        return empty
+    executed = json.loads(trajectory.read_text()).get("executed") or []
+    if len(executed) < 8:
+        return empty
+    t = np.array([e["t"] for e in executed])
+    a = np.array([e["action"] for e in executed], dtype=float)
+    grid = np.arange(t[0], t[-1], 1.0 / fps)
+    held = a[np.clip(np.searchsorted(t, grid, side="right") - 1, 0, len(a) - 1)]  # hold during stalls
+    if len(held) < 4:
+        return empty
+    jerk = np.diff(held, 3, axis=0) * fps**3
+    return {"jerk": float(np.sqrt((jerk**2).mean())) / 1000, "max_step_deg": float(np.abs(np.diff(held, axis=0)).max())}
+
+
 def trial_metrics(csv: Path) -> dict:
     df = pd.read_csv(csv)
     received = df.index[df["action_received"] == 1]
@@ -55,6 +79,8 @@ def trial_metrics(csv: Path) -> dict:
         "estimate_error_ms": (at_arrival["latency_estimate_ms"] - at_arrival["measured_latency_ms"]).median(),
         "chunk_l2": df["chunk_mean_l2"].dropna().median(),
         "chunks": len(measured),
+        "playback_rate": running["playback_rate"].mean() if "playback_rate" in running else 1.0,
+        **motion_metrics(csv.with_suffix(".trajectory.json")),
     }
 
 
@@ -87,19 +113,21 @@ def summarise(trials: pd.DataFrame) -> pd.DataFrame:
             "experiment": experiment, "model": model, "trials": len(g), "labelled": n, "successes": k,
             "success_rate": k / n if n else math.nan, "ci_low": lo, "ci_high": hi,
             **{m: g[m].median() for m in ("stall_pct", "stall_events", "latency_ms_median", "latency_ms_p95",
-                                          "estimate_error_ms", "chunk_l2")},
+                                          "estimate_error_ms", "chunk_l2", "jerk", "max_step_deg",
+                                          "playback_rate")},
         })
     return pd.DataFrame(out)
 
 
 def markdown(summary: pd.DataFrame) -> str:
-    lines = ["| Experiment | Model | Success (95% CI) | Trials | Stall % | Stalls | Latency ms (median / p95) | Estimate error ms | Chunk L2 |",
-             "|---|---|---|---|---|---|---|---|---|"]
+    lines = ["| Experiment | Model | Success (95% CI) | Trials | Stall % | Stalls | Latency ms (median / p95) | Estimate error ms | Chunk L2 | Jerk k°/s³ | Max step ° | Playback rate |",
+             "|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in summary.itertuples():
         success = (f"{r.successes}/{r.labelled} = {r.success_rate:.0%} ({r.ci_low:.0%}–{r.ci_high:.0%})"
                    if r.labelled else "not labelled")
         lines.append(f"| {r.experiment} | {r.model} | {success} | {r.trials} | {r.stall_pct:.1f} | {r.stall_events:.0f} | "
-                     f"{r.latency_ms_median:.0f} / {r.latency_ms_p95:.0f} | {r.estimate_error_ms:+.0f} | {r.chunk_l2:.2f} |")
+                     f"{r.latency_ms_median:.0f} / {r.latency_ms_p95:.0f} | {r.estimate_error_ms:+.0f} | {r.chunk_l2:.2f} | "
+                     f"{r.jerk:.1f} | {r.max_step_deg:.1f} | {r.playback_rate:.2f} |")
     return "\n".join(lines) + "\n"
 
 
@@ -135,6 +163,7 @@ def plot_summary(summary: pd.DataFrame, trials: pd.DataFrame) -> list[Path]:
         plt.close(fig)
 
     for metric, label, name in (("stall_pct", "stall % of control ticks", "stalls.png"),
+                                ("jerk", "RMS command jerk (k deg/s^3)", "jerk.png"),
                                 ("latency_ms_median", "median round-trip latency (ms)", "latency.png")):
         fig, ax = plt.subplots(figsize=(max(6, 1.2 * len(experiments)), 4))
         data, positions, ticks = [], [], []

@@ -120,11 +120,41 @@ class GrootPolicy(PreTrainedPolicy):
 
         return loss, loss_dict
 
+    def _velocity_guidance(self, rtc_kwargs: dict):
+        """RTC prefix inpainting and/or smoothness guidance for GR00T's flow-matching head (lab addition).
+
+        The DRTC policy server sets `self.rtc_processor` (an AsyncRTCProcessor, written for the PI0 /
+        SmolVLA convention: time 1 = noise -> 0 = clean, x1 = x - time * v). GR00T integrates the other
+        way (t 0 = noise -> 1 = clean, x += dt * v), so its velocity is passed in negated with
+        time = 1 - t, and the result negated back. Returns None when there is nothing to apply.
+        """
+        rtc = getattr(self, "rtc_processor", None)
+        if rtc is None:
+            return None
+        has_prefix = rtc_kwargs.get("prev_chunk_left_over") is not None
+        if not (has_prefix and rtc.cfg.enabled) and rtc.cfg.smoothness_weight <= 0:
+            return None
+
+        def guidance(actions, t, num_steps, velocity):
+            v_pi = rtc.denoise_step(
+                x_t=actions,
+                prev_chunk_left_over=rtc_kwargs.get("prev_chunk_left_over"),
+                inference_delay=rtc_kwargs.get("inference_delay"),
+                time=1.0 - t,
+                original_denoise_step_partial=lambda x: -velocity(x),
+                overlap_end=rtc_kwargs.get("overlap_end"),
+                num_flow_matching_steps=num_steps,
+            )
+            return -v_pi
+
+        return guidance
+
     @torch.no_grad()
-    def predict_action_chunk(self, batch: dict[str, Tensor]) -> Tensor:
+    def predict_action_chunk(self, batch: dict[str, Tensor], **rtc_kwargs) -> Tensor:
         """Predict a chunk of actions for inference by delegating to Isaac-GR00T.
 
-        Returns a tensor of shape (B, n_action_steps, action_dim).
+        Returns a tensor of shape (B, n_action_steps, action_dim). `rtc_kwargs` (inference_delay,
+        prev_chunk_left_over, overlap_end) come from the DRTC policy server; see _velocity_guidance.
         """
         self.eval()
 
@@ -143,7 +173,7 @@ class GrootPolicy(PreTrainedPolicy):
 
         # Use bf16 autocast for inference to keep memory low and match backbone dtype
         with torch.autocast(device_type=device.type, dtype=torch.bfloat16, enabled=self.config.use_bf16):
-            outputs = self._groot_model.get_action(groot_inputs)
+            outputs = self._groot_model.get_action(groot_inputs, self._velocity_guidance(rtc_kwargs))
 
         actions = outputs.get("action_pred")
 

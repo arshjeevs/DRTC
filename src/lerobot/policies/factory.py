@@ -307,8 +307,9 @@ def make_pre_post_processors(
         if isinstance(policy_cfg, GrootConfig):
             # GROOT handles normalization in groot_pack_inputs_v3 step
             # Need to override both stats AND normalize_min_max since saved config might be empty
-            preprocessor_overrides = {}
-            postprocessor_overrides = {}
+            # Keep the caller's overrides (device, camera renaming) and add GR00T's own on top.
+            preprocessor_overrides = dict(kwargs.get("preprocessor_overrides") or {})
+            postprocessor_overrides = dict(kwargs.get("postprocessor_overrides") or {})
             preprocessor_overrides["groot_pack_inputs_v3"] = {
                 "stats": kwargs.get("dataset_stats"),
                 "normalize_min_max": True,

@@ -28,7 +28,7 @@ DEFAULTS_PATH = EXPERIMENTS_DIR / "_defaults.yaml"
 RESULTS_DIR = REPO_ROOT / "results"
 
 # Policies whose server-side inference accepts RTC inpainting kwargs (flow matching).
-RTC_POLICIES = {"smolvla", "pi0", "pi05"}
+RTC_POLICIES = {"smolvla", "pi0", "pi05", "groot"}  # groot: RTC added in GrootPolicy (lab)
 # Policies whose dependencies conflict with the main .venv run from .venv-<name> (lab/bin/venv <name>).
 POLICY_VENVS = {"pi0": "pi", "pi05": "pi", "pi0_fast": "pi", "groot": "groot"}
 

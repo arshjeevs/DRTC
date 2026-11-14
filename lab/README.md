@@ -187,6 +187,27 @@ Conventions:
 - **Never edit a config after reporting results from it.** Copy it to a new name instead. Every run stores the resolved config and git commit, but the file name is what `index.csv` groups by.
 - Commit configs before running, so `run.json` shows `git_dirty: false`.
 
+## Smoothing methods (short-chunk policies)
+
+GR00T predicts 16 actions per chunk. At ~270 ms round trip from the H200 the queue runs dry between chunks:
+19-24% of ticks stalled and the jerkiest commands of all models (`lab/bin/analyze`: jerk, max step). Three
+methods, each a setting, compared in `lab/experiments/smoothing/` (one at a time, then all):
+
+| Setting | Method | Where |
+|---|---|---|
+| `playback_mode: adaptive` | **A. Latency-adaptive playback.** Moves through the schedule at a rate in [`playback_min_rate`, 1], interpolating between actions, so the queued actions last until the next chunk is expected (DRTC's latency estimate + `playback_margin_steps`). Full queue: exactly fixed playback. Any policy | client, `src/lerobot/async_inference/playback.py` |
+| `rtc_enabled: true` (GR00T) | **B. Real-time chunking for GR00T.** RTC prefix inpainting inside GR00T's flow-matching head, so each new chunk continues the actions already committed | server, `GrootPolicy._velocity_guidance` |
+| `smoothness_guidance: 0.5` | **C. Smoothness guidance.** At every denoising step the predicted chunk takes a jerk-descent step (frozen RTC prefix kept). Flow-matching policies: SmolVLA, pi0, pi05, GR00T | server, `rtc_guidance.smoothness_step` |
+
+```bash
+for m in baseline playback rtc smooth all; do lab/bin/run smoothing/$m --trials 5; done
+lab/bin/analyze --experiment smoothing/baseline smoothing/playback smoothing/rtc smoothing/smooth smoothing/all
+```
+Any experiment can use them, e.g. `--model` another policy. Adaptive playback trades speed for continuity
+(the task takes longer): compare `duration_s` with the success rate. In a simulation of the client loop (16
+actions, 9-11 ticks of latency), A cut stalls from 37% to 1.5% and 99th-percentile jerk ~10x, at 12% less
+progress per second.
+
 ## One-time setup
 
 **Laptop**

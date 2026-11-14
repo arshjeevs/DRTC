@@ -96,6 +96,12 @@ class ExperimentConfig:
     rtc_prefix_attention_schedule: str = "linear"
     rtc_sigma_d: float = 0.2
     rtc_full_trajectory_alignment: bool = False
+    # Lab additions: smoothness guidance (server) and latency-adaptive playback (client)
+    smoothness_guidance: float = 0.0
+    playback_mode: str = "fixed"
+    playback_min_rate: float = 0.5
+    playback_margin_steps: float = 4.0
+    playback_rate_slew: float = 0.05
     # Butterworth filter
     action_filter_mode: str = "butterworth"
     action_filter_butterworth_cutoff: float = 3.0
@@ -131,6 +137,7 @@ _SCALAR_FIELDS = frozenset({
     "duration_s", "fps", "actions_per_chunk",
     "num_flow_matching_steps", "rtc_enabled", "rtc_max_guidance_weight",
     "rtc_prefix_attention_schedule", "rtc_sigma_d", "rtc_full_trajectory_alignment",
+    "smoothness_guidance", "playback_mode", "playback_min_rate", "playback_margin_steps", "playback_rate_slew",
     "action_filter_mode", "action_filter_butterworth_cutoff",
     "action_filter_butterworth_order", "action_filter_gain",
     "action_filter_past_buffer_size",
@@ -306,6 +313,11 @@ def create_client_config(
         rtc_prefix_attention_schedule=config.rtc_prefix_attention_schedule,
         rtc_sigma_d=config.rtc_sigma_d,
         rtc_full_trajectory_alignment=config.rtc_full_trajectory_alignment,
+        smoothness_guidance=config.smoothness_guidance,
+        playback_mode=config.playback_mode,
+        playback_min_rate=config.playback_min_rate,
+        playback_margin_steps=config.playback_margin_steps,
+        playback_rate_slew=config.playback_rate_slew,
         # Butterworth filter
         action_filter_mode=config.action_filter_mode,
         action_filter_butterworth_cutoff=config.action_filter_butterworth_cutoff,

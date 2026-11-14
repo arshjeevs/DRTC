@@ -1,0 +1,6 @@
+# A + B + C together
+description: Adaptive playback + RTC + smoothness guidance
+model: groot_cubebox_v1_lora
+playback_mode: adaptive
+rtc_enabled: true
+smoothness_guidance: 0.5

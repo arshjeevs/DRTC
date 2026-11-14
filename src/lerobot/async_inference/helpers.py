@@ -363,6 +363,8 @@ class RemotePolicyConfig:
     rtc_full_trajectory_alignment: bool = False  # Skip gradient for faster/smoother transitions
     # Denoising steps override (Alex Soare: Beta should scale with n)
     num_flow_matching_steps: int | None = None  # None = use policy default (e.g., 10 for PI0/SmolVLA)
+    # Jerk penalty inside flow-matching denoising, 0 = off (rtc_guidance.smoothness_step)
+    smoothness_guidance: float = 0.0
     # Spike injection (client-driven, for experiments)
     # List of dicts: [{"start_s": 5.0, "delay_ms": 2000}, ...]
     spikes: list[dict] = field(default_factory=list)
@@ -373,6 +375,7 @@ class RemotePolicyConfig:
         """Back-compat for pickles created before RTC/spike fields existed."""
         self.__dict__.update(state)
         self.__dict__.setdefault("finetune", "full")
+        self.__dict__.setdefault("smoothness_guidance", 0.0)
         self.__dict__.setdefault("rtc_enabled", False)
         self.__dict__.setdefault("rtc_max_guidance_weight", None)  # Default to auto (Alex Soare opt)
         self.__dict__.setdefault("rtc_prefix_attention_schedule", "linear")

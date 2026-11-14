@@ -20,6 +20,13 @@ rtc_enabled: true
 rtc_sigma_d: 0.2
 rtc_prefix_attention_schedule: linear
 
+# Smoothing methods (lab additions; lab/experiments/smoothing/). Off by default.
+smoothness_guidance: 0.0        # jerk penalty in flow-matching denoising, 0-2 (0.5 = moderate)
+playback_mode: fixed            # fixed | adaptive (slow down while few actions are queued)
+playback_min_rate: 0.5
+playback_margin_steps: 4.0
+playback_rate_slew: 0.05
+
 # Action filter
 action_filter_mode: butterworth
 action_filter_butterworth_cutoff: 3.0

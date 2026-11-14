@@ -42,6 +42,7 @@ from .utils.simulation import DisconnectSimulator, DropSimulator, DuplicateSimul
 from .utils.trajectory_viz import TrajectoryVizClient
 from .utils.compression import encode_images_for_transport
 from .lww_register import LWWReader, LWWRegister
+from .playback import AdaptivePlayback
 
 @dataclass
 class ScheduledAction:
@@ -93,6 +94,13 @@ class ActionSchedule:
             return None
         # SortedDict maintains sorted key order; pop first (lowest key) item
         step, scheduled = self._schedule.popitem(0)
+        return step, scheduled.action, scheduled.src_control_step, scheduled.chunk_start_step
+
+    def peek_front(self) -> tuple[int, np.ndarray, int, int] | None:
+        """The first scheduled action without removing it (same tuple as pop_front)."""
+        if not self._schedule:
+            return None
+        step, scheduled = self._schedule.peekitem(0)
         return step, scheduled.action, scheduled.src_control_step, scheduled.chunk_start_step
 
     def get_masking_chunk_spans(
@@ -339,6 +347,7 @@ class RobotClientDrtc:
             rtc_sigma_d=config.rtc_sigma_d,
             rtc_full_trajectory_alignment=config.rtc_full_trajectory_alignment,
             num_flow_matching_steps=config.num_flow_matching_steps,
+            smoothness_guidance=config.smoothness_guidance,
             spikes=config.spikes,
             diagnostics_verbose=config.metrics_diagnostic_verbose,
         )
@@ -355,6 +364,15 @@ class RobotClientDrtc:
         # Action state: n(t), initialized to -1 per algorithm.
         # Note: Only the main control loop thread reads/writes action_step.
         self.action_step: int = -1
+
+        # Latency-adaptive playback (lab addition, playback.py): None = one action per tick.
+        self._playback = (
+            AdaptivePlayback(config.playback_min_rate, config.playback_margin_steps, config.playback_rate_slew)
+            if config.playback_mode == "adaptive"
+            else None
+        )
+        self._ticks_since_request = 0
+        self._awaiting_chunk_from: int | None = None  # control step of the newest unanswered request
 
         # Control-loop tick counter t ∈ ℕ (monotone, incremented every tick).
         # Used as the LWW logical clock so that dropped messages never stall watermarks.
@@ -600,6 +618,12 @@ class RobotClientDrtc:
             "rtc_prefix_attention_schedule": self.config.rtc_prefix_attention_schedule,
             "rtc_sigma_d": self.config.rtc_sigma_d,
             "rtc_full_trajectory_alignment": self.config.rtc_full_trajectory_alignment,
+            "smoothness_guidance": self.config.smoothness_guidance,
+            # Playback
+            "playback_mode": self.config.playback_mode,
+            "playback_min_rate": self.config.playback_min_rate,
+            "playback_margin_steps": self.config.playback_margin_steps,
+            "playback_rate_slew": self.config.playback_rate_slew,
             # Action filter
             "filter_type": self.config.action_filter_mode,
             "filter_cutoff": self.config.action_filter_butterworth_cutoff,
@@ -1045,42 +1069,55 @@ class RobotClientDrtc:
             # Step 1: Execute action if available
             # ---------------------------------------------------------------------
             t_phase1_start = time.perf_counter()
-            if not self.action_schedule.is_empty():
+            _tick_playback_rate = 1.0
+            if self._playback is not None:
+                # Ticks until the next chunk should arrive: the latency estimate (unclamped, in ticks),
+                # minus the time the in-flight request has already been out.
+                latency_ticks = self.latency_estimator.estimate_seconds / self.config.environment_dt
+                if self._awaiting_chunk_from is not None:
+                    latency_ticks = max(latency_ticks - self._ticks_since_request, 0.0)
+                played = self._playback.next(self.action_schedule, latency_ticks)
+                result = None if played is None else (
+                    played.step, played.action, played.src_control_step, played.chunk_start_step)
+                _tick_playback_rate = 0.0 if played is None else played.advanced
+            elif not self.action_schedule.is_empty():
                 result = self.action_schedule.pop_front()
-                if result is not None:
-                    step, action, src_control_step, chunk_start_step = result
+            else:
+                result = None
+            if result is not None:
+                step, action, src_control_step, chunk_start_step = result
 
-                    # Apply action filter to reduce jitter from policy micro-updates
-                    ctx = FilterContext(action=action)
-                    filtered_action = self._action_filter.apply(ctx)
+                # Apply action filter to reduce jitter from policy micro-updates
+                ctx = FilterContext(action=action)
+                filtered_action = self._action_filter.apply(ctx)
 
-                    t_send_start = time.perf_counter()
-                    self.robot.send_action(self._action_array_to_dict(filtered_action))
-                    t_send_done = time.perf_counter()
+                t_send_start = time.perf_counter()
+                self.robot.send_action(self._action_array_to_dict(filtered_action))
+                t_send_done = time.perf_counter()
 
-                    # Keep action_step aligned with the schedule's action-step keys.
-                    # Only the main control loop thread writes this.
-                    self.action_step = step
-                    self._metrics.diagnostic.timing_s("send_action_ms", t_send_done - t_send_start)
+                # Keep action_step aligned with the schedule's action-step keys.
+                # Only the main control loop thread writes this.
+                self.action_step = step
+                self._metrics.diagnostic.timing_s("send_action_ms", t_send_done - t_send_start)
 
-                    # Stream executed action to the visualization server (best-effort).
-                    if self._trajectory_viz_client is not None:
-                        self._trajectory_viz_client.on_executed_action(
-                            EvExecutedAction(
-                                step=step,
-                                action=filtered_action.tolist(),
-                                timestamp=time.time(),
-                            )
-                        )
-
-                    # Record executed action for experiment trajectory visualization
-                    if self._metrics.experiment is not None:
-                        self._metrics.experiment.record_executed_action(
+                # Stream executed action to the visualization server (best-effort).
+                if self._trajectory_viz_client is not None:
+                    self._trajectory_viz_client.on_executed_action(
+                        EvExecutedAction(
                             step=step,
-                            action=filtered_action,
-                            src_control_step=src_control_step,
-                            chunk_start_step=chunk_start_step,
+                            action=filtered_action.tolist(),
+                            timestamp=time.time(),
                         )
+                    )
+
+                # Record executed action for experiment trajectory visualization
+                if self._metrics.experiment is not None:
+                    self._metrics.experiment.record_executed_action(
+                        step=step,
+                        action=filtered_action,
+                        src_control_step=src_control_step,
+                        chunk_start_step=chunk_start_step,
+                    )
 
             t_phase1_end = time.perf_counter()
             _phase_exec_ms = self._ms(t_phase1_end - t_phase1_start)
@@ -1167,6 +1204,8 @@ class RobotClientDrtc:
 
                 _tick_obs_triggered = True
                 self._metrics.diagnostic.counter("obs_triggered", 1)
+                self._awaiting_chunk_from = request.control_step
+                self._ticks_since_request = 0
             else:
                 # Decrement cooldown: O^c(t+1) = max(O^c(t) - 1, 0)
                 # Only decrement in 'cooldown' mode (default behavior for drop recovery)
@@ -1190,6 +1229,8 @@ class RobotClientDrtc:
 
                 # Update latency estimate
                 self.latency_estimator.update(chunk.measured_latency)
+                if self._awaiting_chunk_from is not None and chunk.src_control_step >= self._awaiting_chunk_from:
+                    self._awaiting_chunk_from = None  # the newest request has been answered
 
                 # Merge actions into schedule
                 merge_stats = self.action_schedule.merge(
@@ -1247,6 +1288,7 @@ class RobotClientDrtc:
 
             # Advance the control-loop clock (always monotone, even when no action executes)
             self.control_step += 1
+            self._ticks_since_request += 1
 
             # ---------------------------------------------------------------------
             # Step 4: Maintain control frequency
@@ -1297,6 +1339,7 @@ class RobotClientDrtc:
                     chunk_overlap_count=_tick_chunk_overlap_count,
                     chunk_mean_l2=_tick_chunk_mean_l2,
                     chunk_max_l2=_tick_chunk_max_l2,
+                    playback_rate=_tick_playback_rate,
                 )
 
     def _action_array_to_dict(self, action_array: np.ndarray) -> dict[str, float]:

@@ -403,19 +403,28 @@ class PolicyServerDrtc(services_pb2_grpc.AsyncInferenceServicer):
                 else:
                     self._metrics.diagnostic.counter("num_flow_steps_override_ignored", 1)
 
-        # Optional: enable RTC via client instructions (server-side inpainting)
-        if getattr(policy_specs, "rtc_enabled", False):
+        # Optional: enable RTC via client instructions (server-side inpainting), and/or smoothness
+        # guidance (jerk penalty in the same denoising hook; lab addition, rtc_guidance.smoothness_step).
+        self._rtc_cfg = None
+        rtc_on = bool(getattr(policy_specs, "rtc_enabled", False))
+        smoothness = float(getattr(policy_specs, "smoothness_guidance", 0.0) or 0.0)
+        if rtc_on or smoothness > 0:
             # Handle optional max_guidance_weight (None = use num_flow_matching_steps, Alex Soare opt)
             max_gw_raw = getattr(policy_specs, "rtc_max_guidance_weight", None)
             max_gw = float(max_gw_raw) if max_gw_raw is not None else None
+            action_feature = getattr(self.policy.config, "output_features", {}).get("action")
 
             self._rtc_cfg = AsyncRTCConfig(
-                enabled=True,
+                enabled=rtc_on,
                 prefix_attention_schedule=str(getattr(policy_specs, "rtc_prefix_attention_schedule", "linear")),
                 max_guidance_weight=max_gw,
                 sigma_d=float(getattr(policy_specs, "rtc_sigma_d", 1.0)),
                 full_trajectory_alignment=bool(getattr(policy_specs, "rtc_full_trajectory_alignment", False)),
+                smoothness_weight=smoothness,
+                # Robot action dims; the rest of a padded action space (pi0 / GR00T: 32) is not guided.
+                action_dims=int(action_feature.shape[0]) if action_feature is not None else None,
             )
+            self.logger.info(f"Denoising guidance: RTC {'on' if rtc_on else 'off'}, smoothness {smoothness:g}")
             # NOTE: We do NOT pass self.postprocessor to RTC guidance because:
             # - RTC operates INSIDE the model's denoising loop in raw action space (e.g. 32 dims)
             # - The postprocessor (NormalizeProcessor) expects executable action space (e.g. 6 dims)
