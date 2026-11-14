@@ -1,7 +1,8 @@
 #!/bin/bash
 # Train a registry model on the laptop GPU and push it to the Hub (laptop):
 #   lab/bin/train <model> [--dry-run] [--no-push] [--resume] [--<lerobot-train flag>=value ...]
-#   lab/bin/train <model> --push [checkpoint]     (upload a saved checkpoint, e.g. after stopping early)
+#   lab/bin/train <model> --push [checkpoint]     (upload a saved checkpoint)
+# Stop early: Ctrl-C once (or lab/bin/stop <model>) saves a checkpoint and pushes it; --resume continues.
 source "$(dirname "$0")/_env"
 # pi0 / pi05 entries run in .venv-pi (created on first use); --dry-run only reads the config.
 case " $* " in *" --dry-run "*) ;; *) use_model_venv "$1" ;; esac
@@ -21,4 +22,6 @@ log="logs/train_${1:-none}_$(date +%Y%m%d-%H%M%S).log"
 case " $* " in *" --dry-run "*) exec "$PY" -m lab.tools.train "$@" ;; esac
 echo "log: $log"
 set -o pipefail
-PYTHONUNBUFFERED=1 "$PY" -m lab.tools.train "$@" 2>&1 | tee "$log"
+# Ctrl-C (or lab/bin/stop <model>): training saves a checkpoint and stops; --resume continues it.
+# tee -i: the log keeps recording while training saves after Ctrl-C.
+PYTHONUNBUFFERED=1 "$PY" -m lab.tools.train "$@" 2>&1 | tee -i "$log"

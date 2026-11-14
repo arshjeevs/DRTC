@@ -1,0 +1,21 @@
+#!/bin/bash
+# Stop a training run cleanly from any terminal: it finishes its current step, saves a checkpoint
+# (model + optimizer state), pushes it to the Hub and exits. Continue later with:
+#   lab/bin/train <model> --resume
+# Same as pressing Ctrl-C once in the run's own terminal.
+#   lab/bin/stop <model>          e.g. lab/bin/stop dot_cubebox_v1_lora
+#   lab/bin/stop --all            every run in outputs/train that is still training
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+runs="$REPO_ROOT/outputs/train"
+[ -n "$1" ] || { echo "usage: lab/bin/stop <model> | --all"; exit 1; }
+if [ "$1" = "--all" ]; then
+    targets=$(find "$runs" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null)
+else
+    targets="$1"
+fi
+for model in $targets; do
+    dir="$runs/$model"
+    [ -d "$dir" ] || { echo "$model: no run folder $dir"; continue; }
+    touch "$dir/STOP"
+    echo "$model: stop requested; it saves a checkpoint after its current step (watch its log)"
+done

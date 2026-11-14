@@ -15,10 +15,12 @@
 # limitations under the License.
 import datetime as dt
 import logging
+import signal
 from collections import deque
 import time
 from contextlib import nullcontext
 from copy import deepcopy
+from pathlib import Path
 from pprint import pformat
 from typing import Any
 
@@ -189,6 +191,46 @@ def frames_to_float(batch: dict, camera_keys: list[str]) -> dict:
     return batch
 
 
+STOP_FILE = "STOP"  # `lab/bin/stop <model>` creates <output_dir>/STOP
+
+
+def ignore_interrupts(_worker_id: int = 0) -> None:
+    """DataLoader worker_init_fn: Ctrl-C reaches every process in the terminal; the workers keep
+    loading so the training process can finish its step and save (StopRequest)."""
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+
+class StopRequest:
+    """Stop training early but cleanly: on Ctrl-C, SIGTERM or a STOP file in the output directory, the
+    training loop finishes its step, saves a checkpoint (model + optimizer/scheduler state) and ends;
+    `lab/bin/train <model> --resume` continues from it. A second Ctrl-C quits at once."""
+
+    def __init__(self, output_dir: Path):
+        self.file = Path(output_dir) / STOP_FILE
+        self.file.unlink(missing_ok=True)  # a stale request from an earlier stop
+        self.reason = None
+        signal.signal(signal.SIGINT, self._handle)
+        signal.signal(signal.SIGTERM, self._handle)
+
+    def _handle(self, signum, _frame) -> None:
+        self.reason = signal.Signals(signum).name
+        signal.signal(signal.SIGINT, signal.default_int_handler)  # the next Ctrl-C interrupts
+        logging.warning(f"{self.reason}: stopping after this step and saving a checkpoint "
+                        "(Ctrl-C again to quit without saving)")
+
+    @property
+    def requested(self) -> bool:
+        if self.reason is None and self.file.exists():
+            self.reason = f"{STOP_FILE} file"
+            logging.warning(f"{self.file} found: stopping after this step and saving a checkpoint")
+        return self.reason is not None
+
+    def done(self) -> None:
+        self.file.unlink(missing_ok=True)
+        signal.signal(signal.SIGINT, signal.default_int_handler)
+        signal.signal(signal.SIGTERM, signal.SIG_DFL)
+
+
 class Progress:
     """Progress line for the training log: bar, percent, elapsed, time left, finish time.
 
@@ -263,6 +305,7 @@ def make_val_loader(cfg: TrainPipelineConfig, device: torch.device) -> torch.uti
         shuffle=False,
         num_workers=cfg.num_workers,
         pin_memory=device.type == "cuda",
+        worker_init_fn=ignore_interrupts if cfg.num_workers > 0 else None,
     )
 
 
@@ -502,6 +545,7 @@ def train(cfg: TrainPipelineConfig, accelerator: Accelerator | None = None):
         pin_memory=device.type == "cuda",
         drop_last=False,
         prefetch_factor=2 if cfg.num_workers > 0 else None,
+        worker_init_fn=ignore_interrupts if cfg.num_workers > 0 else None,
     )
 
     # Prepare everything with accelerator
@@ -539,6 +583,8 @@ def train(cfg: TrainPipelineConfig, accelerator: Accelerator | None = None):
         )
 
     progress = Progress(step, cfg.steps)
+    stop = StopRequest(cfg.output_dir) if is_main_process else None
+    stopped_at = None
     for _ in range(step, cfg.steps):
         start_time = time.perf_counter()
         batch = frames_to_float(next(dl_iter), camera_keys)
@@ -561,7 +607,8 @@ def train(cfg: TrainPipelineConfig, accelerator: Accelerator | None = None):
         step += 1
         train_tracker.step()
         is_log_step = cfg.log_freq > 0 and step % cfg.log_freq == 0 and is_main_process
-        is_saving_step = step % cfg.save_freq == 0 or step == cfg.steps
+        stopping = stop is not None and stop.requested
+        is_saving_step = step % cfg.save_freq == 0 or step == cfg.steps or stopping
         is_eval_step = cfg.eval_freq > 0 and step % cfg.eval_freq == 0
 
         if is_log_step:
@@ -603,6 +650,12 @@ def train(cfg: TrainPipelineConfig, accelerator: Accelerator | None = None):
                     wandb_logger.log_policy(checkpoint_dir)
 
             accelerator.wait_for_everyone()
+
+        if stopping:
+            stopped_at = step
+            logging.warning(f"Stopped at step {step} of {cfg.steps} ({stop.reason}); checkpoint saved. "
+                            f"Continue with: lab/bin/train <model> --resume")
+            break
 
         if val_loader is not None and (step % cfg.val_freq == 0 or step == cfg.steps):
             try:
@@ -667,7 +720,9 @@ def train(cfg: TrainPipelineConfig, accelerator: Accelerator | None = None):
     if eval_env:
         close_envs(eval_env)
 
-    if val_loader is not None:
+    if stop is not None:
+        stop.done()
+    if val_loader is not None and stopped_at is None:
         try:
             final = validate(accelerator.unwrap_model(policy), val_loader, preprocessor, accelerator, actions=True)
             logging.info(f"Held-out action MSE (normalized): {final['val_action_mse']:.4f}")

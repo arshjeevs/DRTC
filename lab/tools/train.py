@@ -354,8 +354,14 @@ def main() -> None:
         lerobot_train.make_policy = lora_make_policy(lerobot_train.make_policy, spec, None if args.resume else base_id)
     sys.argv = cmd
     lerobot_train.main()
-    if push:
+    last = out / "checkpoints/last"
+    done = json.loads((last / "training_state/training_step.json").read_text())["step"]
+    goal = json.loads((last / "pretrained_model/train_config.json").read_text())["steps"]
+    if push:  # also after an early stop: the Hub then holds the model so far and its training state
         push_checkpoint(out, "last", target)
+    if done < goal:
+        print(f"\nStopped early at step {done} of {goal}. Continue (here or on another machine) with:\n"
+              f"    lab/bin/train {args.model} --resume", flush=True)
 
 
 if __name__ == "__main__":
