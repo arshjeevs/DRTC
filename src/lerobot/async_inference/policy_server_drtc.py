@@ -223,6 +223,18 @@ class PolicyServerDrtc(services_pb2_grpc.AsyncInferenceServicer):
     def policy_image_features(self):
         return self.policy.config.image_features
 
+    @property
+    def robot_image_features(self):
+        """policy_image_features also keyed by the robot's camera names, for models trained with a
+        rename_map (pi0 / pi05 / X-VLA: camera2 -> base_0_rgb, ...). Observations arrive with the robot's
+        names and are resized before the preprocessor renames them."""
+        features = dict(self.policy_image_features)
+        for step in getattr(self.preprocessor, "steps", []):
+            for robot_key, policy_key in (getattr(step, "rename_map", None) or {}).items():
+                if policy_key in self.policy_image_features:
+                    features.setdefault(robot_key, self.policy_image_features[policy_key])
+        return features
+
     def _reset_server(self) -> None:
         """Reset server state when a new client connects.
 
@@ -690,7 +702,7 @@ class PolicyServerDrtc(services_pb2_grpc.AsyncInferenceServicer):
         observation: Observation = raw_observation_to_observation(
             raw_obs,
             self.lerobot_features,
-            self.policy_image_features,
+            self.robot_image_features,
         )
 
         # 2. Preprocess
