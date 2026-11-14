@@ -319,6 +319,7 @@ smolvla_cubebox_v1_full:
     from: lerobot/smolvla_base
     epochs: 45
     batch_size: 64
+    save_freq: 1000      # ~2.4 epochs: stop (Ctrl-C) once val_loss rises; lab/bin/train <model> --push <best>
 
 smolvla_cubebox_v1_lora:
   policy_type: smolvla
@@ -333,6 +334,7 @@ smolvla_cubebox_v1_lora:
     from: lerobot/smolvla_base
     epochs: 45
     batch_size: 64
+    save_freq: 1000      # ~2.4 epochs: stop (Ctrl-C) once val_loss rises; lab/bin/train <model> --push <best>
     lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
 
 # --- Data efficiency (item 15): same recipe and epochs, random 10 / 25 / 50 of the 100 training episodes ---
@@ -350,6 +352,7 @@ smolvla_cubebox_v1_lora_ep10:
     from: lerobot/smolvla_base
     epochs: 45
     batch_size: 64
+    save_freq: 100    # same ~2.4 epochs as 1000 steps on all 100 episodes
     lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
 
 smolvla_cubebox_v1_lora_ep25:
@@ -366,6 +369,7 @@ smolvla_cubebox_v1_lora_ep25:
     from: lerobot/smolvla_base
     epochs: 45
     batch_size: 64
+    save_freq: 250    # same ~2.4 epochs as 1000 steps on all 100 episodes
     lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
 
 smolvla_cubebox_v1_lora_ep50:
@@ -382,6 +386,7 @@ smolvla_cubebox_v1_lora_ep50:
     from: lerobot/smolvla_base
     epochs: 45
     batch_size: 64
+    save_freq: 500    # same ~2.4 epochs as 1000 steps on all 100 episodes
     lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
 
 # --- Camera ablation (item 16): same recipe, scene camera only (vs both in smolvla_cubebox_v1_lora) ---
@@ -398,6 +403,7 @@ smolvla_cubebox_v1_lora_scene:
     from: lerobot/smolvla_base
     epochs: 45
     batch_size: 64
+    save_freq: 1000      # ~2.4 epochs: stop (Ctrl-C) once val_loss rises; lab/bin/train <model> --push <best>
     lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
 
 # --- Model comparison (item 13) ---
