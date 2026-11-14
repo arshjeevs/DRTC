@@ -68,10 +68,13 @@ def server_labels(host: str, port: int) -> tuple[str, str] | None:
     import grpc
 
     from lerobot.transport import services_pb2, services_pb2_grpc
+    from lerobot.transport.utils import grpc_channel_options
 
     try:
-        with grpc.insecure_channel(f"{host}:{port}") as channel:
-            _, call = services_pb2_grpc.AsyncInferenceStub(channel).Ready.with_call(services_pb2.Empty(), timeout=10)
+        # Same retrying channel as the robot client: the first connection through an SSH tunnel can fail.
+        with grpc.insecure_channel(f"{host}:{port}", grpc_channel_options()) as channel:
+            _, call = services_pb2_grpc.AsyncInferenceStub(channel).Ready.with_call(
+                services_pb2.Empty(), timeout=20, wait_for_ready=True)
             meta = dict(call.trailing_metadata() or ())
     except grpc.RpcError as e:
         print(f"NOTE: could not ask the server who it is ({e.code().name}); using rig.yaml's labels.", file=sys.stderr)

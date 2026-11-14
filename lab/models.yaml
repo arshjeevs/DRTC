@@ -544,6 +544,8 @@ diffusion_cubebox_v1_lora:
   task: *study_task
   rtc_enabled: false
   num_flow_matching_steps: null
+  actions_per_chunk: 16          # the model predicts 16 actions per chunk (run default asks for 50)
+  s_min: 8                       # must stay below actions_per_chunk (default 20): next request at half a chunk
   train:
     dataset: *study_ds
     split: *study_split
@@ -574,6 +576,8 @@ sfp_cubebox_v1_lora:
   task: *study_task
   rtc_enabled: false
   num_flow_matching_steps: null
+  actions_per_chunk: 16          # the model predicts 16 actions per chunk (run default asks for 50)
+  s_min: 8                       # must stay below actions_per_chunk (default 20): next request at half a chunk
   train:
     dataset: *study_ds
     split: *study_split
@@ -600,6 +604,8 @@ groot_cubebox_v1_lora:
   task: *study_task
   rtc_enabled: false
   num_flow_matching_steps: null
+  actions_per_chunk: 16          # the model predicts 16 actions per chunk (run default asks for 50)
+  s_min: 8                       # must stay below actions_per_chunk (default 20): next request at half a chunk
   train:
     dataset: *study_ds
     split: *study_split
