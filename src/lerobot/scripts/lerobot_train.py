@@ -13,7 +13,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import datetime as dt
 import logging
+from collections import deque
 import time
 from contextlib import nullcontext
 from copy import deepcopy
@@ -185,6 +187,39 @@ def frames_to_float(batch: dict, camera_keys: list[str]) -> dict:
         if key in batch and batch[key].dtype == torch.uint8:
             batch[key] = batch[key].float().div_(255)
     return batch
+
+
+class Progress:
+    """Progress line for the training log: bar, percent, elapsed, time left, finish time.
+
+    Speed is measured over the last few log intervals (wall clock, so validation and checkpoints are
+    included), which follows changes such as other jobs starting on a shared GPU.
+    """
+
+    def __init__(self, start_step: int, total_steps: int, window: int = 10):
+        self.start_step, self.total = start_step, total_steps
+        self.started = time.perf_counter()
+        self.points = deque([(self.started, start_step)], maxlen=window + 1)
+
+    @staticmethod
+    def _hms(seconds: float) -> str:
+        seconds = int(seconds)
+        return f"{seconds // 3600}h{seconds % 3600 // 60:02d}m" if seconds >= 3600 else f"{seconds // 60}m{seconds % 60:02d}s"
+
+    def line(self, step: int, width: int = 24) -> str:
+        now = time.perf_counter()
+        self.points.append((now, step))
+        (t0, s0), (t1, s1) = self.points[0], self.points[-1]
+        rate = (s1 - s0) / (t1 - t0) if t1 > t0 and s1 > s0 else 0.0  # steps per second
+        fraction = step / self.total
+        filled = int(round(fraction * width))
+        text = (f"progress [{'#' * filled}{'.' * (width - filled)}] {100 * fraction:5.1f}% "
+                f"step {step}/{self.total} | elapsed {self._hms(now - self.started)}")
+        if rate > 0:
+            left = (self.total - step) / rate
+            finish = dt.datetime.now() + dt.timedelta(seconds=left)
+            text += f" | left ~{self._hms(left)} | done ~{finish:%a %H:%M} | {1 / rate:.2f} s/step"
+        return text
 
 
 def episode_bounds(dataset) -> tuple[list[int], list[int]]:
@@ -503,6 +538,7 @@ def train(cfg: TrainPipelineConfig, accelerator: Accelerator | None = None):
             f"Start offline training on a fixed dataset, with effective batch size: {effective_batch_size}"
         )
 
+    progress = Progress(step, cfg.steps)
     for _ in range(step, cfg.steps):
         start_time = time.perf_counter()
         batch = frames_to_float(next(dl_iter), camera_keys)
@@ -530,6 +566,7 @@ def train(cfg: TrainPipelineConfig, accelerator: Accelerator | None = None):
 
         if is_log_step:
             logging.info(train_tracker)
+            logging.info(progress.line(step))
             if wandb_logger:
                 wandb_log_dict = train_tracker.to_dict()
                 if output_dict:

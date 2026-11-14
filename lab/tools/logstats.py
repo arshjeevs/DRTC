@@ -70,6 +70,11 @@ def main() -> None:
     print(f"log: {log}")
     print(f"policy {config['type']}, batch {config['batch_size']}, num_workers {config['num_workers']}, "
           f"target {config['steps']} steps")
+    progress = [line for line in text.splitlines() if "progress [" in line]
+    if progress:  # written by lerobot_train at every log step (bar, % done, time left, finish time)
+        last = progress[-1]
+        stamp = m.group(0) if (m := re.search(r"\d{4}-\d\d-\d\d \d\d:\d\d:\d\d", last)) else "?"
+        print(f"\n{last[last.index('progress ['):]}\n  (logged {stamp}; times in the training machine's clock)")
     if len(rows) < 2:
         sys.exit("Fewer than two step lines yet; wait for the run to log more.")
 
