@@ -419,7 +419,7 @@ xvla_cubebox_v1_lora:
   task: *study_task
   rtc_enabled: false
   num_flow_matching_steps: null
-  actions_per_chunk: 32          # X-VLA predicts 32-action chunks (the run default asks for 50)
+  actions_per_chunk: 30          # X-VLA's chunk_size is 30 (the run default asks for 50)
   train:
     dataset: *study_ds
     split: *study_split

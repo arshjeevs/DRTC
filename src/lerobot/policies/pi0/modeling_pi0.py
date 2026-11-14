@@ -1043,6 +1043,15 @@ class PI0Policy(PreTrainedPolicy):
             if remap_count > 0:
                 print(f"Remapped {remap_count} state dict keys")
 
+            # Gemma ties its input embeddings to lm_head, and the checkpoints store only lm_head. Without
+            # this, the strict load fails after loading everything else and the token embeddings (task
+            # and state tokens) silently stay randomly initialised.
+            embed = "model.paligemma_with_expert.paligemma.model.language_model.embed_tokens.weight"
+            head = "model.paligemma_with_expert.paligemma.lm_head.weight"
+            if embed not in remapped_state_dict and head in remapped_state_dict and embed in model.state_dict():
+                remapped_state_dict[embed] = remapped_state_dict[head]
+                print("Tied embed_tokens to lm_head (not stored separately in the checkpoint)")
+
             # Load the remapped state dict into the model
             missing_keys, unexpected_keys = model.load_state_dict(remapped_state_dict, strict=strict)
 
