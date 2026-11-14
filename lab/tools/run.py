@@ -22,6 +22,7 @@ import logging
 import os
 import socket
 import subprocess
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
@@ -57,6 +58,27 @@ def server_reachable(host: str, port: int) -> bool:
             return True
     except OSError:
         return False
+
+
+def server_labels(host: str, port: int) -> tuple[str, str] | None:
+    """(server host, GPU) as the policy server reports them, or None for a server without that report.
+
+    rig.yaml's hosts.server / hosts.gpu describe the laptop; through a tunnel (lab/bin/tunnel) the
+    server is another machine, and its own answer keeps the recorded labels right."""
+    import grpc
+
+    from lerobot.transport import services_pb2, services_pb2_grpc
+
+    try:
+        with grpc.insecure_channel(f"{host}:{port}") as channel:
+            _, call = services_pb2_grpc.AsyncInferenceStub(channel).Ready.with_call(services_pb2.Empty(), timeout=10)
+            meta = dict(call.trailing_metadata() or ())
+    except grpc.RpcError as e:
+        print(f"NOTE: could not ask the server who it is ({e.code().name}); using rig.yaml's labels.", file=sys.stderr)
+        return None
+    if "drtc-server-host" not in meta:
+        return None
+    return meta["drtc-server-host"], meta.get("drtc-server-gpu", "")
 
 
 def ask_label() -> str:
@@ -97,6 +119,11 @@ def main() -> None:
     if not server_reachable(host, port):
         start = "the policy server (lab/WINDOWS.md, step 11)" if os.name == "nt" else "lab/bin/server on the laptop"
         raise SystemExit(f"Policy server not reachable at {host}:{port}. Start {start}.")
+
+    labels = server_labels(host, port)
+    if labels and labels[0] != resolved["server_host"]:  # the laptop keeps rig.yaml's names
+        resolved["server_host"], resolved["gpu"] = labels
+    print(f"Policy server {host}:{port}: {resolved['server_host']} ({resolved['gpu']})")
 
     runner = load_upstream_runner()
     config = runner._parse_experiment_dict(resolved)

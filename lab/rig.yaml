@@ -13,6 +13,15 @@ server:
   host: 10.42.0.1             # laptop hotspot
   port: 8080
 
+# Policy servers on other machines. The laptop forwards server.port to one of them through SSH
+# (lab/bin/tunnel <name>), so the Pi keeps connecting to the laptop as above, unchanged. The server
+# reports its own name and GPU, and runs record those instead of hosts.server / hosts.gpu.
+remote_servers:
+  h200:
+    ssh: jayaraj@192.168.41.118   # the server account (lab/H200.md)
+    container: drtc_lab           # docker container running lab/bin/server
+    name: gpuh200                 # label recorded with runs it serves
+
 robot:
   type: so101
   port: /dev/serial/by-id/usb-1a86_USB_Single_Serial_5B79017420-if00

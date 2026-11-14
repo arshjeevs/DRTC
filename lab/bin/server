@@ -1,7 +1,9 @@
 #!/bin/bash
-# Start the DRTC policy server on the laptop GPU (logs in logs/). Models are chosen per run by the Pi.
-#   lab/bin/server              main .venv: smolvla, act, ...
-#   lab/bin/server <model>      the venv that model needs, e.g. lab/bin/server pi05_train_new_1_lora
+# Start the DRTC policy server on this machine's GPU (logs in logs/). Models are chosen per run by the Pi.
+#   lab/bin/server              main .venv: smolvla, act, dot, diffusion, sfp, ...
+#   lab/bin/server <model>      the venv that model needs, e.g. lab/bin/server pi05_cubebox_v1_lora
+# On the H200 (inside the drtc_lab container) the same command works; the laptop then forwards the
+# Pi's connection to it with lab/bin/tunnel h200 (lab/H200.md, "Serving models from the H200").
 source "$(dirname "$0")/_env"
 set -e
 if [ -n "$1" ] && [ "${1#-}" = "$1" ]; then use_model_venv "$1"; shift; fi
@@ -11,10 +13,21 @@ for ac in /sys/class/power_supply/{AC,ADP}*/online; do
     [ -f "$ac" ] && [ "$(cat "$ac")" = "0" ] && echo "WARNING: on battery -- GPU will throttle"
 done
 port="$(rig server.port)"
-ss -tln | grep -q ":$port " && { echo "Port $port in use (pkill -f policy_server_drtc)"; exit 1; }
+# (python, not ss: ss may be missing in the H200 container image)
+"$PY" -c "import socket, sys; s = socket.socket(); sys.exit(s.connect_ex(('127.0.0.1', $port)) != 0)" \
+    && { echo "Port $port in use (pkill -f policy_server_drtc)"; exit 1; }
+
+# The name the server reports to the client, recorded with every run (lab/tools/run.py).
+if [ -f "$REPO_ROOT/.server.env" ]; then
+    export DRTC_SERVER_NAME="${DRTC_SERVER_NAME:-$(rig remote_servers.h200.name)}"
+    echo "H200: from the laptop, forward the Pi's connection here with:  lab/bin/tunnel h200"
+    echo "      (this container's address: $("$PY" -c 'import socket; print(socket.gethostbyname(socket.gethostname()))'))"
+else
+    export DRTC_SERVER_NAME="${DRTC_SERVER_NAME:-$(rig hosts.server)}"
+fi
 
 mkdir -p logs
 log="logs/server_$(date +%Y%m%d-%H%M%S).log"
-echo "Serving on 0.0.0.0:$port -> $log"
+echo "Serving on 0.0.0.0:$port as $DRTC_SERVER_NAME -> $log"
 PYTHONUNBUFFERED=1 "$PY" examples/tutorial/async-inf/policy_server_drtc.py \
     --host 0.0.0.0 --port "$port" --verbose-diagnostics "$@" 2>&1 | tee "$log"

@@ -27,6 +27,7 @@ H200 GPU server: [H200.md](H200.md). On Windows, see [WINDOWS.md](WINDOWS.md): s
 | Command | Where | Purpose |
 |---|---|---|
 | `lab/bin/server` | laptop | Policy server on the GPU. Loads whichever model each run asks for |
+| `lab/bin/tunnel h200` | laptop | Forward the Pi's server connection to `lab/bin/server` running on the H200 ([H200.md](H200.md#serving-models-from-the-h200)) |
 | `lab/bin/session [record]` | Pi / laptop | tmux: `phonecam` window + `work` window running preflight. Re-run to re-attach |
 | `lab/bin/run <group/name> [--model M] [--trials N] [--note TEXT] [--no-label]` | Pi | Run a condition. Prompts for scene reset before and success after each trial |
 | `lab/bin/train <model> [--dry-run] [--no-push] [--resume] [--push [ckpt]] [--<lerobot flag>=value ...]` | laptop | Train a `models.yaml` entry that has a `train:` block and push it to its Hub id. See [Training](#training) |

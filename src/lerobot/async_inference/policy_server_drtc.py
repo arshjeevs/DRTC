@@ -20,6 +20,7 @@ python -m lerobot.async_inference.policy_server_drtc \
 """
 
 import logging
+import os
 import pickle  # nosec
 import threading
 import time
@@ -257,6 +258,10 @@ class PolicyServerDrtc(services_pb2_grpc.AsyncInferenceServicer):
         self._metrics.diagnostic.counter("client_ready", 1)
         self._reset_server()
         self.shutdown_event.clear()
+        # Which machine answers: the client records it with each run (lab/tools/run.py), so runs served
+        # through a tunnel (e.g. the H200) are not labelled with the laptop's rig.yaml names.
+        with suppress(Exception):
+            context.set_trailing_metadata(server_identity())
         return services_pb2.Empty()
 
     def SendTrajectoryChunk(self, request, context):  # noqa: N802
@@ -857,6 +862,15 @@ class PolicyServerDrtc(services_pb2_grpc.AsyncInferenceServicer):
         """Stop the server."""
         self._reset_server()
         self._metrics.diagnostic.stop()
+
+
+def server_identity() -> tuple[tuple[str, str], ...]:
+    """gRPC metadata naming this server: DRTC_SERVER_NAME (set by lab/bin/server) or the hostname, and the GPU."""
+    import socket
+
+    gpu = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu"
+    return (("drtc-server-host", os.environ.get("DRTC_SERVER_NAME") or socket.gethostname()),
+            ("drtc-server-gpu", gpu))
 
 
 @draccus.wrap()

@@ -1,0 +1,47 @@
+#!/bin/bash
+# Laptop: forward the policy-server port (rig.yaml server.port) to a policy server on another machine
+# (rig.yaml remote_servers), so the Pi keeps connecting to the laptop and is served by that machine.
+#   lab/bin/tunnel h200                 finds the drtc_lab container's address on the server by itself
+#   lab/bin/tunnel h200 <container-ip>  or use the address lab/bin/server printed there
+# Start lab/bin/server <model> on the H200 first (lab/H200.md). Ctrl-C closes the tunnel.
+# Asks for the server account's password once. Stop the laptop's own lab/bin/server first (same port).
+source "$(dirname "$0")/_env"
+set -e
+name="${1:?usage: lab/bin/tunnel <remote server in rig.yaml, e.g. h200> [container-ip]}"
+target="$(rig "remote_servers.$name.ssh")"
+container="$(rig "remote_servers.$name.container")"
+port="$(rig server.port)"
+
+"$PY" -c "import socket, sys; s = socket.socket(); sys.exit(s.connect_ex(('127.0.0.1', $port)) != 0)" \
+    && { echo "Port $port is in use on the laptop: stop the local server first (pkill -f policy_server_drtc)"; exit 1; }
+
+sock="${XDG_RUNTIME_DIR:-/tmp}/drtc-tunnel-$name-$$"
+# One SSH connection (one password prompt), reused below for the address lookup and the forward.
+ssh -M -S "$sock" -o GatewayPorts=yes -o ServerAliveInterval=15 -o ExitOnForwardFailure=yes -fN "$target"
+trap 'ssh -S "$sock" -O exit "$target" 2>/dev/null; echo "tunnel closed"' EXIT
+
+ip="$2"
+if [ -z "$ip" ]; then
+    ip="$(ssh -S "$sock" "$target" \
+        "docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $container" 2>/dev/null)" \
+        || { echo "Container $container is not running on $target (lab/H200.md: h200-start)"; exit 1; }
+fi
+[ -n "$ip" ] || { echo "No address for container $container; pass the one lab/bin/server printed: lab/bin/tunnel $name <ip>"; exit 1; }
+
+# 0.0.0.0: reachable from the Pi on the hotspot, not just from the laptop itself.
+ssh -S "$sock" -O forward -L "0.0.0.0:$port:$ip:$port" "$target" >/dev/null
+echo "laptop :$port -> $target -> $container ($ip:$port)"
+
+labels="$("$PY" -c "
+from lab.tools.run import server_labels
+l = server_labels('127.0.0.1', $port)
+print(f'{l[0]} ({l[1]})' if l else '')" 2>/dev/null || true)"
+if [ -n "$labels" ]; then
+    echo "policy server answering: $labels"
+else
+    echo "WARNING: no policy server answering at $ip:$port yet. Start it in the container:"
+    echo "         cd /workspace/drtc_lab && lab/bin/server <model>   (the tunnel stays open; runs work once it is up)"
+fi
+echo "On the Pi, run as usual (lab/bin/preflight, lab/bin/run ...). Keep this open; Ctrl-C closes the tunnel."
+while ssh -S "$sock" -O check "$target" 2>/dev/null; do sleep 5; done
+echo "SSH connection to $target lost"
