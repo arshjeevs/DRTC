@@ -13,6 +13,7 @@ esac
 [ -e "$port" ] || { echo "$1 not found at $port -- plugged in? (ls /dev/serial/by-id/)"; exit 1; }
 
 file="$C/$sub/$id.json"
+echo "$file"
 if [ -e "$file" ]; then
     cp -L "$file" "$file.$(date +%Y%m%d-%H%M%S).bak"
     rm "$file"  # also drops a laptop-setup symlink, so the new calibration is a real file

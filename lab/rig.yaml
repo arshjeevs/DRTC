@@ -10,7 +10,7 @@ hosts:
   gpu: RTX 4060 Laptop
 
 server:
-  host: 10.42.0.1             # laptop hotspot
+  host: 0.0.0.0             # laptop hotspot
   port: 8080
 
 # Policy servers on other machines. The laptop forwards server.port to one of them through SSH

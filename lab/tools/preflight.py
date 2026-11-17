@@ -89,6 +89,7 @@ def main() -> None:
         return
 
     host, sport = rig["server"]["host"], int(rig["server"]["port"])
+    print(host,sport)
     try:
         with socket.create_connection((host, sport), timeout=2):
             results.append(report(True, f"policy server {host}:{sport}"))
