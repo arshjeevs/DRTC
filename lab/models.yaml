@@ -869,6 +869,29 @@ molmoact2_cubebox_v1_full_trim:  # H200 / A100; served from a server GPU
       policy.gradient_checkpointing: true
       rename_map: {observation.images.camera2: observation.images.cam0, observation.images.camera1: observation.images.cam1}
 
+# GR00T N1.7 (NVIDIA, nvidia/GR00T-N1.7-3B): Qwen3-VL backbone + flow-matching DiT action head, 40-action chunks
+# by default (N1.5: 16), RTC support built in. NOT TRAINABLE YET: in upstream LeRobot (>= 0.6, which dropped N1.5),
+# not in this one (0.4.3); it needs transformers >= 5 (Qwen3-VL), so the port goes in its own venv like .venv-groot.
+# Recipe below = NVIDIA's (VLM frozen; projector, VL layer norm and DiT trained), the same as upstream's defaults.
+# GR00T N1.6 is in neither LeRobot (only NVIDIA's Isaac-GR00T and LoongForge), so it has no entry.
+grootn17_cubebox_v1_full_trim:   # H200 / A100; served from a server GPU
+  policy_type: groot_n17
+  pretrained_name_or_path: orangemoon599/grootn17_cubebox_v1_full_trim
+  finetune: full
+  fps: 30
+  task: *study_task
+  rtc_enabled: false
+  num_flow_matching_steps: null
+  actions_per_chunk: 40          # N1.7's chunk_size (run default asks for 50)
+  train:
+    dataset: *trim_ds
+    split: *trim_split
+    from: nvidia/GR00T-N1.7-3B
+    epochs: 10
+    batch_size: 32
+    save_freq: 2000
+    flags: {policy.chunk_size: 40, policy.n_action_steps: 40, policy.embodiment_tag: new_embodiment, policy.tune_llm: false, policy.tune_visual: false, policy.tune_projector: true, policy.tune_diffusion_model: true}
+
 # Template for our own models:
 # smolvla_cube_v1:
 #   policy_type: smolvla
