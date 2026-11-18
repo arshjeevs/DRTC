@@ -6,14 +6,15 @@
 smolvla_cubebox_v1_full: {recipe: smolvla_full_45ep, dataset: so101_cubebox_v1, status: planned,
   notes: Shortlisted 2026-11-18; recipe to be confirmed}
 groot_cubebox_v1_full: {recipe: groot_n15_nvidia, dataset: so101_cubebox_v1, status: planned,
-  notes: 'Shortlisted 2026-11-18; recipe to be confirmed. RTC needs supports_rtc() in the groot_n15 plugin'}
+  notes: 'Shortlisted 2026-11-18; recipe to be confirmed. H200 test run ok; guided RTC via the groot_n15 plugin'}
 grootn17_cubebox_v1_full: {recipe: groot_n17_nvidia, dataset: so101_cubebox_v1, status: planned,
-  notes: 'Shortlisted 2026-11-18; recipe to be confirmed. GR00T N1.7 is upstream `groot` in LeRobot 0.7; smoke train
-    on the H200 pending (tests/smoke)'}
+  notes: 'Shortlisted 2026-11-18; recipe to be confirmed. GR00T N1.7 is upstream `groot` in LeRobot 0.7; H200 test
+    run ok (chunk + RTC)'}
 pi05_cubebox_v1_full: {recipe: pi05_full_openpi, dataset: so101_cubebox_v1, status: planned,
   notes: Shortlisted 2026-11-18; recipe to be confirmed}
 molmoact2_cubebox_v1_full: {recipe: molmoact2_full, dataset: so101_cubebox_v1, status: planned,
-  notes: 'Shortlisted 2026-11-18; recipe to be confirmed. Smoke train on the H200 pending (tests/smoke)'}
+  notes: 'Shortlisted 2026-11-18; recipe to be confirmed. H200 test run ok, but serving (475 ms, RTC 604 ms) misses
+    the margin at s_min 20; open (lab/PLAN.md)'}
 act_cubebox_v1_full: {recipe: act_100ep, dataset: so101_cubebox_v1, status: planned,
   notes: 'Shortlisted 2026-11-18, also the edge fallback; recipe to be confirmed'}
 diffusion_cubebox_v1_full: {recipe: diffusion_full, dataset: so101_cubebox_v1, status: planned,

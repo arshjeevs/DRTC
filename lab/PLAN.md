@@ -556,7 +556,7 @@ RTC. The other five can be compared with and without RTC.
   - the chunk length at 30 fps;
   - steps vs epochs, and the stopping rule;
   - relative vs absolute actions.
-- [ ] Test runs of all 7 on the H200: `bash tests/smoke/train.sh` (the user runs it).
+- [x] Test runs of all 7 on the H200: `bash tests/smoke/train.sh` (the user runs it). All 7 train and serve; 6 fit the timing margin.
   - **First run (2026-11-18, commit c4d24663).** Serve times are the H200's; 30 fps, s_min 20:
 
     | Model | Train (30 steps) | Peak train GPU | Serve check |
@@ -638,7 +638,7 @@ RTC. The other five can be compared with and without RTC.
 
 - [ ] For each candidate, who made it work on an SO100/SO101-class arm: ArmnetBench read (reference only). The
       recipe source is being researched by the user.
-  - [ ] Inference speed against DRTC's timing: the H200 test runs above.
+  - [x] Inference speed against DRTC's timing: the H200 test runs above (MolmoAct 2 does not fit yet).
 - [x] Selection criteria: the user's choice (2026-11-18).
 - [x] Candidates reviewed; shortlist of 7 (2026-11-18).
 - [x] `lab/models/cubebox_v1.yaml`: the shortlist `planned`, the rest `retired`.
