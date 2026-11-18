@@ -19,6 +19,13 @@ Diffusion Policy:
 - π0.5 also has three camera slots of which our rigs fill two (it gives missing slots an empty, masked image, as in
   training) and pads the state to max_state_dim: supplied names must be a subset (state and at least one camera
   included) and the state no longer than the checkpoint's. MolmoAct 2 keeps exact names and state shape.
+
+MolmoAct 2 guided RTC:
+- the action expert caches its per-step timestep modulations across calls. A chunk-mode call (warmup included)
+  creates them under `torch.inference_mode`; a later rtc_guided call then feeds them into the RTC correction's
+  autograd graph, which PyTorch refuses ("Inference tensors cannot be saved for backward"). Outside inference
+  mode, a cache holding inference tensors is rebuilt once; ordinary tensors also work in chunk mode, so it is not
+  rebuilt again.
 """
 
 from __future__ import annotations
@@ -34,6 +41,7 @@ def install() -> None:
         return
     _install_diffusion()
     _install_resizing_vlas()
+    _install_molmoact2_rtc()
     _installed = True
 
 
@@ -116,3 +124,31 @@ def _install_resizing_vlas() -> None:
 
     PI05Policy.validate_chunk_input_features = validate_pi05_features
     MolmoAct2Policy.validate_chunk_input_features = validate_molmoact2_features
+
+
+def _holds_inference_tensors(cache) -> bool:
+    import torch
+
+    for step in cache:
+        tensors = [step.conditioning, *step.final_modulation]
+        for block in step.block_modulations:
+            tensors.extend(block)
+        if any(isinstance(t, torch.Tensor) and t.is_inference() for t in tensors):
+            return True
+    return False
+
+
+def _install_molmoact2_rtc() -> None:
+    import torch
+    from lerobot.policies.molmoact2.molmoact2_hf_model.modeling_molmoact2 import ActionExpert
+
+    original = ActionExpert.get_or_prepare_modulation_cache
+
+    @functools.wraps(original)
+    def get_or_prepare_modulation_cache(self, timesteps, *, cache_key=None):
+        cached = self._modulation_cache_value
+        if cached is not None and not torch.is_inference_mode_enabled() and _holds_inference_tensors(cached):
+            self._modulation_cache_key = self._modulation_cache_value = None
+        return original(self, timesteps, cache_key=cache_key)
+
+    ActionExpert.get_or_prepare_modulation_cache = get_or_prepare_modulation_cache

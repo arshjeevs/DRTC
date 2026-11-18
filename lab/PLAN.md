@@ -511,7 +511,7 @@ declares `supports_rtc()`.
 |---|---|---|---|---|
 | SmolVLA | 50 | yes (kept model run on the replay robot, ~280 ms on the 4060) | yes | — |
 | GR00T N1.5 (our plugin) | 16 | yes (same path as the kept model) | **yes since 2026-11-18** (see below) | 613 ms on the laptop vs a 533 ms chunk, so serve from the H200. H − s_min = 8 steps is tight |
-| GR00T N1.7 (upstream `groot`) | 40 | not tested | yes | smoke train + serve on the H200. Recipe fixed: `policy: groot` + `policy.base_model_path` |
+| GR00T N1.7 (upstream `groot`) | 40 | yes (smoke-trained) | yes (H200: RTC 121 ms) | — |
 | π0.5 | 50 | yes (smoke-trained) | yes | — |
 | MolmoAct 2 | 30 | not tested | only with `inference_action_mode: continuous` (its default) | smoke train + serve on the H200 |
 | ACT | 100 | yes (serve check on the laptop: 27 ms per chunk) | no (not flow matching): chunk switching only | temporal ensembling must stay off (the server refuses it) |
@@ -605,7 +605,20 @@ RTC. The other five can be compared with and without RTC.
     - MolmoAct 2: exact names and state.
 
     Tests in `tests/test_chunk_adapters.py`.
-  - [ ] Third run: π0.5, MolmoAct 2 and GR00T N1.7.
+  - **Third run (2026-11-18, commit a327e859)**, after the user's new HF token opened the GR00T N1.7 gate:
+
+    | Model | Train | Peak train GPU | Serve check |
+    |---|---|---|---|
+    | π0.5 | ok, 377 s, eval 0.27 | 45.5 GB | **admitted** chunk + rtc_guided; 178.7 ms (6 steps) / RTC 256.0 ms (8 steps) vs margin 30; serve peak 10.3 GB |
+    | MolmoAct 2 | ok, 603 s, eval 0.23 | 55.8 GB | refused in warmup: "Inference tensors cannot be saved for backward" (fix 7) |
+    | GR00T N1.7 | ok, 178 s, eval 1.21 | 36.4 GB | **admitted** chunk + rtc_guided; 119.5 ms (4 steps) / RTC 121.2 ms (4 steps) vs margin 20; serve peak 15.3 GB |
+
+  - **Fix 7.** MolmoAct 2's action expert caches its per-step timestep modulations across calls. The chunk-mode
+    warmup creates them under `torch.inference_mode`, and the rtc_guided warmup then uses them in the RTC
+    correction's autograd graph. `drtc.control.chunk_adapters` rebuilds a cache holding inference tensors once, when
+    called outside inference mode; ordinary tensors work in both modes. Test in `tests/test_chunk_adapters.py`
+    (fails without the fix with the H200's error).
+  - [ ] Fourth run: MolmoAct 2 only.
 - [x] GR00T N1.5 plugin: guided RTC on 0.7, with `supports_rtc()` (2026-11-18).
 
 **What LeRobot 0.7 covers:**

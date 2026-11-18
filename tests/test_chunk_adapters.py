@@ -99,3 +99,34 @@ def test_installed_on_the_policies():
 
     assert PI05Policy.validate_chunk_input_features is chunk_adapters.validate_pi05_features
     assert MolmoAct2Policy.validate_chunk_input_features is chunk_adapters.validate_molmoact2_features
+    from lerobot.policies.molmoact2.molmoact2_hf_model.modeling_molmoact2 import ActionExpert
+
+    assert ActionExpert.get_or_prepare_modulation_cache.__wrapped__ is not None
+
+
+def test_molmoact2_modulation_cache_survives_chunk_then_rtc():
+    # The H200 serve check: chunk warmup under inference_mode, then guided RTC differentiates through the expert.
+    from lerobot.policies.molmoact2.molmoact2_hf_model.configuration_molmoact2 import MolmoAct2ActionExpertConfig
+    from lerobot.policies.molmoact2.molmoact2_hf_model.modeling_molmoact2 import ActionExpert
+
+    chunk_adapters.install()
+    cfg = MolmoAct2ActionExpertConfig(max_action_horizon=4, max_action_dim=6, hidden_size=32, num_layers=1,
+                                      num_heads=2, ffn_multiple_of=8, timestep_embed_dim=16)
+    expert = ActionExpert(cfg, llm_dim=16, llm_kv_dim=16, llm_num_layers=1).eval()
+    steps = [torch.full((1,), i / 2) for i in range(2)]
+    key = (2, 1, torch.device("cpu"), torch.float32)
+
+    def modulated(x):
+        mod = expert.get_or_prepare_modulation_cache(steps, cache_key=key)[0]
+        return (x * mod.conditioning).sum()  # saves the cached tensor for backward, as the expert's gates do
+
+    with torch.inference_mode():
+        modulated(torch.ones(1, 32))  # chunk mode: the cache is created as inference tensors
+    with torch.no_grad(), torch.enable_grad():  # guided RTC's correction
+        x = torch.ones(1, 32, requires_grad=True)
+        (grad,) = torch.autograd.grad(modulated(x), x)
+    assert torch.isfinite(grad).all()
+    first = expert._modulation_cache_value
+    with torch.inference_mode():
+        modulated(torch.ones(1, 32))
+    assert expert._modulation_cache_value is first  # rebuilt once, then reused in both modes
