@@ -483,18 +483,50 @@ Ours: 110 episodes, 30 fps, 25,067 frames.
   task because the earlier `_20k` (before the fix) was also evaluated, so the 14.8% mixes both. The fixed
   checkpoints alone: 19.6% single-arm, 63% on eye_drops_to_basket.
 
-**Shortlist options (for the user to decide):**
-- **A:** π0.5, GR00T N1.7, ACT. One model per family (PaliGemma flow VLA, NVIDIA VLA, small model for the edge).
-- **B:** A + π0. The ArmnetBench top three plus the edge model.
-- **C:** B + Diffusion. All five recipes read here; Diffusion is the strongest small model on bimanual (35.8%) but
-  weak on single-arm (22%).
-- **D:** C + GR00T N1.5. Continuity with the minor (80%, the only model that worked).
+**The user's view (2026-11-18):** these are not the recipes to follow; they are reference only. The user is
+looking for the right source. The training configs are confirmed after that research.
 
-**Recipe choices per model:**
-- copy ArmnetBench as-is, or adapt it to our 30 fps / 110 episodes;
-- chunk: same action count, or same duration (π 30 → 45, GR00T 16 → 24, ACT 30 → 45);
-- steps: same steps, same epochs (π ~69k on our data), or save every 2k and stop on held-out action error
-  (IRA: best π0.5 at 8–10k).
+### Shortlist (decided 2026-11-18)
+**Models:**
+- SmolVLA
+- GR00T N1.5
+- GR00T N1.7
+- π0.5
+- MolmoAct 2
+- ACT, also the edge fallback
+- Diffusion Policy
+
+**Retired:** π0, π0-FAST, X-VLA, DOT, SFP (`status: retired` in `lab/models/cubebox_v1.yaml`).
+
+**DRTC compatibility.** DRTC's own parts work for any policy that LeRobot 0.7's policy server can serve as action
+chunks:
+- the trigger (request when the queue is ≤ H − s_min);
+- the latency estimators;
+- the cooldown re-request.
+
+RTC (inpainting the next chunk onto the actions still queued) is extra. It needs a flow-matching policy that
+declares `supports_rtc()`.
+
+| Model | Chunk H (current recipe) | Served by the 0.7 server | RTC in 0.7 | To do |
+|---|---|---|---|---|
+| SmolVLA | 50 | yes (kept model run on the replay robot, ~280 ms on the 4060) | yes | — |
+| GR00T N1.5 (our plugin) | 16 | yes (same path as the kept model) | guidance code is there, but `supports_rtc()` is not declared, so the server never uses it | add `supports_rtc()` to the plugin. 613 ms on the laptop vs a 533 ms chunk, so serve from the H200. H − s_min = 8 steps is tight |
+| GR00T N1.7 (upstream `groot`) | 40 | not tested | yes | smoke train + serve on the H200. The recipe says `policy: groot_n17`; 0.7 registers it as `groot` |
+| π0.5 | 50 | yes (smoke-trained) | yes | — |
+| MolmoAct 2 | 30 | not tested | only with `inference_action_mode: continuous` | smoke train + serve on the H200 |
+| ACT | 100 | yes | no (not flow matching): chunk switching only | temporal ensembling must stay off (the server refuses it) |
+| Diffusion | 16 executed | **no as configured:** default `n_obs_steps=2`, and the server refuses observation history | no | train with `n_obs_steps: 1`, or write a custom runner |
+
+ACT and Diffusion get DRTC scheduling with the Butterworth filter and the Phase 5 smoothing (method A), but no
+RTC. The other five can be compared with and without RTC.
+
+**Next:**
+- [ ] Recipes after the user's research. The choices to make:
+  - the chunk length at 30 fps;
+  - steps vs epochs, and the stopping rule;
+  - relative vs absolute actions.
+- [ ] GR00T N1.7 and MolmoAct 2: smoke train on the H200 (`tests/smoke/train.sh`); then `status: planned`.
+- [ ] GR00T N1.5 plugin: declare `supports_rtc()`.
 
 **What LeRobot 0.7 covers:**
 - π0.5, π0 and GR00T: `use_relative_actions` with `relative_exclude_joints: [gripper]`.
