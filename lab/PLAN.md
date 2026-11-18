@@ -373,9 +373,33 @@ Findings so far (2026-11-18):
 - **MolmoAct 2:** 56.7% on SO-100/101 in its paper (pretrained on 38k community SO-100/101 episodes), but 18.9% in
   ArmnetBench.
 - **X-VLA, EVO1, LaWAM:** no SO-101 success rates found.
-- **Also pending:** "Benchmarking VLA models on SO-101: failure and recovery" (arXiv 2606.08881: ACT 33.75%,
-  SmolVLA 32.5% average), and "Does validation loss predict real-robot success?" (arXiv 2611.00283, on a low-cost
-  arm, relevant to checkpoint selection).
+- **SO-101 failure and recovery benchmark** (arXiv 2606.08881): 100 demos per task, 4 tasks, 20 trials each.
+  - **Average success:** π0.5 **56.25%**, Wall-X 51.25%, ACT 33.75%, SmolVLA 32.5%.
+  - **Multi-object packing into a box:** π0.5 55%, ACT 10%, SmolVLA 10%.
+  - **Recovery after a failure:** π0.5 30.8%, ACT 6.5%.
+  - **Failures:** execution failures (grasp instability, repetition loops) dominate for all models; π0.5 has the
+    fewest state mismatches.
+  - No recipes in the paper.
+- **"Does validation loss predict real-robot success?"** (arXiv 2611.00283): SO-101, a green ball among
+  distractors into a basket, 225 demos, budgets 12 to 200, LeRobot 0.6.2 default recipes. Recipes:
+  - ACT: 100k steps;
+  - Diffusion: 100k steps;
+  - SmolVLA: 20k steps, from pretrained;
+  - π0.5: action expert only, 6k steps.
+
+  Findings:
+  - **Success at 200 episodes:** π0.5 **73%**, SmolVLA 38% (71% of the runs where it started moving); ACT 37/40
+    at 100 episodes.
+  - **"Never started" (the arm stays at rest) is a major failure mode:** untrimmed Diffusion 96% of rollouts, **trimmed
+    Diffusion 9%**; SmolVLA 47%. This is direct support for trimming every dataset.
+  - **Validation loss is a weak guide:**
+    - held-out *action error* tracks success within a policy, but no better than the number of episodes;
+    - held-out *loss* rises during training for diffusion/flow-matching models while action error falls, so it is
+      not a stopping rule for them;
+    - final checkpoints were within 5.3% of the best;
+    - **use held-out action error to decide when to stop, not to choose models; judge only on the robot**, and
+      report "never started" separately from success.
+  - **Plateaus:** ACT at 20k–40k steps, SmolVLA at 2k–10k, Diffusion at 10k–30k (with ≤50 episodes).
 - **Tentative shortlist (for the user to decide):** π0.5, π0, GR00T N1.7 (and N1.5 for continuity), Diffusion as
   the strongest small model; ACT for the edge fallback. SmolVLA and MolmoAct 2 rank low in independent tests.
 
