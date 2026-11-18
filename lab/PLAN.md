@@ -400,9 +400,7 @@ Findings so far (2026-11-18):
     MolmoAct 2 18.9%, SmolVLA 15.0%.
   - **Closest tasks to ours:** transfer_cube (π0.5 86%, π0 47%, GR00T N1.7 47%, ACT 0%) and eye_drops_to_basket
     (π0 70%, π0.5 67%, GR00T N1.7 67%, ACT 63%).
-  - **Recipes are not in the paper,** but the trained checkpoints are on the Hub
-    (huggingface.co/collections/armnet/armnetbench-v01). **Next step:** read each checkpoint's `train_config.json`
-    for the exact recipe (steps, batch, learning rate, frozen parts, chunk size).
+  - **Recipes:** read on 2026-11-18, see "ArmnetBench recipes" below.
 - **Project-IRA π0.5 on SO-101** (Hub model cards): `lerobot/pi05_base`, batch 32, 30k steps, checkpoints every 2k.
   The best checkpoints were at **8k–10k steps**; after ~20k they were unusable on the robot (overfitting, like
   our minor's validation curves).
@@ -442,6 +440,72 @@ Findings so far (2026-11-18):
   - **Plateaus:** ACT at 20k–40k steps, SmolVLA at 2k–10k, Diffusion at 10k–30k (with ≤50 episodes).
 - **Tentative shortlist (for the user to decide):** π0.5, π0, GR00T N1.7 (and N1.5 for continuity), Diffusion as
   the strongest small model; ACT for the edge fallback. SmolVLA and MolmoAct 2 rank low in independent tests.
+
+### ArmnetBench recipes (read 2026-11-18)
+**Where they are.** The HF collection holds only the three datasets. The checkpoint links are in the dataset
+README (`armnet/armnetbench_v01_lerobot_so101`, `..._bimanual_so101`), one checkpoint per (task, policy).
+Each rollout's `policy_repo_id` and `success` are in `meta/episodes`. The formats differ by family:
+- ACT and Diffusion: LeRobot `train_config.json`;
+- GR00T N1.7: Isaac-GR00T `experiment_cfg/conf.yaml`;
+- π0 and π0.5: openpi JAX checkpoints with no config; the configs are in GitHub `pravsels/openpi`, branch
+  `task/v50-retrain`, `src/openpi/training/config.py` (`_make_v50`, `LeRobotSO101DataConfig`).
+
+**Their data:** 50 demos per task, 20 fps, front/top 576×1024 and wrist 720×1280 cameras, ~9.1k frames per task.
+Ours: 110 episodes, 30 fps, 25,067 frames.
+
+**Success by embodiment,** recomputed from `meta/episodes`. Single-arm is our setting; transfer_cube is bimanual.
+
+| | π0.5 | π0 | GR00T N1.7 | Diffusion | ACT | MolmoAct 2 | SmolVLA |
+|---|---|---|---|---|---|---|---|
+| Single-arm, 8 tasks | **45.4%** | 36.4% | 34.6% | 22.1% | 20.3% | 14.8% | 13.6% |
+| Bimanual, 4 tasks | **52.1%** | 32.5% | 19.2% | 35.8% | 2.0% | 8.8% | 12.0% |
+| eye_drops_to_basket (single) | 67% | 70% | 67% | 43% | 63% | 33% | 23% |
+
+**Recipes:**
+
+| | π0.5 / π0 (identical except base) | GR00T N1.7 | ACT | Diffusion |
+|---|---|---|---|---|
+| Trainer | openpi (JAX), fork with per-timestep action norm | Isaac-GR00T, 4× RTX 5090 DDP | LeRobot | LeRobot |
+| Base | `pi05_base` / `pi0_base` | `nvidia/GR00T-N1.7-3B` | ResNet18 ImageNet | ResNet18 ImageNet |
+| Trained | everything (openpi default, no LoRA in params) | projector + DiT + VLLN; LLM and vision frozen | everything | everything |
+| Steps × batch | **25k × 32** (2 GPU × 16) | **20k × 32** | **20k × 16** (10k + 10k warm restart) | 20k × 32 on 5 single-arm tasks; 80k × 8 on 3; several resumed from an earlier checkpoint, so these are not totals |
+| ≈ epochs of their data | ~88 | ~70 | ~35 | ~70 |
+| LR | 2.5e-5 peak, 1k warmup, cosine to 2.5e-6 over 100k (so nearly flat over 25k); EMA 0.999 | 1e-4 cosine, 5% warmup, wd 1e-5, grad clip 1 | 1e-5 (backbone too), wd 1e-4, constant | 1e-4, diffusers schedule, 500 warmup, wd 1e-6 |
+| Chunk | 30 predicted (1.5 s), executed per their client | 16 used (0.8 s) of the 40-step head | 30 / 30 executed | horizon 64, 32 executed, 2 obs steps |
+| Actions | **delta joints, absolute gripper**; per-timestep action normalization (per-step mean/std/q01/q99) | **relative arm, absolute gripper**; percentile stats | absolute, mean/std | absolute |
+| Cameras | front + wrist (top dropped) | front, wrist, top | top, wrist, front at 480×640 | all three at full resolution, no crop, one encoder per camera |
+| Other | default prompt per task | colour jitter, crop 244→224, state dropout 0.2 | image augmentation on (jitter, sharpness, small affine), KL 10 | DDPM 50 steps (DDIM 20 on 2 tasks), down_dims 512/1024/2048, no augmentation |
+
+**Caveats:**
+- The Diffusion recipe is not uniform. `cable_clip_remote_v2_diffusion`'s config names the block_stack dataset,
+  which looks like an upload mistake.
+- MolmoAct 2: the `quantile_norm_fix_25k` checkpoints are what the README links. The dataset has 60 rollouts per
+  task because the earlier `_20k` (before the fix) was also evaluated, so the 14.8% mixes both. The fixed
+  checkpoints alone: 19.6% single-arm, 63% on eye_drops_to_basket.
+
+**Shortlist options (for the user to decide):**
+- **A:** π0.5, GR00T N1.7, ACT. One model per family (PaliGemma flow VLA, NVIDIA VLA, small model for the edge).
+- **B:** A + π0. The ArmnetBench top three plus the edge model.
+- **C:** B + Diffusion. All five recipes read here; Diffusion is the strongest small model on bimanual (35.8%) but
+  weak on single-arm (22%).
+- **D:** C + GR00T N1.5. Continuity with the minor (80%, the only model that worked).
+
+**Recipe choices per model:**
+- copy ArmnetBench as-is, or adapt it to our 30 fps / 110 episodes;
+- chunk: same action count, or same duration (π 30 → 45, GR00T 16 → 24, ACT 30 → 45);
+- steps: same steps, same epochs (π ~69k on our data), or save every 2k and stop on held-out action error
+  (IRA: best π0.5 at 8–10k).
+
+**What LeRobot 0.7 covers:**
+- π0.5, π0 and GR00T: `use_relative_actions` with `relative_exclude_joints: [gripper]`.
+- EMA for any policy: `--ema.type`.
+- Not covered: openpi's per-timestep action normalization for π. It would need a processor step or plugin.
+
+**How our current recipes differ:**
+- `pi05_full_openpi` / `pi0_full_openpi`: absolute actions, chunk 50, 10 epochs (~7.8k steps), no EMA.
+- `groot_n17_nvidia`: chunk 40, absolute actions.
+- `act_100ep`: batch 64, ~39k steps, no augmentation, chunk 100 (default).
+- `diffusion_full`: horizon 32 / 16 executed, 240×320 with crop, DDIM 10.
 
 - [ ] For each candidate: who made it work on an SO100/SO101-class arm, with which recipe (steps, batch, what was
       frozen, chunk length, data size), and how fast it runs at inference (does it fit DRTC's timing?)
