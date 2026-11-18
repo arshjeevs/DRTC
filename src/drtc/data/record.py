@@ -3,7 +3,7 @@
     raw recording -> checks -> trim -> push both -> registry entries
 
 - The hardware comes from the current rig (lab/rigs) for this machine (hosts.yaml): ports, cameras, the explicit
-  calibration files and the joint units (use_degrees: false, like every dataset so far).
+  calibration files and the joint units (degrees for new recordings, LeRobot 0.7's convention).
 - Recording is LeRobot 0.7's lerobot-record; its terminal key listener works on Wayland and over SSH:
   -> / n next, <- / r re-record, Esc / q stop.
 - The untrimmed recording is <name>_raw; the trimmed copy, the one to train on, is <name> (lab trim).
@@ -104,7 +104,8 @@ def registry_entries(reg: Registry, name: str, raw_repo: str, trimmed_repo: str,
         meta = LeRobotDatasetMetadata(repo)
         tags = {t.name: t.target_commit for t in api.list_repo_refs(repo, repo_type="dataset").tags}
         entry = {"repo": repo, "revision": tags.get("v3.0"), "rig": reg.current_rig().id, "task": task, "fps": fps,
-                 "episodes": meta.total_episodes, "frames": meta.total_frames}
+                 "episodes": meta.total_episodes, "frames": meta.total_frames,
+                 "use_degrees": reg.current_rig().robot.use_degrees}
         if ds_id == name:
             entry["parents"] = [f"{name}_raw"]
             entry["derivation"] = {"kind": "autotrim", "params": {"tool": "drtc.data.trim"}}

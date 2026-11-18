@@ -33,9 +33,9 @@ class Arm(BaseModel):
     # Calibration file, relative to LeRobot's calibration root. Always passed explicitly: LeRobot 0.7 looks in
     # robots/so_follower/ by default, where this laptop has an older calibration.
     calibration: str
-    # Joint units. LeRobot 0.4.3 (the minor) recorded SO101 joints as -100..100 (gripper 0..100); LeRobot 0.7's default
-    # is degrees. Every dataset and model so far uses -100..100, so the rig states it and every tool passes it.
-    use_degrees: bool = False
+    # Joint units for NEW recordings. From 2026-11-18: degrees (LeRobot 0.7's convention, the user's choice). Datasets
+    # record their own units (Dataset.use_degrees); a model runs the robot in its dataset's units.
+    use_degrees: bool = True
 
 
 class Camera(BaseModel):
@@ -127,6 +127,9 @@ class Dataset(Entry):
     revision: str | None = None
     episodes: int | None = None
     frames: int | None = None
+    # Joint units of this dataset: False = -100..100 (gripper 0..100; LeRobot 0.4.3, every dataset before
+    # 2026-11-18), True = degrees (LeRobot 0.7). Models trained on it must run the robot in the same units.
+    use_degrees: bool | None = None
     parents: list[str] = Field(default_factory=list)
     derivation: Derivation | None = None
     split: Split | None = None

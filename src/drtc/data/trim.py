@@ -376,7 +376,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--min-keep-frac", type=float, default=Params.min_keep_frac)
     ap.add_argument("--show", type=int, default=15)
     ap.add_argument("--quantiles", choices=QUANTILE_CONVENTIONS, default="lerobot",
-                    help="how dataset quantiles combine the episodes' (default: the installed LeRobot's way)")
+                    help="how dataset quantiles combine the episodes' (default and the lab's convention from "
+                         "2026-11-18: the installed LeRobot's)")
     a = ap.parse_args(argv)
     p = Params(a.move, a.noise_mult, a.pad, a.min_keep, a.min_keep_frac)
     ds = RawDataset(a.raw)

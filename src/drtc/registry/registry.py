@@ -316,6 +316,8 @@ class Registry:
                     p.append(f"dataset {d.id}: unknown parent {parent!r}")
             if not d.legacy and (d.revision is None or d.frames is None or d.episodes is None):
                 p.append(f"dataset {d.id}: needs revision, episodes and frames (the pin of its Hub version)")
+            if not d.legacy and d.use_degrees is None:
+                p.append(f"dataset {d.id}: needs use_degrees (its joint units: false = -100..100, true = degrees)")
             if d.split and not (d.split.total or d.episodes):
                 p.append(f"dataset {d.id}: split needs `total` or the dataset's `episodes`")
             if d.split and d.episodes and d.split.total and d.split.total > d.episodes:

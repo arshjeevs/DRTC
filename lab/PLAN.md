@@ -190,17 +190,19 @@ porting the old tools.
       110 crops, the same data rows and episode windows as the old setup. The per-episode stats are exact; the old
       editor's std was float32-imprecise, up to ~10% on the wrist roll.
     - **Generic:** on `so101_cubebox_v0_raw` it measures its own noise (0.0058) and cuts 19%.
-    - **[open] Dataset quantiles:** LeRobot 0.4.3 (the minor, so the current v1) stores the frame-weighted mean of
-      the episodes' quantiles (q01 −22.9 on joint 1). LeRobot 0.7 keeps an envelope (−50.6). The true q01 is
-      −46.5. They matter for π0.5's QUANTILES normalization. `--quantiles lerobot|weighted_mean`; default: the
-      installed LeRobot's.
+    - **Dataset quantiles (decided 2026-11-18): LeRobot's current convention** (the installed LeRobot's
+      `aggregate_stats`, an envelope: q01 −50.6 on joint 1 of v1). LeRobot 0.4.3 used the frame-weighted mean of
+      the episodes' quantiles (−22.9, which the current v1 keeps); the true value is −46.5. `--quantiles
+      weighted_mean` only reproduces old datasets.
   - [x] `lab record` (`drtc.data.record`): records `<name>_raw` with 0.7's `lerobot-record` (its terminal key
     listener works on Wayland/SSH), checks it, trims into `<name>`, pushes both and writes pinned registry entries.
     0.7's RecordConfig parses the generated command, with the right calibration folders and joint units. Not yet
     run with the robot.
-  - **Found:** LeRobot 0.7's SO101 default is `use_degrees: true`. Every dataset and model so far is −100..100,
-    so the rig states `use_degrees: false` and every tool passes it. **[open]** whether future datasets switch
-    to degrees (upstream's default, and what `remote_inference`'s SO101 semantics expect). Not mixable with v1.
+  - **Joint units (decided 2026-11-18): LeRobot's current convention, degrees, for new recordings.** LeRobot
+    0.7's SO101 default is `use_degrees: true`.
+    - Each dataset entry states its own units: v1, v1_raw and v0_raw are −100..100.
+    - A model runs the robot in its dataset's units (control system, D).
+    - The user accepts retraining for new data; v2+ in degrees is not mixable with v1.
   - [ ] `lab` CLI with the old names as aliases (record, calibrate, preflight, session, run, bench, eval-offline, analyze, edit-dataset, list, logstats)
   - [ ] jobs + worker + `lab submit` (train, eval, bench, serve)
   - [ ] logging (wandb trials, lineage, Hub mirror), import of `results/index.csv`
