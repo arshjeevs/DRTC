@@ -147,6 +147,29 @@ porting the old tools.
       the efficiency work.
   - [ ] DOT, SFP plugins (only if shortlisted in Phase 2)
 - [ ] 1.6 Training wrapper (clean stop, progress line), recipes → 0.7 `lerobot-train` flags
+  - [x] `lab train <model>` (`drtc.train`, 2026-11-18). It builds the 0.7 `lerobot-train` command from the
+    registry:
+    - the dataset pinned to its revision; a stale local copy is refused;
+    - our seeded held-out split, mapped onto 0.7's eval split (training episodes first, held-out last);
+    - epochs → steps, and ~20 held-out evals per run;
+    - recipe flags checked against the policy config;
+    - camera roles → `rename_map`.
+
+    It adds a clean stop (Ctrl-C / SIGTERM / `lab stop`: checkpoint at the next step, pushed with training
+    state, `--resume` anywhere) and pushes the final or a chosen checkpoint (`--push <step>`). 0.7's own
+    progress bar shows the time left.
+  - [x] Tested on the laptop with ACT: 200 steps with held-out eval; stop at 55, resume to 200 (the same losses
+    as an uninterrupted run).
+  - [x] `lab submit` / `lab worker` / `lab jobs` (`drtc.jobs`). A job pins the pushed commit, `uv.lock` and its
+    GPU memory need; the worker starts it only then, one at a time by default. Tested locally.
+  - [ ] Dry runs: the commands build for all 9 trainable planned models. DOT and SFP need plugins (only if
+    shortlisted).
+  - [ ] **[open]** Logging: 0.7 has no wandb, only Trackio. Choose a Trackio Space, wandb through our wrapper,
+    or both. Until then runs log to local Trackio, project `drtc-lab`.
+  - [ ] Short training runs on the H200 for the big recipes (SmolVLA, π0, π0.5, π0-FAST, X-VLA, GR00T N1.5
+    plugin, Diffusion), to confirm each trains on 0.7. Watch the old base-revision pins of π0/π0.5/π0-FAST: they
+    were a workaround for the old fork and may no longer fit 0.7.
+  - [ ] After training (later): pick the best checkpoint by held-out loss, then offline eval and benchmark.
 - [ ] 1.7 Lab system (see above), in this order:
   - [x] registry + checker + import of the old `models.yaml` / `rig.yaml` (2026-11-18)
     - `src/drtc/registry/`, files in `lab/rigs`, `lab/hosts.yaml`, `lab/datasets`, `lab/recipes`, `lab/models`

@@ -23,7 +23,7 @@ hosts:
     roles: [serve, train]
     ssh: jayaraj@192.168.41.118
     container: drtc_lab
-    repo: /workspace/drtc_lab
+    repo: /home/jayaraj/drtc_major   # new setup (branch major); /workspace/drtc_major inside the drtc_lab container
     gpus:
     - {name: H200, memory_gb: 141}
     shared: true
