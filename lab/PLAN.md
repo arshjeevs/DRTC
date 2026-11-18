@@ -147,7 +147,20 @@ porting the old tools.
     **Why the lost-message runs end:** with one request in flight, a lost message blocks requests until its 5 s
     deadline. The queue runs out, and upstream's starvation recovery sends one fresh request with 1 s of grace,
     which falls in the next fault window. **This is the measured case for option (b)** (DRTC's cooldown
-    re-request), to be decided.
+    re-request).
+  - [x] D4b (decided 2026-11-18, built): the cooldown re-request. A request unanswered for its cooldown (latency
+    estimate in steps, capped at H/2, + ε; s_min + ε before the first measurement) is given up, and a fresh
+    observation is sent. Upstream's server rules are kept:
+    - a `BUSY` reply backs off one action interval;
+    - a `STALE` "duplicate" reply for the request in flight is ignored;
+    - the aligned-mode anchor is cleared after a give-up.
+
+    Every recovery is logged (`recovery.csv`). **Validation pending:** the first full run was invalid because
+    the laptop was saturated by another job (load 101 on 24 cores: a 6 Hz loop, 0.5 s turnaround). It needs a
+    quiet laptop or the H200. In that run the baseline completed, and re-sends happened in the drop conditions.
+  - [x] D6 (decided 2026-11-18: only this for now): the Butterworth action filter, ported unchanged (order 2,
+    3 Hz, gain 1.4; identical to the old filter to 1e-12, `tests/test_action_filter.py`). It is applied to every
+    action before the robot and reset when motion is invalidated. Smoothing A/B/C: decided later.
 - [ ] 1.5 Policy plugins (DOT, SFP, GR00T N1.5)
   - [x] GR00T N1.5 plugin `lerobot_policy_groot_n15` (type `groot_n15`, steps `groot_n15_*`), ported to
     transformers 5. Changes:

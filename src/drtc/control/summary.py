@@ -63,6 +63,9 @@ def summarize(run_dir: Path) -> dict:
     out["outcome"] = info.get("outcome", "completed")
     if info.get("error"):
         out["fault_reason"] = info["error"][-200:]
+    rec = run_dir / "recovery.csv"
+    if rec.is_file():
+        out["recovery"] = dict(Counter(r["action"] for r in csv.DictReader(open(rec))))
     log = run_dir / "rollout.log"
     if log.is_file():
         reasons = [line.strip() for line in log.read_text(errors="replace").splitlines()
@@ -100,6 +103,8 @@ def main(argv: list[str] | None = None) -> int:
         rtt = f"{s.get('turnaround_med_ms')}/{s.get('turnaround_max_ms')}"
         early = f" ENDED EARLY ({s.get('outcome')})" if s.get("ended_early") or s.get("outcome") not in (None, "completed") else ""
         faults = ", ".join(f"{k} {v}" for k, v in (s.get("faults") or {}).items())
+        if s.get("recovery"):
+            faults += " | recovered: " + ", ".join(f"{k} {v}" for k, v in s["recovery"].items())
         print(f"{str(s['experiment']):28s} {str(s.get('model')):26s} {s.get('ran_s', '-'):>5} {s.get('stalls', '-'):>6} "
               f"{s.get('longest_stall_s', '-'):>7} {s.get('chunks', '-'):>6} {rtt:>14}  {faults}{early}")
         if s.get("fault_reason"):

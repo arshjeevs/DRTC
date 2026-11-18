@@ -29,18 +29,17 @@ RESULTS = Path("results")
 INDEX_FIELDS = ["run_id", "experiment", "model", "trial", "success", "started_at", "duration_s", "git_commit",
                 "git_dirty", "note", "run_dir", "robot", "host", "outcome"]
 # Composed experiment keys this run applies; anything else that is set is reported as not applied yet.
-APPLIED = {*("drop_obs", "drop_action", "dup_obs", "dup_action", "reorder_obs", "reorder_action", "disconnect",
+APPLIED = {"cooldown", "epsilon", "action_filter_mode", "action_filter_butterworth_cutoff", "action_filter_gain", *("drop_obs", "drop_action", "dup_obs", "dup_action", "reorder_obs", "reorder_action", "disconnect",
               "spikes"), "estimator", "s_min", "latency_k", "latency_alpha", "latency_beta", "duration_s", "fps", "task",
            "policy_type", "pretrained_name_or_path", "finetune", "model", "name", "description", "train",
            "rtc_enabled", "num_flow_matching_steps", "actions_per_chunk"}
 APPLIED_PREFIXES = ("robot_", "camera", "client_host", "server_host", "gpu")
 # Settings that only matter for the features still to come (D5 faults, D6 smoothing) or the old client.
-PENDING = {"cooldown": "DRTC cooldown re-request (option b, later)", "epsilon": "DRTC cooldown margin (option b)",
-           "smoothness_guidance": "smoothing C (D6)", "playback_mode": "smoothing A (D6)",
+PENDING = {"smoothness_guidance": "smoothing C (D6)", "playback_mode": "smoothing A (D6)",
            "playback_min_rate": "smoothing A (D6)", "playback_margin_steps": "smoothing A (D6)",
            "playback_rate_slew": "smoothing A (D6)", "rtc_sigma_d": "RTC (D6)",
-           "rtc_prefix_attention_schedule": "RTC (D6)", "action_filter_mode": "action filter (D6)",
-           "action_filter_butterworth_cutoff": "action filter (D6)", "action_filter_gain": "action filter (D6)",
+           "rtc_prefix_attention_schedule": "RTC (D6)", 
+            
            "full_diagnostics": "old client diagnostics"}
 FAULT_KEYS = ("drop_obs", "drop_action", "dup_obs", "dup_action", "reorder_obs", "reorder_action", "disconnect",
               "spikes")
@@ -105,6 +104,11 @@ def build(reg: Registry, experiment: str, model: str | None, robot: str, episode
         "inference.latency_alpha": float(composed.get("latency_alpha", 0.125)),
         "inference.latency_beta": float(composed.get("latency_beta", 0.25)),
         "inference.metrics_path": str(run_dir / "ticks.csv"),
+        "inference.cooldown": bool(composed.get("cooldown", True)),
+        "inference.action_filter": "butterworth" if composed.get("action_filter_mode") == "butterworth" else "none",
+        "inference.filter_cutoff_hz": float(composed.get("action_filter_butterworth_cutoff", 3.0)),
+        "inference.filter_gain": float(composed.get("action_filter_gain", 1.4)),
+        "inference.epsilon": int(composed.get("epsilon", 1)),
         **({"inference.faults_json": json.dumps({k: composed[k] for k in FAULT_KEYS if composed.get(k)})}
            if any(composed.get(k) for k in FAULT_KEYS) else {}),
         "fps": float(composed.get("fps", 30)),

@@ -14,6 +14,11 @@ Estimator (the turnaround used by the upstream rule and by RTC's delay estimate)
 - "jk":       Jacobson-Karels, smoothed mean + k * smoothed deviation (RFC 6298 alpha/beta), as in DRTC;
 - "max_last_10": max of the last 10 turnarounds, as in DRTC's comparison estimator;
 - "fixed":    a constant (fixed_latency_s).
+Cooldown re-request (option b, decided 2026-11-18): with cooldown on, a request unanswered for its cooldown
+(latency estimate in steps, capped at H/2, plus epsilon steps; as in DRTC) is given up and a fresh observation is
+sent (freshest wins). Inside upstream's server rules: a BUSY reply (the old inference still running) backs off one
+action interval; a STALE "duplicate" reply for the request in flight (a duplicated message) is ignored. Every
+recovery action is logged (recovery.csv).
 Metrics: one row per control tick (queue length, whether an action was available, request pending, latency
 estimate, accepted chunks, last turnaround), written as CSV when the engine stops.
 """
@@ -89,6 +94,25 @@ class DRTCRuntime(ChunkRuntime):
         self.s_min = s_min
         self.horizon: int | None = None  # H: the last accepted chunk's length
         self.last_turnaround: float | None = None
+        self.not_before = 0.0  # backoff after a BUSY reply
+
+    def abandon(self, request_id: str, backoff: float = 0.0) -> bool:
+        """Give up the request in flight (its late reply is then discarded as stale)."""
+        with self.lock:
+            if self.pending is None or self.pending.request_id != request_id:
+                return False
+            self.pending = None
+            # Upstream's aligned mode refuses another request until the cursor advances past the last request's
+            # anchor (anti-spam); after giving one up, the next fresh observation must be allowed at once.
+            self._last_anchor = None
+            if backoff:
+                self.not_before = self.clock() + backoff
+            return True
+
+    def should_request(self, *, task_version: int | None = None) -> bool:
+        if self.clock() < self.not_before:
+            return False
+        return super().should_request(task_version=task_version)
 
     @property
     def turnaround(self) -> float:
@@ -132,6 +156,13 @@ class DRTCInferenceConfig(RemoteInferenceConfig):
     fixed_latency_s: float = 0.1
     metrics_path: str | None = None  # per-tick CSV, written when the engine stops
     faults_json: str | None = None  # network faults to inject (drtc.control.faults), JSON
+    cooldown: bool = True  # option b: give up an unanswered request after its cooldown and send a fresh one
+    epsilon: int = 1  # cooldown margin, action steps
+    # Action filter on every action before it goes to the robot (the minor client's default: butterworth).
+    action_filter: Literal["none", "butterworth"] = "none"
+    filter_cutoff_hz: float = 3.0
+    filter_order: int = 2
+    filter_gain: float = 1.4
 
     def __post_init__(self) -> None:
         super().__post_init__()
@@ -171,6 +202,12 @@ class DRTCEngine(RemoteInferenceEngine):
             self.latency = self.runtime.latency
         self._ticks: list[list] = []
         self._t0 = time.monotonic()
+        self.action_filter = None
+        if isinstance(cfg, DRTCInferenceConfig) and cfg.action_filter == "butterworth":
+            from drtc.control.action_filter import ButterworthFilter
+
+            self.action_filter = ButterworthFilter(cfg.filter_cutoff_hz, 1.0 / self.runtime.interval,
+                                                   cfg.filter_order, cfg.filter_gain)
         self.faults = None
         spec = getattr(cfg, "faults_json", None)
         if spec:
@@ -184,6 +221,80 @@ class DRTCEngine(RemoteInferenceEngine):
                 self.faults = FaultInjector(plan)
                 self.faults.install(self.client)
 
+        self.recovery: list[tuple[float, str, str]] = []
+        if isinstance(cfg, DRTCInferenceConfig) and cfg.cooldown:
+            self.client._exchange = self._cooldown_exchange(self.client._exchange)
+
+    def cooldown_s(self) -> float:
+        """DRTC: latency estimate in steps (capped at H/2) + epsilon steps."""
+        rt = self.runtime
+        est = rt.turnaround if rt._completed else None
+        if est is None or not math.isfinite(est):
+            # Before the first measurement (cold start is slow), seed with s_min + epsilon steps, as DRTC does.
+            return (self.config.s_min + self.config.epsilon) * rt.interval
+        steps = max(1, math.ceil(est / rt.interval))
+        if getattr(rt, "horizon", None):
+            steps = min(steps, max(1, rt.horizon // 2))
+        return max(2, steps + self.config.epsilon) * rt.interval
+
+    def _note(self, kind: str, request_id: str) -> None:
+        self.recovery.append((round(time.monotonic() - self._t0, 4), kind, request_id))
+
+    def _cooldown_exchange(self, original):
+        """The client's observation exchange with DRTC's cooldown re-request (other exchanges unchanged)."""
+        import lerobot.remote_inference.client as client_mod
+        from queue import Empty
+
+        from lerobot.remote_inference.client import RequestCancelled
+        from lerobot.transport.protocol import decode_reply
+        from lerobot.transport.protocol.envelope import ErrorCode, MessageType, ProtocolError
+
+        engine = self
+
+        def exchange(request, suffix, channel, timeout, cancelled):
+            if suffix != "/obs":
+                return original(request, suffix, channel, timeout, cancelled)
+            client = engine.client
+            if cancelled():
+                raise RequestCancelled()
+            if not client.present:
+                raise ConnectionError("Server presence lost; session cannot recover")
+            started = time.monotonic()
+            payload = client_mod.encode_message(request)
+            if cancelled():
+                raise RequestCancelled()
+            client.transport.publish(client._key + suffix, payload)
+            cooldown = engine.cooldown_s()
+            while time.monotonic() - started <= timeout:
+                if cancelled():
+                    raise RequestCancelled()
+                if channel.oversized or channel.dropped:
+                    raise ProtocolError(ErrorCode.MALFORMED, "Inference reply channel overflow or oversized message")
+                try:
+                    payload = channel.get(timeout=min(0.02, timeout))
+                except Empty:
+                    if time.monotonic() - started > cooldown:
+                        if engine.runtime.abandon(request.request_id):
+                            engine._note("cooldown_resend", request.request_id)
+                        raise RequestCancelled()
+                    continue
+                response = decode_reply(payload, request, discard_stale=True)
+                if response is None:
+                    continue
+                if response.message_type is MessageType.ERROR:
+                    code, message = response.body.get("code"), str(response.body.get("message", ""))
+                    if code == ErrorCode.STALE.value and "Duplicate" in message:
+                        engine._note("duplicate_ignored", request.request_id)
+                        continue  # a duplicated copy of this request; its real reply is still coming
+                    if code == ErrorCode.BUSY.value:
+                        engine.runtime.abandon(request.request_id, backoff=engine.runtime.interval)
+                        engine._note("busy_backoff", request.request_id)
+                        raise RequestCancelled()
+                return response
+            raise TimeoutError("Remote inference request deadline exceeded")
+
+        return exchange
+
     def start(self) -> None:
         self._t0 = time.monotonic()
         if self.faults is not None:
@@ -192,6 +303,11 @@ class DRTCEngine(RemoteInferenceEngine):
 
     def get_action(self, obs_frame):
         action = super().get_action(obs_frame)
+        if action is not None and self.action_filter is not None:
+            import torch
+
+            filtered = self.action_filter.apply(action.detach().cpu().numpy())
+            action = torch.as_tensor(filtered, dtype=action.dtype, device=action.device)
         rt = self.runtime
         est = rt.turnaround if rt._completed else None
         self._ticks.append([
@@ -201,6 +317,11 @@ class DRTCEngine(RemoteInferenceEngine):
             getattr(rt, "horizon", None),
         ])
         return action
+
+    def _invalidate(self, operation: str) -> None:
+        if self.action_filter is not None:
+            self.action_filter.reset()  # motion restarts from a held pose: do not smooth across it
+        super()._invalidate(operation)
 
     def stop(self) -> None:
         try:
@@ -213,6 +334,11 @@ class DRTCEngine(RemoteInferenceEngine):
                     w = csv.writer(f)
                     w.writerow(TICK_FIELDS)
                     w.writerows(self._ticks)
+            if path and self.recovery:
+                with open(Path(path).with_name("recovery.csv"), "w", newline="") as f:
+                    w = csv.writer(f)
+                    w.writerow(["t", "action", "request_id"])
+                    w.writerows(self.recovery)
             if path and self.faults is not None:
                 with open(Path(path).with_name("faults.csv"), "w", newline="") as f:
                     w = csv.writer(f)
