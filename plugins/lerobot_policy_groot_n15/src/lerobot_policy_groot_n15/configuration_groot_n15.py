@@ -20,6 +20,7 @@ from lerobot.configs.policies import PreTrainedConfig
 from lerobot.configs.types import FeatureType, NormalizationMode, PolicyFeature
 from lerobot.optim.optimizers import AdamWConfig
 from lerobot.optim.schedulers import CosineDecayWithWarmupSchedulerConfig
+from lerobot.policies.rtc.configuration_rtc import RTCConfig
 
 
 @PreTrainedConfig.register_subclass("groot_n15")
@@ -116,6 +117,10 @@ class GrootN15Config(PreTrainedConfig):
     dataloader_num_workers: int = 8
     report_to: str = "wandb"
     resume: bool = False
+
+    # Real-Time Chunking (guided) at inference (lab addition). The LeRobot 0.7 policy server sets this from the
+    # deployment's `execution.rtc` when it serves an RTC mode; None = plain chunks.
+    rtc_config: RTCConfig | None = None
 
     def __post_init__(self):
         super().__post_init__()

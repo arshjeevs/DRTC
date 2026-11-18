@@ -41,6 +41,7 @@ from torch import Tensor
 from lerobot_policy_groot_n15.configuration_groot_n15 import GrootN15Config
 from lerobot_policy_groot_n15.groot_n1 import GR00TN15
 from lerobot.policies.pretrained import PreTrainedPolicy
+from lerobot.policies.rtc.modeling_rtc import RTCProcessor
 
 
 class GrootN15Policy(PreTrainedPolicy):
@@ -57,8 +58,18 @@ class GrootN15Policy(PreTrainedPolicy):
 
         # Initialize GR00T model using ported components
         self._groot_model = self._create_groot_model()
+        self.init_rtc_processor()
 
         self.reset()
+
+    def supports_rtc(self) -> bool:
+        """Guided RTC through the flow-matching action head (see _velocity_guidance)."""
+        return True
+
+    def init_rtc_processor(self) -> None:
+        """Build the RTC processor from `config.rtc_config` (set by the policy server for RTC modes)."""
+        rtc_config = getattr(self.config, "rtc_config", None)
+        self.rtc_processor = RTCProcessor(rtc_config) if rtc_config is not None else None
 
     def _create_groot_model(self):
         """Create and initialize the GR00T model using Isaac-GR00T API.
@@ -121,31 +132,46 @@ class GrootN15Policy(PreTrainedPolicy):
         return loss, loss_dict
 
     def _velocity_guidance(self, rtc_kwargs: dict):
-        """RTC prefix inpainting and/or smoothness guidance for GR00T's flow-matching head (lab addition).
+        """Guided RTC prefix inpainting for GR00T's flow-matching head (lab addition, LeRobot 0.7 RTCProcessor).
 
-        The DRTC policy server sets `self.rtc_processor` (an AsyncRTCProcessor, written for the PI0 /
-        SmolVLA convention: time 1 = noise -> 0 = clean, x1 = x - time * v). GR00T integrates the other
-        way (t 0 = noise -> 1 = clean, x += dt * v), so its velocity is passed in negated with
-        time = 1 - t, and the result negated back. Returns None when there is nothing to apply.
+        RTCProcessor is written for the PI0 / SmolVLA convention (time 1 = noise -> 0 = clean,
+        x1 = x - time * v). GR00T integrates the other way (t 0 = noise -> 1 = clean, x += dt * v), so its
+        velocity is passed in negated with time = 1 - t and the result negated back, as upstream's
+        `euler_integrate` does for NOISE_AT_ZERO policies.
+
+        The prefix (`prev_chunk_left_over`, model coordinates) has the robot's action width, while GR00T
+        denoises `max_action_dim` padded dims. Only the real dims are guided: the padded ones are held at
+        their current values inside the guided call and keep their unguided velocity (otherwise RTC would
+        pull them to the prefix's zero padding). Returns None when there is nothing to apply.
         """
         rtc = getattr(self, "rtc_processor", None)
-        if rtc is None:
+        prefix = rtc_kwargs.get("prev_chunk_left_over")
+        if rtc is None or prefix is None or not rtc.rtc_config.enabled:
             return None
-        has_prefix = rtc_kwargs.get("prev_chunk_left_over") is not None
-        if not (has_prefix and rtc.cfg.enabled) and rtc.cfg.smoothness_weight <= 0:
-            return None
+        width = prefix.shape[-1]
+        delay = rtc_kwargs.get("inference_delay") or 0
+        horizon = rtc_kwargs.get("execution_horizon")
 
         def guidance(actions, t, num_steps, velocity):
-            v_pi = rtc.denoise_step(
-                x_t=actions,
-                prev_chunk_left_over=rtc_kwargs.get("prev_chunk_left_over"),
-                inference_delay=rtc_kwargs.get("inference_delay"),
+            padding = actions[..., width:].detach()
+            full = {}
+
+            def real_dims_velocity(x_real):
+                v = velocity(torch.cat([x_real, padding.to(x_real.dtype)], dim=-1))
+                full["v"] = v
+                return -v[..., :width]
+
+            v_real = -rtc.denoise_step(
+                x_t=actions[..., :width],
+                prev_chunk_left_over=prefix.to(device=actions.device, dtype=actions.dtype),
+                inference_delay=delay,
                 time=1.0 - t,
-                original_denoise_step_partial=lambda x: -velocity(x),
-                overlap_end=rtc_kwargs.get("overlap_end"),
-                num_flow_matching_steps=num_steps,
+                original_denoise_step_partial=real_dims_velocity,
+                execution_horizon=horizon,
             )
-            return -v_pi
+            v = full["v"].detach().clone()
+            v[..., :width] = v_real.to(v.dtype)
+            return v
 
         return guidance
 

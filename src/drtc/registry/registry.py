@@ -30,11 +30,13 @@ DATASET_NAME = re.compile(rf"^{ROBOT}_(?P<base>[a-z0-9]+_v\d+)(?:_(?P<variant>[a
 MODEL_NAME = re.compile(
     r"^(?P<policy>[a-z0-9]+)_(?P<base>[a-z0-9]+_v\d+)_(?P<method>full|lora)(?P<variants>(?:_[a-z0-9]+)*)$"
 )
-# Model-name prefix per policy where it is not the policy type without underscores: GR00T N1.5 models were always
-# named groot_* (N1.7 ones are grootn17_*).
-NAME_PREFIX = {"groot_n15": "groot"}
-# Policies whose server-side inference accepts RTC inpainting (flow matching).
-RTC_POLICIES = {"smolvla", "pi0", "pi05", "groot", "groot_n15"}
+# Model-name prefixes per policy where it is not the policy type without underscores: GR00T N1.5 models were always
+# named groot_* and N1.7 ones grootn17_*. LeRobot 0.7's `groot` is N1.7, but the minor's kept N1.5 checkpoints
+# still carry the old type `groot` (drtc.compat maps it), so both prefixes are accepted for it.
+NAME_PREFIX = {"groot_n15": ("groot",), "groot": ("grootn17", "groot")}
+# Policies whose server-side inference accepts RTC inpainting (flow matching; supports_rtc() in LeRobot 0.7).
+# MolmoAct 2 only with inference_action_mode "continuous" (its default).
+RTC_POLICIES = {"smolvla", "pi0", "pi05", "groot", "groot_n15", "molmoact2"}
 
 
 class RegistryError(Exception):
@@ -355,7 +357,7 @@ class Registry:
         mm = MODEL_NAME.match(r.id)
         if not mm:
             return ["name should be <policy>_<task>_v<N>_<full|lora>[_<variant>]"]
-        if mm["policy"] != NAME_PREFIX.get(r.policy, r.policy.replace("_", "")):
+        if mm["policy"] not in NAME_PREFIX.get(r.policy, (r.policy.replace("_", ""),)):
             out.append(f"name starts with {mm['policy']!r} but the policy is {r.policy!r}")
         if mm["method"] != r.finetune:
             out.append(f"name says {mm['method']!r} but the recipe fine-tunes {r.finetune!r}")

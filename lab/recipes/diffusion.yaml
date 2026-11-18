@@ -9,9 +9,11 @@ diffusion_full:
     policy.crop_shape: [216, 288]
     policy.pretrained_backbone_weights: ResNet18_Weights.IMAGENET1K_V1
     policy.use_group_norm: false
+    # One observation frame: LeRobot 0.7's policy server refuses observation history (n_obs_steps > 1).
+    policy.n_obs_steps: 1
     policy.horizon: 32
     policy.n_action_steps: 16
-    policy.drop_n_last_frames: 15
+    policy.drop_n_last_frames: 16   # horizon - n_action_steps - n_obs_steps + 1
     policy.noise_scheduler_type: DDIM
     policy.num_inference_steps: 10
   serve: {rtc_enabled: false, num_flow_matching_steps: null, actions_per_chunk: 16, s_min: 8}

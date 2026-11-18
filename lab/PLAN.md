@@ -510,12 +510,34 @@ declares `supports_rtc()`.
 | Model | Chunk H (current recipe) | Served by the 0.7 server | RTC in 0.7 | To do |
 |---|---|---|---|---|
 | SmolVLA | 50 | yes (kept model run on the replay robot, ~280 ms on the 4060) | yes | — |
-| GR00T N1.5 (our plugin) | 16 | yes (same path as the kept model) | guidance code is there, but `supports_rtc()` is not declared, so the server never uses it | add `supports_rtc()` to the plugin. 613 ms on the laptop vs a 533 ms chunk, so serve from the H200. H − s_min = 8 steps is tight |
-| GR00T N1.7 (upstream `groot`) | 40 | not tested | yes | smoke train + serve on the H200. The recipe says `policy: groot_n17`; 0.7 registers it as `groot` |
+| GR00T N1.5 (our plugin) | 16 | yes (same path as the kept model) | **yes since 2026-11-18** (see below) | 613 ms on the laptop vs a 533 ms chunk, so serve from the H200. H − s_min = 8 steps is tight |
+| GR00T N1.7 (upstream `groot`) | 40 | not tested | yes | smoke train + serve on the H200. Recipe fixed: `policy: groot` + `policy.base_model_path` |
 | π0.5 | 50 | yes (smoke-trained) | yes | — |
-| MolmoAct 2 | 30 | not tested | only with `inference_action_mode: continuous` | smoke train + serve on the H200 |
-| ACT | 100 | yes | no (not flow matching): chunk switching only | temporal ensembling must stay off (the server refuses it) |
-| Diffusion | 16 executed | **no as configured:** default `n_obs_steps=2`, and the server refuses observation history | no | train with `n_obs_steps: 1`, or write a custom runner |
+| MolmoAct 2 | 30 | not tested | only with `inference_action_mode: continuous` (its default) | smoke train + serve on the H200 |
+| ACT | 100 | yes (serve check on the laptop: 27 ms per chunk) | no (not flow matching): chunk switching only | temporal ensembling must stay off (the server refuses it) |
+| Diffusion | 16 executed | yes once trained with `n_obs_steps: 1` (now in `diffusion_full`) | no | — |
+
+**Done on 2026-11-18 for the test runs:**
+- **GR00T N1.5 plugin, guided RTC on 0.7.**
+  - `rtc_config` config field; the server sets it for `rtc_guided`.
+  - An `RTCProcessor` built at init, `supports_rtc()`, and the 0.7 `denoise_step` call.
+  - The time and sign mapping is upstream's NOISE_AT_ZERO one.
+  - Only the robot's 6 action dims are guided; GR00T's 26 padded dims keep their unguided velocity.
+  - Tests in `tests/test_groot_n15_rtc.py`: the prefix is pulled in, nothing changes past the execution horizon,
+    the padding is untouched, the server's RTC call interface is accepted, and the config round-trips.
+  - The old setup's smoothness guidance (method C) is not ported; it belongs to Phase 5.
+- **Recipes and registry:**
+  - `groot_n17_nvidia` now uses `policy: groot` and `policy.base_model_path`.
+  - `diffusion_full` now uses `n_obs_steps: 1` and `drop_n_last_frames: 16`.
+  - GR00T N1.7 and MolmoAct 2 are `planned`, so the test run can reach them.
+  - MolmoAct 2 is in the registry's RTC policies.
+  - The naming rule accepts `grootn17_*` for `groot`. The kept N1.5 model still carries the old type `groot`.
+- **`tests/smoke/train.sh`:** the 7 shortlisted models.
+  - Each one trains 30 steps and saves the step-30 checkpoint.
+  - Then `tests/smoke/serve_check.py` runs on that checkpoint, using upstream's `load_deployment`. That covers
+    admission and warmup in `chunk` and, for RTC policies, `rtc_guided`.
+  - It times each request and compares it with H − s_min at 30 fps.
+  - Results: `logs/smoke/summary.txt` and `logs/smoke/serve_<model>.json`.
 
 ACT and Diffusion get DRTC scheduling with the Butterworth filter and the Phase 5 smoothing (method A), but no
 RTC. The other five can be compared with and without RTC.
@@ -525,8 +547,9 @@ RTC. The other five can be compared with and without RTC.
   - the chunk length at 30 fps;
   - steps vs epochs, and the stopping rule;
   - relative vs absolute actions.
-- [ ] GR00T N1.7 and MolmoAct 2: smoke train on the H200 (`tests/smoke/train.sh`); then `status: planned`.
-- [ ] GR00T N1.5 plugin: declare `supports_rtc()`.
+- [ ] Test runs of all 7 on the H200: `bash tests/smoke/train.sh` (the user runs it). Record train exit, peak
+      memory, admission and time per chunk per model here.
+- [x] GR00T N1.5 plugin: guided RTC on 0.7, with `supports_rtc()` (2026-11-18).
 
 **What LeRobot 0.7 covers:**
 - π0.5, π0 and GR00T: `use_relative_actions` with `relative_exclude_joints: [gripper]`.
@@ -539,12 +562,13 @@ RTC. The other five can be compared with and without RTC.
 - `act_100ep`: batch 64, ~39k steps, no augmentation, chunk 100 (default).
 - `diffusion_full`: horizon 32 / 16 executed, 240×320 with crop, DDIM 10.
 
-- [ ] For each candidate: who made it work on an SO100/SO101-class arm, with which recipe (steps, batch, what was
-      frozen, chunk length, data size), and how fast it runs at inference (does it fit DRTC's timing?)
-- [ ] **[open]** Selection criteria (results others got, architecture variety, inference speed, or a mix)
-- [ ] Candidates: GR00T N1.5/N1.7, π0, π0.5, π0-FAST, SmolVLA, X-VLA, MolmoAct2, ACT, DOT, Diffusion, SFP, and
-      models new in 0.7 (EVO1, LaWAM, VLA-JEPA, ...)
-- [ ] Update `models.yaml`: the shortlist as `*_full_trim` entries with their recipes; the rest marked as not kept
+- [ ] For each candidate, who made it work on an SO100/SO101-class arm: ArmnetBench read (reference only). The
+      recipe source is being researched by the user.
+  - [ ] Inference speed against DRTC's timing: the H200 test runs above.
+- [x] Selection criteria: the user's choice (2026-11-18).
+- [x] Candidates reviewed; shortlist of 7 (2026-11-18).
+- [x] `lab/models/cubebox_v1.yaml`: the shortlist `planned`, the rest `retired`.
+  - [ ] Recipes confirmed after the research.
 
 ## Phase 3: Faster training
 - [ ] **[open]** Hardware available (H200 only, or the A100 too; one GPU or several)
