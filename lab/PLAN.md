@@ -19,10 +19,16 @@ nothing has to be redone. Items marked **[open]** are decisions still to make.*
 ---
 
 ## Status at the end of the 2026-11-18 session (handover)
-**Phase 1 is done except for what needs other machines:**
+**Phase 1 is done except for what needs other machines. These items wait until the user says the hardware is
+available:**
 - **D7:** Zenoh across machines (an H200 server with the laptop client), the GR00T N1.5 kept-model serving test
   on the H200, and the Pi as the client. Needs H200 access, then the robot.
-- **Robot-side checks:** calibration, a test recording with `lab record`, robot runs.
+- **Pi:** the new setup's Pi install (`uv sync`), then Zenoh to the laptop or H200 server.
+- **Robot-side checks:**
+  - `lab check --rig` with everything plugged in;
+  - `lab calibrate` against the explicit `so101_*` calibration files;
+  - a short `lab record` test (record → trim → push);
+  - real `lab run` trials, including the replication conditions with option (b).
 
 Small open items: robot-run logging to the Trackio Space plus a results mirror; DOT and SFP plugins (only if
 shortlisted); best-checkpoint selection after training.
