@@ -15,3 +15,4 @@ wandb/
 *.log
 lab/report/
 .server.env
+.queue/

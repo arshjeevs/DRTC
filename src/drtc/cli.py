@@ -136,7 +136,32 @@ def cmd_check(args) -> int:
     return 1 if problems else 0
 
 
+def cmd_stop(args) -> int:
+    """Ask a running `lab train <model>` to save a checkpoint, push it and exit (it checks every step)."""
+    from drtc.train import OUTPUTS, stop_file
+
+    models = args.models
+    if args.all:
+        models = [p.name for p in OUTPUTS.iterdir() if p.is_dir() and not p.name.startswith(".")] \
+            if OUTPUTS.is_dir() else []
+    for m in models:
+        f = stop_file(m)
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.touch()
+        print(f"  {m}: stop requested ({f}); a running `lab train {m}` saves, pushes and exits at its next step")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> None:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv and argv[0] == "train":  # its own argument parser; unknown flags go to lerobot-train
+        from drtc.train import main as train_main
+
+        sys.exit(train_main(argv[1:]))
+    if argv and argv[0] in ("submit", "worker", "jobs"):
+        from drtc import jobs
+
+        sys.exit({"submit": jobs.cmd_submit, "worker": jobs.cmd_worker, "jobs": jobs.cmd_jobs}[argv[0]](argv[1:]))
     ap = argparse.ArgumentParser(prog="lab", description="Lab tools (lab/PLAN.md)")
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("list", help="models, datasets, rigs, hosts")
@@ -148,6 +173,14 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--data", action="store_true")
     p.add_argument("--online", action="store_true", help="with --data: also check the Hub revision")
     p.set_defaults(fn=cmd_check)
+    sub.add_parser("train", help="train a registry model (lab train <model> -h)")
+    sub.add_parser("submit", help="queue a training job here or on a host (lab submit <model> --host h200)")
+    sub.add_parser("worker", help="run queued jobs on this machine")
+    sub.add_parser("jobs", help="list this machine's jobs")
+    p = sub.add_parser("stop", help="stop running trainings cleanly (save, push, exit)")
+    p.add_argument("models", nargs="*")
+    p.add_argument("--all", action="store_true")
+    p.set_defaults(fn=cmd_stop)
     args = ap.parse_args(argv)
     sys.exit(args.fn(args))
 
