@@ -108,3 +108,11 @@ def test_compose_identical(reg, monkeypatch, old_experiments, rig_file, host, ex
     expected = renamed(old.compose(old_experiments / f"{experiment}.yaml"))
     expected["model"] = KEPT[expected["model"]]
     assert reg.compose(experiment) == expected
+
+
+def test_compose_without_a_known_host(reg, monkeypatch):
+    """On a machine that is not in hosts.yaml the client defaults to the network's client host."""
+    monkeypatch.delenv("LAB_HOST", raising=False)
+    monkeypatch.setattr(type(reg), "current_host", lambda self: None)
+    merged = reg.compose("smoothing/baseline")
+    assert merged["client_host"] == reg.hosts["pi"].label

@@ -249,7 +249,8 @@ class Registry:
         host = host or self.current_host()
         hid = host.id if host else None
         server_host = self.hosts.get(for_host(self.network.legacy_server.get("host_id"), hid))
-        client = host if host and "client" in host.roles else self.hosts.get(self.network.legacy_server.get("client_id"))
+        client = host if host and "client" in host.roles else \
+            self.hosts.get(for_host(self.network.legacy_server.get("client_id"), hid))
         cams = list(rig.cameras.values())
         first = cams[0]
         return {
