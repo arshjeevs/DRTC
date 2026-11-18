@@ -8,11 +8,13 @@ so101_v2:
     type: so101_follower
     port: {default: /dev/serial/by-id/usb-1a86_USB_Single_Serial_5B79017420-if00, windows-laptop: COM5}
     id: follower
+    use_degrees: false   # -100..100 like every dataset and model so far (LeRobot 0.7 defaults to degrees)
     calibration: robots/so101_follower/follower.json
   leader:
     type: so101_leader
     port: {default: /dev/serial/by-id/usb-1a86_USB_Single_Serial_5B79016953-if00, windows-laptop: COM6}
     id: leader
+    use_degrees: false   # -100..100 like every dataset and model so far (LeRobot 0.7 defaults to degrees)
     calibration: teleoperators/so101_leader/leader.json
   cameras:
     camera1:
