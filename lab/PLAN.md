@@ -538,6 +538,15 @@ declares `supports_rtc()`.
     admission and warmup in `chunk` and, for RTC policies, `rtc_guided`.
   - It times each request and compares it with H − s_min at 30 fps.
   - Results: `logs/smoke/summary.txt` and `logs/smoke/serve_<model>.json`.
+- **Serve check on the laptop (RTX 4060, s_min 20, 30 fps):**
+
+  | Model | Checkpoint | Modes admitted | H | Time per chunk (median) | DRTC margin |
+  |---|---|---|---|---|---|
+  | ACT | the Phase 1 300-step test | chunk | 100 | chunk 27 ms (1 step) | 80 steps |
+  | SmolVLA | 5 steps, batch 2 (removed after the check) | chunk + rtc_guided | 50 | chunk 157 ms (5 steps); RTC 229 ms (7 steps) | 30 steps |
+
+  Peak GPU: ACT 0.3 GB, SmolVLA 1.5 GB. Guided RTC costs about +45% per chunk for SmolVLA (the autograd
+  correction at each denoising step).
 
 ACT and Diffusion get DRTC scheduling with the Butterworth filter and the Phase 5 smoothing (method A), but no
 RTC. The other five can be compared with and without RTC.
