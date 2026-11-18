@@ -27,9 +27,10 @@ from drtc.registry import Registry, RegistryError
 
 RESULTS = Path("results")
 INDEX_FIELDS = ["run_id", "experiment", "model", "trial", "success", "started_at", "duration_s", "git_commit",
-                "git_dirty", "note", "run_dir", "robot", "host"]
+                "git_dirty", "note", "run_dir", "robot", "host", "outcome"]
 # Composed experiment keys this run applies; anything else that is set is reported as not applied yet.
-APPLIED = {"estimator", "s_min", "latency_k", "latency_alpha", "latency_beta", "duration_s", "fps", "task",
+APPLIED = {*("drop_obs", "drop_action", "dup_obs", "dup_action", "reorder_obs", "reorder_action", "disconnect",
+              "spikes"), "estimator", "s_min", "latency_k", "latency_alpha", "latency_beta", "duration_s", "fps", "task",
            "policy_type", "pretrained_name_or_path", "finetune", "model", "name", "description", "train",
            "rtc_enabled", "num_flow_matching_steps", "actions_per_chunk"}
 APPLIED_PREFIXES = ("robot_", "camera", "client_host", "server_host", "gpu")
@@ -82,8 +83,8 @@ def build(reg: Registry, experiment: str, model: str | None, robot: str, episode
     else:
         off |= {"action_filter_butterworth_cutoff", "action_filter_gain"}
     for k, v in composed.items():
-        if k in FAULT_KEYS and v:
-            notes.append(f"{k}: fault injection is D5 (not applied yet)")
+        if k in FAULT_KEYS:
+            continue
         elif k in PENDING and k not in off and v not in (None, False, 0, 0.0, "fixed", "none"):
             notes.append(f"{k}={v}: {PENDING[k]} (not applied yet)")
     if composed.get("rtc_enabled"):
@@ -104,6 +105,8 @@ def build(reg: Registry, experiment: str, model: str | None, robot: str, episode
         "inference.latency_alpha": float(composed.get("latency_alpha", 0.125)),
         "inference.latency_beta": float(composed.get("latency_beta", 0.25)),
         "inference.metrics_path": str(run_dir / "ticks.csv"),
+        **({"inference.faults_json": json.dumps({k: composed[k] for k in FAULT_KEYS if composed.get(k)})}
+           if any(composed.get(k) for k in FAULT_KEYS) else {}),
         "fps": float(composed.get("fps", 30)),
         "task": composed["task"],
         "duration": float(duration if duration is not None else composed.get("duration_s", 25.0)),
@@ -161,13 +164,42 @@ def main(argv: list[str] | None = None) -> int:
 
         register_third_party_plugins()
         install()
+        import logging
+
+        handler = logging.FileHandler(run_dir / "rollout.log")
+        handler.setFormatter(logging.Formatter("%(levelname)s %(asctime)s %(name)s %(message)s"))
+        # lerobot-rollout reconfigures logging when it starts (init_logging), which drops handlers added before;
+        # attach ours right after it.
+        _init_logging = lerobot_rollout.init_logging
+
+        def init_logging(*args, **kwargs):
+            _init_logging(*args, **kwargs)
+            logging.getLogger().addHandler(handler)
+
+        lerobot_rollout.init_logging = init_logging
         started = datetime.now()
         t0 = time.monotonic()
         sys.argv = cmd
+        outcome, error = "completed", None
         try:
-            lerobot_rollout.main()
+            code = lerobot_rollout.main()
+            if code not in (None, 0):
+                outcome = f"exit {code}"
+        except SystemExit as e:  # a terminal fault ends the rollout through sys.exit
+            if e.code not in (None, 0):
+                outcome = f"exit {e.code}"
+        except Exception as e:  # noqa: BLE001 - a failed run is still a result
+            outcome, error = "error", f"{type(e).__name__}: {e}"
         finally:
             took = time.monotonic() - t0
+            logging.getLogger().removeHandler(handler)
+            handler.close()
+            lerobot_rollout.init_logging = _init_logging
+        if outcome != "completed":
+            fault = [line for line in (run_dir / "rollout.log").read_text(errors="replace").splitlines()
+                     if "terminal fault" in line or line.startswith("ERROR")]
+            error = error or (fault[-1][-300:] if fault else None)
+            print(f"trial {trial}: {outcome}{f': {error}' if error else ''}", flush=True)
         success = ""
         if label:
             ans = input("Success? [y/n/blank = unknown]: ").strip().lower()
@@ -177,8 +209,9 @@ def main(argv: list[str] | None = None) -> int:
         info = {"run_id": run_id, "experiment": exp_id, "model": model_id, "trial": trial, "success": success,
                 "started_at": started.isoformat(timespec="seconds"), "duration_s": round(took, 1),
                 "git_commit": commit, "git_dirty": dirty, "note": a.note, "run_dir": str(run_dir),
-                "robot": a.robot, "host": host.id if host else socket.gethostname()}
-        (run_dir / "run.json").write_text(json.dumps({**info, "command": cmd, "not_applied": notes}, indent=2))
+                "robot": a.robot, "host": host.id if host else socket.gethostname(), "outcome": outcome}
+        (run_dir / "run.json").write_text(json.dumps({**info, "outcome": outcome, "error": error, "command": cmd,
+                                                      "not_applied": notes}, indent=2))
         index = RESULTS / "index.csv"
         new = not index.exists()
         with open(index, "a", newline="") as f:

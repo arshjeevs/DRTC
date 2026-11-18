@@ -158,6 +158,10 @@ def main(argv: list[str] | None = None) -> None:
         from drtc.train import main as train_main
 
         sys.exit(train_main(argv[1:]))
+    if argv and argv[0] == "results":
+        from drtc.control.summary import main as results_main
+
+        sys.exit(results_main(argv[1:]))
     if argv and argv[0] == "run":
         from drtc.control.run import main as run_main
 
@@ -193,6 +197,7 @@ def main(argv: list[str] | None = None) -> None:
     sub.add_parser("submit", help="queue a training job here or on a host (lab submit <model> --host h200)")
     sub.add_parser("worker", help="run queued jobs on this machine")
     sub.add_parser("trim", help="trim the idle start/end of every episode into a new dataset (lab trim -h)")
+    sub.add_parser("results", help="summaries of robot runs: stalls, chunks, turnaround, faults (lab results -h)")
     sub.add_parser("run", help="run an experiment condition against a served model (lab run -h)")
     sub.add_parser("serve", help="serve a registry model with LeRobot 0.7's policy server (lab serve -h)")
     sub.add_parser("record", help="record <name>_raw with the leader arm, trim into <name>, push both (lab record -h)")

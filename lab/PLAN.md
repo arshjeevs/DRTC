@@ -122,6 +122,32 @@ porting the old tools.
     folder on the servers, so old caches there are never read.
 - [x] 1.3 Finish the change table above (2026-11-18)
 - [ ] 1.4 Build `src/drtc/` on upstream `remote_inference` (DRTC's scheduling ideas, our fault injection and logging) and run it against a test policy on the laptop
+  - [x] D1: replay robot plugin `lerobot_robot_replay` (`--robot.type=replay`). It plays a recorded episode
+    (real frames, 18 ms per observation); its state follows commands, it logs them, and it declares position hold.
+  - [x] D2: `lab serve <model>`: the deployment comes from the registry. Joint semantics follow the dataset's units
+    (`so101-range100-…` for v0/v1, `so101-degrees-…` for new data); camera semantics follow the rig's roles.
+    Upstream's server and client ran end to end on the laptop: 29.8 Hz, 0 starved ticks.
+  - [x] D3: `lab run <experiment> [--model] [--robot rig|replay]` plus `lab results`.
+    - Per run: `results/<exp>/<model>/<run_id>/` with config.yaml, ticks.csv (per control tick), faults.csv,
+      run.json (outcome and fault reason), rollout.log and the robot's commands; plus `results/index.csv`.
+    - Failed runs are recorded too.
+  - [x] D4 (option a): `--inference.type=drtc`. It extends upstream's remote engine and changes only the request
+    threshold (DRTC: queue ≤ H − s_min) and the latency estimate (jk / max_last_10 / fixed / upstream).
+    Replay test: the DRTC scheduler requested 32 chunks (queue ≥ 79), upstream 8 (queue down to 14); 0 stalls each.
+  - [x] D5: fault injection at the transport (observations published, replies received), for all 10 replication
+    conditions. **Replay results with the test ACT** (3.3 s chunks, ~45 ms turnaround, DRTC trigger):
+
+    | Condition | Outcome on upstream's runtime |
+    |---|---|
+    | baseline, dup_action, spikes_jk, spikes_max_last_10 | 25 s, 0 stalls (duplicate replies rejected; 0.5 s and 1 s spikes absorbed) |
+    | reorder_action | 25 s, 5 short stalls |
+    | drop_obs, drop_action, disconnect, reorder_obs, mixture | **terminal fault after 6–10 s**: "action starvation grace expired" |
+    | dup_obs | **terminal fault after 3 s**: the server rejects the second copy as "Duplicate or completed request", and the client treats it as a protocol error |
+
+    **Why the lost-message runs end:** with one request in flight, a lost message blocks requests until its 5 s
+    deadline. The queue runs out, and upstream's starvation recovery sends one fresh request with 1 s of grace,
+    which falls in the next fault window. **This is the measured case for option (b)** (DRTC's cooldown
+    re-request), to be decided.
 - [ ] 1.5 Policy plugins (DOT, SFP, GR00T N1.5)
   - [x] GR00T N1.5 plugin `lerobot_policy_groot_n15` (type `groot_n15`, steps `groot_n15_*`), ported to
     transformers 5. Changes:

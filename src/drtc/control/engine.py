@@ -131,6 +131,7 @@ class DRTCInferenceConfig(RemoteInferenceConfig):
     latency_beta: float = 0.25
     fixed_latency_s: float = 0.1
     metrics_path: str | None = None  # per-tick CSV, written when the engine stops
+    faults_json: str | None = None  # network faults to inject (drtc.control.faults), JSON
 
     def __post_init__(self) -> None:
         super().__post_init__()
@@ -170,6 +171,24 @@ class DRTCEngine(RemoteInferenceEngine):
             self.latency = self.runtime.latency
         self._ticks: list[list] = []
         self._t0 = time.monotonic()
+        self.faults = None
+        spec = getattr(cfg, "faults_json", None)
+        if spec:
+            import yaml
+
+            from drtc.control.faults import FaultInjector, FaultPlan
+
+            # The CLI parser (draccus) may hand the JSON over re-printed as a Python dict; YAML reads both.
+            plan = FaultPlan.from_dict(spec if isinstance(spec, dict) else yaml.safe_load(spec))
+            if plan:
+                self.faults = FaultInjector(plan)
+                self.faults.install(self.client)
+
+    def start(self) -> None:
+        self._t0 = time.monotonic()
+        if self.faults is not None:
+            self.faults.start()  # fault windows are on the run's clock, from here
+        super().start()
 
     def get_action(self, obs_frame):
         action = super().get_action(obs_frame)
@@ -194,6 +213,11 @@ class DRTCEngine(RemoteInferenceEngine):
                     w = csv.writer(f)
                     w.writerow(TICK_FIELDS)
                     w.writerows(self._ticks)
+            if path and self.faults is not None:
+                with open(Path(path).with_name("faults.csv"), "w", newline="") as f:
+                    w = csv.writer(f)
+                    w.writerow(["t", "fault", "value"])
+                    w.writerows(self.faults.events)
 
 
 def install() -> None:
