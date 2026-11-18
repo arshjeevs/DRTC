@@ -30,7 +30,7 @@ gpu = [
 lab = "drtc.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/drtc"]
+packages = ["src/drtc", "src/lerobot_policy_groot_n15"]
 
 [dependency-groups]
 dev = ["pytest>=8,<10"]
