@@ -87,7 +87,7 @@ def robot_flags(reg: Registry, model_id: str, robot: str, episode: int, log_path
 
 def build(reg: Registry, experiment: str, model: str | None, robot: str, episode: int, endpoint: str,
           duration: float | None, run_dir: Path) -> tuple[list[str], dict, list[str]]:
-    from drtc.control.serve import deployment_name, semantics_for
+    from drtc.control.serve import camera_renames, deployment_name, semantics_for
 
     composed = reg.compose(experiment, model_override=model)
     model_id = composed["model"]
@@ -137,6 +137,9 @@ def build(reg: Registry, experiment: str, model: str | None, robot: str, episode
         "duration": float(duration if duration is not None else composed.get("duration_s", 25.0)),
         "play_sounds": False,
     }
+    renames = camera_renames(reg, model_id)
+    if renames:  # robot camera keys -> the checkpoint's names, which the server declares (drtc.control.serve)
+        flags["rename_map"] = json.dumps(renames)
     cmd = ["lerobot-rollout", *(f"--{k}={v}" for k, v in flags.items())]
     return cmd, composed, notes
 

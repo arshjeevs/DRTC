@@ -79,3 +79,19 @@ def test_config_round_trip_keeps_rtc(tmp_path):
     (tmp_path / "plain").mkdir()
     plain._save_pretrained(tmp_path / "plain")
     assert GrootN15Config.from_pretrained(tmp_path / "plain").rtc_config is None
+
+
+def test_postprocessor_keeps_the_whole_chunk():
+    """LeRobot 0.7's chunk server postprocesses (1, H, D_model) and requires (1, H, robot width) back."""
+    from lerobot.processor import TransitionKey
+    from lerobot_policy_groot_n15.processor_groot_n15 import GrootActionUnpackUnnormalizeStep
+
+    stats = {"action": {"min": torch.full((WIDTH,), -10.0), "max": torch.full((WIDTH,), 30.0)}}
+    step = GrootActionUnpackUnnormalizeStep(env_action_dim=WIDTH, stats=stats)
+    chunk = torch.linspace(-1, 1, H).view(1, H, 1).expand(1, H, PADDED).clone()
+    out = step({TransitionKey.ACTION: chunk})[TransitionKey.ACTION]
+    assert out.shape == (1, H, WIDTH)
+    torch.testing.assert_close(out[0, 0], torch.full((WIDTH,), -10.0))  # y=-1 -> min
+    torch.testing.assert_close(out[0, -1], torch.full((WIDTH,), 30.0))  # y=+1 -> max
+    single = step({TransitionKey.ACTION: chunk[:, 0]})[TransitionKey.ACTION]  # one action: unchanged behaviour
+    assert single.shape == (1, WIDTH)

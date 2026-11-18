@@ -39,12 +39,23 @@ def semantics_for(reg: Registry, model_id: str) -> dict:
     return {"joints": JOINT_SEMANTICS[r.dataset.use_degrees], "cameras": cams}
 
 
+def camera_renames(reg: Registry, model_id: str) -> dict[str, str]:
+    """Dataset camera key -> the checkpoint's input name, from the recipe's `cameras` (the training rename_map).
+
+    The server declares the checkpoint's names (LeRobot 0.7 requires them to match the policy's input_features);
+    the robot client maps its camera keys onto them with the same map (`lab run` passes it as --rename_map).
+    """
+    r = reg.resolve(model_id)
+    return dict((r.flags or {}).get("rename_map") or {})
+
+
 def server_config(reg: Registry, model_id: str, path: str | None = None, device: str = "cuda",
                   listen: str = "tcp/127.0.0.1:7447", modes: list[str] | None = None) -> dict:
     from lerobot.datasets import LeRobotDatasetMetadata
 
     r = reg.resolve(model_id)
     sem = semantics_for(reg, model_id)
+    renames = camera_renames(reg, model_id)
     meta = LeRobotDatasetMetadata(r.dataset.repo, revision=r.dataset.revision)
     state = meta.features["observation.state"]
     action = meta.features["action"]
@@ -55,7 +66,7 @@ def server_config(reg: Registry, model_id: str, path: str | None = None, device:
             continue
         cam = key.removeprefix("observation.images.")
         h, w, c = f["shape"]
-        features.append({"name": key, "shape": [h, w, c], "dtype": "uint8", "kind": "rgb",
+        features.append({"name": renames.get(key, key), "shape": [h, w, c], "dtype": "uint8", "kind": "rgb",
                          "semantics": sem["cameras"].get(cam, f"rgb-{cam}-v1")})
     return {
         "deployment": deployment_name(model_id),
@@ -97,6 +108,9 @@ def main(argv: list[str] | None = None) -> int:
     from lerobot.utils.import_utils import register_third_party_plugins
 
     register_third_party_plugins()
+    from drtc.control.chunk_adapters import install as install_chunk_adapters
+
+    install_chunk_adapters()  # Diffusion Policy chunk serving
     if not a.path:
         from drtc.compat.serve import install_loader, needs_compat, prepare_checkpoint
 

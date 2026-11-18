@@ -579,10 +579,9 @@ class GrootActionUnpackUnnormalizeStep(ProcessorStep):
         if not isinstance(action, torch.Tensor):
             return transition
 
-        # Select last timestep and slice to env dimension
-        if action.dim() == 3:
-            action = action[:, -1, :]
-        # Now action is (B, D_model)
+        # Slice to env dimension. Single actions are (B, D_model); whole chunks (B, T, D_model) keep every timestep
+        # (lab change: upstream's N1.5 port kept only the last one, which LeRobot 0.7's chunk server rejects; the
+        # unnormalization below broadcasts over T).
         if self.env_action_dim and action.shape[-1] >= self.env_action_dim:
             action = action[..., : self.env_action_dim]
 

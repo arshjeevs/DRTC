@@ -556,8 +556,34 @@ RTC. The other five can be compared with and without RTC.
   - the chunk length at 30 fps;
   - steps vs epochs, and the stopping rule;
   - relative vs absolute actions.
-- [ ] Test runs of all 7 on the H200: `bash tests/smoke/train.sh` (the user runs it). Record train exit, peak
-      memory, admission and time per chunk per model here.
+- [ ] Test runs of all 7 on the H200: `bash tests/smoke/train.sh` (the user runs it).
+  - **First run (2026-11-18, commit c4d24663).** Serve times are the H200's; 30 fps, s_min 20:
+
+    | Model | Train (30 steps) | Peak train GPU | Serve check |
+    |---|---|---|---|
+    | ACT | ok, 170 s, eval 0.81 | 44.6 GB | admitted chunk; 13.7 ms (1 step) vs margin 80 |
+    | SmolVLA | ok, 170 s, eval 0.46 | 14.7 GB | admitted chunk + rtc_guided; 175 ms (6 steps) / RTC 301 ms (10 steps) vs margin 30 |
+    | Diffusion | ok, 167 s, eval 1.00 | 9.6 GB | refused: no `chunk_size` (fix 1) |
+    | π0.5 | ok, 585 s, eval 0.27 | 45.5 GB | refused: feature names ≠ checkpoint inputs (fix 2) |
+    | GR00T N1.5 | ok, 261 s, eval 0.22 | 20.5 GB | refused: postprocessor returned one action, not the chunk (fix 3) |
+    | GR00T N1.7 | failed: gated Hub repo (`nvidia/Cosmos-Reason2-2B`, the backbone) | — | — |
+    | MolmoAct 2 | failed: the base config has 4 fields 0.7 dropped (fix 4) | — | — |
+
+  - **Fixes:**
+    1. `drtc.control.chunk_adapters` (installed by `lab serve` and the serve check) gives Diffusion a chunk spec
+       (prediction = execution = `n_action_steps`; `n_obs_steps` must be 1). It also adds the observation-time
+       axis to state: without it the server's (B, D) state fails in `generate_actions`, as a test showed.
+       Tests: `tests/test_chunk_adapters.py`.
+    2. Camera renames. `lab serve` declares the checkpoint's camera names (the recipe's `cameras`, the training
+       `rename_map`), and `lab run` passes the same map as `--rename_map`. Camera semantics are kept.
+    3. The GR00T N1.5 `action_unpack_unnormalize` step keeps every timestep of a (B, T, D) chunk. Upstream's N1.5
+       port kept only the last one; single actions are unchanged. Test in `tests/test_groot_n15_rtc.py`.
+    4. `lab train` passes a base with an outdated config as an upgraded local copy (`drtc.train.upgraded_base`:
+       files linked, unknown fields dropped and printed). `molmoact2_full` now also sets
+       `policy.train_mode_vlm: fft`; 0.7's default is LoRA on the VLM.
+    5. GR00T N1.7: the user accepts the gate of `nvidia/Cosmos-Reason2-2B` (auto-approved) with the Hub account
+       whose token is on the H200.
+  - [ ] Second run: the 5 that failed.
 - [x] GR00T N1.5 plugin: guided RTC on 0.7, with `supports_rtc()` (2026-11-18).
 
 **What LeRobot 0.7 covers:**

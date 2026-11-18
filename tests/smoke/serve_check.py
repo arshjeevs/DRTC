@@ -54,6 +54,9 @@ def main(argv: list[str] | None = None) -> int:
     from drtc.registry.registry import RTC_POLICIES
 
     register_third_party_plugins()
+    from drtc.control.chunk_adapters import install as install_chunk_adapters
+
+    install_chunk_adapters()  # as `lab serve` does
     reg = Registry()
     r = reg.resolve(a.model)
     rtc = r.policy in RTC_POLICIES

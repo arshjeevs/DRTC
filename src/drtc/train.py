@@ -123,13 +123,47 @@ def flag_value(v: Any) -> str:
 
 
 def resolve_base(base: str) -> str:
-    """repo or repo@revision -> what --policy.path loads (a pinned revision is downloaded and passed as a folder)."""
+    """repo or repo@revision -> what --policy.path loads (a pinned revision is downloaded and passed as a folder).
+
+    A base whose config.json has fields the LeRobot 0.7 policy class no longer has (e.g. MolmoAct 2's Hub
+    conversion, written for an earlier MolmoAct2Config) is passed as a local copy: the files linked, the config
+    upgraded by drtc.compat.configs (fields only dropped, each drop printed). The Hub snapshot is not modified.
+    """
     repo, _, rev = base.partition("@")
     if not rev:
         return repo
     from huggingface_hub import snapshot_download
 
-    return snapshot_download(repo, revision=rev)
+    return str(upgraded_base(Path(snapshot_download(repo, revision=rev)), f"{repo.replace('/', '--')}@{rev}"))
+
+
+def upgraded_base(snapshot: Path, name: str) -> Path:
+    from lerobot.configs import PreTrainedConfig
+    from lerobot.utils.import_utils import register_third_party_plugins
+
+    from drtc.compat.configs import upgrade_config
+    from drtc.compat.serve import CACHE
+
+    raw = json.loads((snapshot / "config.json").read_text())
+    register_third_party_plugins()
+    if raw.get("type") not in PreTrainedConfig.get_known_choices():
+        return snapshot
+    upgraded = upgrade_config(raw, PreTrainedConfig.get_choice_class(raw["type"]))
+    if upgraded == raw:
+        return snapshot
+    out = CACHE.parent / "compat_bases" / name
+    out.mkdir(parents=True, exist_ok=True)
+    for f in snapshot.rglob("*"):
+        rel = f.relative_to(snapshot)
+        dst = out / rel
+        if f.is_dir() or rel == Path("config.json"):
+            continue
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        if not dst.exists():
+            dst.symlink_to(f.resolve())
+    (out / "config.json").write_text(json.dumps(upgraded, indent=2))
+    print(f"base {name}: config upgraded for LeRobot 0.7, loading the local copy {out}", flush=True)
+    return out
 
 
 def unknown_policy_flags(policy: str, flags: dict) -> list[str]:
