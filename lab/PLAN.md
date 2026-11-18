@@ -141,6 +141,14 @@ porting the old tools.
   - [ ] jobs + worker + `lab submit` (train, eval, bench, serve)
   - [ ] logging (wandb trials, lineage, Hub mirror), import of `results/index.csv`
   - [ ] Zenoh serving across hosts (replaces `tunnel`), Pi and H200 setup
+    - H200 (cannot be changed; see `lab/H200.md` for the existing setup): the new setup lives in `~/drtc_major`
+      (branch `major`), next to the old `~/drtc_lab`, inside the same `drtc_lab` container (the guide's image, which
+      already mounts all of `/home/jayaraj`). It has its own `.venv` from `uv.lock`.
+      - Shared with the old setup: the Hugging Face model cache (`drtc_lab/.cache/huggingface`, so no second copy
+        of large checkpoints; `/home` is ~88% full) and `drtc_lab/.secrets.env`.
+      - Its own dataset folder (`HF_LEROBOT_HOME=drtc_major/.cache/lerobot`), so the stale untrimmed v1 cached by
+        the old setup is never read.
+      - Nothing in `~/drtc_lab` is modified.
 - [ ] 1.8 Checks:
   - `so101_cubebox_v1_trim` loads
   - a short training per kept policy on the laptop and the H200
