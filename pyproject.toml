@@ -23,14 +23,14 @@ dependencies = [
 # GPU side (laptop, H200, more compute hosts): training and serving the policies we use.
 gpu = [
     "lerobot[training,peft,smolvla,pi,xvla,groot]==0.7.0",
-    "wandb>=0.22,<1",
+    "lerobot_policy_groot_n15",
 ]
 
 [project.scripts]
 lab = "drtc.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/drtc", "src/lerobot_policy_groot_n15"]
+packages = ["src/drtc"]
 
 [dependency-groups]
 dev = ["pytest>=8,<10"]
@@ -43,6 +43,10 @@ name = "pytorch-cu130"
 url = "https://download.pytorch.org/whl/cu130"
 explicit = true
 
+[tool.uv.workspace]
+members = ["plugins/*"]
+
 [tool.uv.sources]
+lerobot_policy_groot_n15 = { workspace = true }
 torch = { index = "pytorch-cu130", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" }
 torchvision = { index = "pytorch-cu130", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" }
