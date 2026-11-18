@@ -1,4 +1,4 @@
 #!/bin/bash
-# Run an experiment condition: lab/bin/run <group/name> [--trials N] [--duration SECONDS] [--note TEXT] [--no-label]
+# Old name kept for compatibility: lab run <experiment> [--model M] [--robot rig|replay] (lab run -h)
 source "$(dirname "$0")/_env"
-exec "$PY" -m lab.tools.run "$@"
+exec "$LAB" run "$@"

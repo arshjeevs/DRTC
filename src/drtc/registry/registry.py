@@ -175,7 +175,7 @@ class Registry:
             return self.hosts[name]
         hostname = socket.gethostname()
         for h in self.hosts.values():
-            if hostname in (h.id, h.label, h.address):
+            if hostname in (h.id, h.label, h.address, h.hostname):
                 return h
         return None
 

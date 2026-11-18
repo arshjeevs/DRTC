@@ -10,6 +10,7 @@ network:
 hosts:
   laptop:
     label: laptop4060
+    hostname: arshjeevs
     roles: [control, record, client, serve, train]
     address: 10.42.0.1
     repo: ~/Projects/drtc

@@ -278,7 +278,18 @@ class DRTCEngine(RemoteInferenceEngine):
                             engine._note("cooldown_resend", request.request_id)
                         raise RequestCancelled()
                     continue
-                response = decode_reply(payload, request, discard_stale=True)
+                try:
+                    response = decode_reply(payload, request, discard_stale=True)
+                except ProtocolError as e:  # decode_reply raises the server's error replies
+                    code = getattr(e.code, "value", e.code)
+                    if code == ErrorCode.STALE.value and "Duplicate" in str(e):
+                        engine._note("duplicate_ignored", request.request_id)
+                        continue  # a duplicated copy of this request; its real reply is still coming
+                    if code == ErrorCode.BUSY.value:
+                        engine.runtime.abandon(request.request_id, backoff=engine.runtime.interval)
+                        engine._note("busy_backoff", request.request_id)
+                        raise RequestCancelled() from None
+                    raise
                 if response is None:
                     continue
                 if response.message_type is MessageType.ERROR:

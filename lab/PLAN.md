@@ -18,6 +18,18 @@ nothing has to be redone. Items marked **[open]** are decisions still to make.*
 
 ---
 
+## Status at the end of the 2026-11-18 session (handover)
+**Phase 1 is done except for what needs other machines:**
+- **D7:** Zenoh across machines (an H200 server with the laptop client), the GR00T N1.5 kept-model serving test
+  on the H200, and the Pi as the client. Needs H200 access, then the robot.
+- **Robot-side checks:** calibration, a test recording with `lab record`, robot runs.
+
+Small open items: robot-run logging to the Trackio Space plus a results mirror; DOT and SFP plugins (only if
+shortlisted); best-checkpoint selection after training.
+
+**Next session:** Phase 2, the shortlist. The findings so far are in the Phase 2 section below. Then start the
+trainings on the H200 (`lab submit` / `lab worker`, or `lab train`; all 8 recipes train there).
+
 ## Phase 1: LeRobot upgrade (option c: LeRobot as a dependency, our code on top)
 
 ### Where we are
@@ -155,12 +167,24 @@ porting the old tools.
     - a `STALE` "duplicate" reply for the request in flight is ignored;
     - the aligned-mode anchor is cleared after a give-up.
 
-    Every recovery is logged (`recovery.csv`). **Validation pending:** the first full run was invalid because
-    the laptop was saturated by another job (load 101 on 24 cores: a 6 Hz loop, 0.5 s turnaround). It needs a
-    quiet laptop or the H200. In that run the baseline completed, and re-sends happened in the drop conditions.
+    Every recovery is logged (`recovery.csv`). **Validated on the quiet laptop (2026-11-18): all 11
+    replication conditions complete their full 25 s** (replay robot, test ACT; at most one 0.03 s stall). Without
+    (b), 6 of them ended in a terminal fault.
+
+    | Condition | Upstream runtime alone | With (b) |
+    |---|---|---|
+    | drop_obs / drop_action / disconnect | terminal after ~6 s | 25 s, 1 stall of 0.03 s, 64–70 re-sends |
+    | reorder_obs | terminal after ~10 s | 25 s, 0 stalls (12 re-sends, 1 BUSY back-off) |
+    | dup_obs | terminal after 3 s (protocol error) | 25 s, 0 stalls (9 duplicates ignored) |
+    | mixture | terminal after ~10 s | 25 s, 0 stalls (37 re-sends, 2 duplicates ignored) |
+    | baseline, dup_action, reorder_action, spikes ×2 | 25 s | 25 s, 0 stalls |
   - [x] D6 (decided 2026-11-18: only this for now): the Butterworth action filter, ported unchanged (order 2,
     3 Hz, gain 1.4; identical to the old filter to 1e-12, `tests/test_action_filter.py`). It is applied to every
     action before the robot and reset when motion is invalidated. Smoothing A/B/C: decided later.
+- [x] Serving the kept models (`drtc.compat.serve`, used by `lab serve`, 2026-11-18). An old-format checkpoint is
+  converted to a local copy (upgraded config, mapped processor step names). Upstream's server builds the policy with
+  our old-LoRA loader. `smolvla_cubebox_v0_lora_raw` was served and run on the replay robot: 15 s, 0 stalls,
+  ~280 ms turnaround on the 4060. GR00T N1.5 uses the same path; its serving test is on the H200 (D7).
 - [ ] 1.5 Policy plugins (DOT, SFP, GR00T N1.5)
   - [x] GR00T N1.5 plugin `lerobot_policy_groot_n15` (type `groot_n15`, steps `groot_n15_*`), ported to
     transformers 5. Changes:
@@ -259,9 +283,19 @@ porting the old tools.
     - Each dataset entry states its own units: v1, v1_raw and v0_raw are −100..100.
     - A model runs the robot in its dataset's units (control system, D).
     - The user accepts retraining for new data; v2+ in degrees is not mixable with v1.
-  - [ ] `lab` CLI with the old names as aliases (record, calibrate, preflight, session, run, bench, eval-offline, analyze, edit-dataset, list, logstats)
+  - [x] `lab` CLI with the old names as aliases (2026-11-18).
+    - **Aliases:** list, train, stop, run, record, preflight → `lab check --rig`, analyze → `lab results`,
+      calibrate → `lab calibrate` (explicit calibration file, backup), server → `lab serve <model>`.
+    - **Kept as is:** phonecam and session (they read the rig through `lab rig <key>`).
+    - **Not ported (they say so):** bench, eval-offline, logstats, ablate-cameras, tunnel, edit-dataset, venv,
+      h200-setup.
+    - **Removed from `major`:** the old `lab/tools`, `models.yaml` and `rig.yaml`. They stay in `minor-final` and
+      the test fixtures.
+    - Hosts can declare their `hostname`, so `lab` knows where it runs (the laptop is `arshjeevs`).
+  - [x] `lab import-results`: the minor's 9 robot runs plus its offline/benchmark folders were copied to
+    `results/minor/` under the new model names.
   - [ ] jobs + worker + `lab submit` (train, eval, bench, serve)
-  - [ ] logging (wandb trials, lineage, Hub mirror), import of `results/index.csv`
+  - [ ] logging to the Trackio Space for robot runs and a Hub mirror of results (training already logs to Trackio); the results import is done
   - [ ] Zenoh serving across hosts (replaces `tunnel`), Pi and H200 setup
     - 2026-11-18, for the parity check, done by Claude with the user's permission (no deletions):
       - `~/drtc_major` was cloned on the H200, with `.server.env` and `.venv` from `uv.lock` (6.8 GB, `uv` 0.10.4

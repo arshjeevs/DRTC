@@ -45,6 +45,27 @@ FAULT_KEYS = ("drop_obs", "drop_action", "dup_obs", "dup_action", "reorder_obs",
               "spikes")
 
 
+def append_index(rows: list[dict], index: Path | None = None) -> None:
+    """Append rows to results/index.csv, first upgrading an older file to the current columns."""
+    index = index or RESULTS / "index.csv"
+    index.parent.mkdir(parents=True, exist_ok=True)
+    if index.is_file():
+        with open(index, newline="") as f:
+            reader = csv.DictReader(f)
+            header, old = reader.fieldnames or [], list(reader)
+        if header != INDEX_FIELDS:
+            with open(index, "w", newline="") as f:
+                w = csv.DictWriter(f, fieldnames=INDEX_FIELDS)
+                w.writeheader()
+                w.writerows({k: r.get(k, "") for k in INDEX_FIELDS} for r in old)
+    new = not index.is_file()
+    with open(index, "a", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=INDEX_FIELDS)
+        if new:
+            w.writeheader()
+        w.writerows({k: r.get(k, "") for k in INDEX_FIELDS} for r in rows)
+
+
 def git_state() -> tuple[str, bool]:
     commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
     dirty = bool(subprocess.run(["git", "status", "--porcelain", "--untracked-files=no"], capture_output=True,
@@ -216,13 +237,7 @@ def main(argv: list[str] | None = None) -> int:
                 "robot": a.robot, "host": host.id if host else socket.gethostname(), "outcome": outcome}
         (run_dir / "run.json").write_text(json.dumps({**info, "outcome": outcome, "error": error, "command": cmd,
                                                       "not_applied": notes}, indent=2))
-        index = RESULTS / "index.csv"
-        new = not index.exists()
-        with open(index, "a", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=INDEX_FIELDS)
-            if new:
-                w.writeheader()
-            w.writerow(info)
+        append_index([info])
         print(f"trial {trial}: {run_dir}", flush=True)
     return 0
 

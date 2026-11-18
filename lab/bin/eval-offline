@@ -1,6 +1,5 @@
 #!/bin/bash
-# Score a trained registry model on held-out episodes (no robot) -> results/offline/<model>.json
-#   lab/bin/eval-offline <model> [--episodes "45-49"] [--batches 20] [--batch-size 16]
-source "$(dirname "$0")/_env"
-use_model_venv "$1"
-exec "$PY" -m lab.tools.eval_offline "$@"
+# Not part of the new setup yet.
+echo "lab/bin/eval-offline: not ported yet (Phase 4: offline ranking of trained models)."
+echo "The old tool is in the minor-final checkout (~/Projects/drtc, branch drtc)."
+exit 1

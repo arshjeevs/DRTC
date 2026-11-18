@@ -1,4 +1,4 @@
 #!/bin/bash
-# List registered models and experiments.
+# Old name kept for compatibility: lab list
 source "$(dirname "$0")/_env"
-exec "$PY" -m lab.tools.config list
+exec "$LAB" list "$@"

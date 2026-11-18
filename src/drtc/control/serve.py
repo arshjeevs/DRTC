@@ -97,6 +97,16 @@ def main(argv: list[str] | None = None) -> int:
     from lerobot.utils.import_utils import register_third_party_plugins
 
     register_third_party_plugins()
+    if not a.path:
+        from drtc.compat.serve import install_loader, needs_compat, prepare_checkpoint
+
+        hub = cfg["model"]["repo_or_path"]
+        if needs_compat(hub):  # a model carried over from the minor (old checkpoint format)
+            local = prepare_checkpoint(hub)
+            print(f"old-format checkpoint {hub}: serving the converted copy {local}", flush=True)
+            cfg["model"]["repo_or_path"] = str(local)
+            out.write_text(yaml.safe_dump(cfg, sort_keys=False))
+            install_loader()
     sys.argv = ["lerobot-policy-server", f"--config_path={out}", *extra]
     return lerobot_policy_server.main() or 0
 

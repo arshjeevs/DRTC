@@ -76,6 +76,7 @@ class Gpu(BaseModel):
 
 class Host(Entry):
     label: str = ""  # name recorded with runs (defaults to the id)
+    hostname: str | None = None  # this machine's hostname, so `lab` knows where it runs (else set LAB_HOST)
     roles: list[Role]
     address: str | None = None
     ssh: str | None = None  # user@host, for hosts the laptop reaches over SSH
