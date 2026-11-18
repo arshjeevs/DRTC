@@ -583,7 +583,29 @@ RTC. The other five can be compared with and without RTC.
        `policy.train_mode_vlm: fft`; 0.7's default is LoRA on the VLM.
     5. GR00T N1.7: the user accepts the gate of `nvidia/Cosmos-Reason2-2B` (auto-approved) with the Hub account
        whose token is on the H200.
-  - [ ] Second run: the 5 that failed.
+  - **Second run (2026-11-18, commit d30fef52), the 5 that failed:**
+
+    | Model | Train | Peak train GPU | Serve check |
+    |---|---|---|---|
+    | Diffusion | ok, 177 s, eval 1.00 | 9.6 GB | **admitted** chunk; 54.9 ms (2 steps) vs margin 8 |
+    | GR00T N1.5 | ok, 245 s, eval 0.22 | 20.5 GB | **admitted** chunk + rtc_guided; 77.7 ms (3 steps) / RTC 99.2 ms (p90 218) vs margin 8. The plugin's RTC works on the real model |
+    | π0.5 | ok, 416 s, eval 0.27 | 45.5 GB | refused: feature names ≠ checkpoint inputs (fix 6) |
+    | MolmoAct 2 | ok, 747 s, eval 0.23 (the base upgrade works) | 55.8 GB | refused: RGB shape ≠ checkpoint (fix 6) |
+    | GR00T N1.7 | failed: gated repo again (fix 5 not done yet) | — | — |
+
+  - **Fix 6.** A fine-tune keeps its base checkpoint's nominal input_features:
+    - π0.5: 3 camera slots at 224×224 and a 32-d state;
+    - MolmoAct 2: cam0/cam1 at 224×224.
+
+    The 0.7 server demands an exact match. `drtc.control.chunk_adapters` overrides `validate_chunk_input_features`
+    for both, as upstream does for VLA-JEPA:
+    - any RGB resolution, since both policies resize images themselves;
+    - π0.5: a subset of the camera slots (the missing one gets the same empty, masked image as in training) and a
+      state no longer than max_state_dim (padded);
+    - MolmoAct 2: exact names and state.
+
+    Tests in `tests/test_chunk_adapters.py`.
+  - [ ] Third run: π0.5, MolmoAct 2 and GR00T N1.7.
 - [x] GR00T N1.5 plugin: guided RTC on 0.7, with `supports_rtc()` (2026-11-18).
 
 **What LeRobot 0.7 covers:**

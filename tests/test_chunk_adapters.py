@@ -41,3 +41,61 @@ def test_observation_history_is_refused():
     chunk_adapters.install()
     with pytest.raises(ValueError, match="n_obs_steps=1"):
         tiny(n_obs_steps=2).chunk_inference_spec()
+
+
+# --- π0.5 / MolmoAct 2 feature admission (the checkpoint keeps its base model's nominal input_features) ----------
+
+from types import SimpleNamespace
+
+from lerobot.utils.feature_spec import FeatureSpec
+
+
+def feat(name, shape, kind):
+    return FeatureSpec(name=name, shape=tuple(shape), dtype="uint8" if kind == "rgb" else "float32", kind=kind,
+                       semantics="test-v1")
+
+
+PI05_BASE = {  # lerobot/pi05_base input_features
+    "observation.images.base_0_rgb": PolicyFeature(FeatureType.VISUAL, (3, 224, 224)),
+    "observation.images.left_wrist_0_rgb": PolicyFeature(FeatureType.VISUAL, (3, 224, 224)),
+    "observation.images.right_wrist_0_rgb": PolicyFeature(FeatureType.VISUAL, (3, 224, 224)),
+    "observation.state": PolicyFeature(FeatureType.STATE, (32,)),
+}
+OURS_PI05 = (feat("observation.state", (6,), "tensor"), feat("observation.images.right_wrist_0_rgb", (600, 800, 3), "rgb"),
+             feat("observation.images.base_0_rgb", (600, 800, 3), "rgb"))
+
+
+def test_pi05_admits_our_rig():
+    fake = SimpleNamespace(config=SimpleNamespace(input_features=PI05_BASE))
+    chunk_adapters.validate_pi05_features(fake, OURS_PI05)  # 2 of 3 slots, 800x600, 6-d state
+
+
+def test_pi05_refusals():
+    fake = SimpleNamespace(config=SimpleNamespace(input_features=PI05_BASE))
+    with pytest.raises(ValueError, match="unknown"):
+        chunk_adapters.validate_pi05_features(fake, OURS_PI05 + (feat("observation.images.cam9", (600, 800, 3), "rgb"),))
+    with pytest.raises(ValueError, match="does not fit"):
+        chunk_adapters.validate_pi05_features(fake, (feat("observation.state", (40,), "tensor"),) + OURS_PI05[1:])
+    with pytest.raises(ValueError, match="Missing non-camera"):
+        chunk_adapters.validate_pi05_features(fake, OURS_PI05[1:])
+
+
+def test_molmoact2_admits_any_resolution_but_exact_names():
+    base = {"observation.images.cam0": PolicyFeature(FeatureType.VISUAL, (3, 224, 224)),
+            "observation.images.cam1": PolicyFeature(FeatureType.VISUAL, (3, 224, 224)),
+            "observation.state": PolicyFeature(FeatureType.STATE, (6,))}
+    fake = SimpleNamespace(config=SimpleNamespace(input_features=base))
+    ours = (feat("observation.state", (6,), "tensor"), feat("observation.images.cam1", (600, 800, 3), "rgb"),
+            feat("observation.images.cam0", (600, 800, 3), "rgb"))
+    chunk_adapters.validate_molmoact2_features(fake, ours)
+    with pytest.raises(ValueError, match="exactly match"):
+        chunk_adapters.validate_molmoact2_features(fake, ours[:2])
+
+
+def test_installed_on_the_policies():
+    chunk_adapters.install()
+    from lerobot.policies.molmoact2.modeling_molmoact2 import MolmoAct2Policy
+    from lerobot.policies.pi05.modeling_pi05 import PI05Policy
+
+    assert PI05Policy.validate_chunk_input_features is chunk_adapters.validate_pi05_features
+    assert MolmoAct2Policy.validate_chunk_input_features is chunk_adapters.validate_molmoact2_features
