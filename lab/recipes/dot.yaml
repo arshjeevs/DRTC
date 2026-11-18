@@ -1,0 +1,9 @@
+# Training recipes. `source`: who made this work and where it comes from.
+
+dot_full:
+  source: Author's real-task (insertion) recipe, converted to 30 fps (github.com/IliaLarchenko/dot_policy)
+  policy: dot
+  finetune: full
+  train: {epochs: 50, batch_size: 12, save_freq: 10000}
+  flags: {policy.lora_rank: 0}
+  serve: {rtc_enabled: false, num_flow_matching_steps: null}

@@ -1,0 +1,6 @@
+# Lab-wide settings.
+hub_account: orangemoon599
+# Training and robot runs log here. "drtc" was the minor's project (old setup); this one starts clean.
+wandb_project: drtc-lab
+# From 2026-11-18 every dataset is trimmed (idle start/end removed) before it is saved; the untrimmed
+# recording is kept as <dataset>_raw. A name without _raw is always trimmed.

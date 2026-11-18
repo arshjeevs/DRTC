@@ -1,0 +1,10 @@
+# Training recipes. `source`: who made this work and where it comes from.
+
+pi0fast_full:
+  policy: pi0_fast
+  finetune: full
+  base: lerobot/pi0fast-base@80f748308df08d1b3a6b480cabe039a35b2e6685
+  train: {epochs: 10, batch_size: 32, save_freq: 2000}
+  flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true}
+  serve: {rtc_enabled: false}
+  cameras: {scene: observation.images.base_0_rgb, wrist: observation.images.right_wrist_0_rgb}

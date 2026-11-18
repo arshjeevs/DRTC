@@ -1,0 +1,34 @@
+# Imported from the old lab config by drtc.compat.import_legacy (2026-11-18); edit freely.
+
+network:
+  legacy_server:
+    host: {default: 10.42.0.1, windows-laptop: 127.0.0.1}
+    port: 8080
+    host_id: {default: laptop, windows-laptop: windows-laptop}
+    client_id: {default: pi, windows-laptop: windows-laptop}
+  zenoh_router: null
+hosts:
+  laptop:
+    label: laptop4060
+    roles: [control, record, client, serve, train]
+    address: 10.42.0.1
+    repo: ~/Projects/drtc
+    gpus:
+    - {name: RTX 4060 Laptop, memory_gb: 8}
+  pi:
+    label: raspberrypiv5
+    roles: [client]
+  h200:
+    label: gpuh200
+    roles: [serve, train]
+    ssh: jayaraj@192.168.41.118
+    container: drtc_lab
+    repo: /workspace/drtc_lab
+    gpus:
+    - {name: H200, memory_gb: 141}
+    shared: true
+  windows-laptop:
+    label: windows-laptop
+    roles: [record, client, serve]
+    gpus:
+    - {name: RTX 4060 Laptop, memory_gb: 8}

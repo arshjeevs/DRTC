@@ -1,0 +1,10 @@
+# Training recipes. `source`: who made this work and where it comes from.
+
+molmoact2_full:
+  policy: molmoact2
+  finetune: full
+  base: lerobot/MolmoAct2-SO100_101-LeRobot@a4ab68081b84bb0659d96f454edbce6abbe8a1cd
+  train: {epochs: 10, batch_size: 32, save_freq: 4000}
+  flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true}
+  serve: {rtc_enabled: false, num_flow_matching_steps: null, actions_per_chunk: 30}
+  cameras: {scene: observation.images.cam0, wrist: observation.images.cam1}

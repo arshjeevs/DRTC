@@ -1,0 +1,11 @@
+# Training recipes. `source`: who made this work and where it comes from.
+
+pi05_full_openpi:
+  source: 'openpi-style full fine-tune: everything trained (vision, VLM, expert)'
+  policy: pi05
+  finetune: full
+  base: lerobot/pi05_base@a538eb273274eb30f126a118f39dbc0ee212c883
+  train: {epochs: 10, batch_size: 32, save_freq: 2000}
+  flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true, policy.train_expert_only: false, policy.freeze_vision_encoder: false}
+  serve: {rtc_enabled: true}
+  cameras: {scene: observation.images.base_0_rgb, wrist: observation.images.right_wrist_0_rgb}

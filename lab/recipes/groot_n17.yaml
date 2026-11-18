@@ -1,0 +1,11 @@
+# Training recipes. `source`: who made this work and where it comes from.
+
+groot_n17_nvidia:
+  source: Same split as groot_n15_nvidia on GR00T N1.7 (upstream LeRobot >= 0.6), 40-action chunks
+  policy: groot_n17
+  finetune: full
+  base: nvidia/GR00T-N1.7-3B
+  train: {epochs: 10, batch_size: 32, save_freq: 2000}
+  flags: {policy.chunk_size: 40, policy.n_action_steps: 40, policy.embodiment_tag: new_embodiment, policy.tune_llm: false,
+    policy.tune_visual: false, policy.tune_projector: true, policy.tune_diffusion_model: true}
+  serve: {rtc_enabled: false, num_flow_matching_steps: null, actions_per_chunk: 40}

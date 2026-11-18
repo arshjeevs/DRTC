@@ -1,0 +1,4 @@
+# Imported from the old lab config by drtc.compat.import_legacy (2026-11-18); edit freely.
+
+so101_v1: {notes: 'Setups before 2026-11-11 (datasets train_*, train_new_1). The Zebronics was not on the wrist; camera placement
+    was not recorded in detail. Models from these datasets do not match so101_v2.', until: '2026-11-10', known: false}

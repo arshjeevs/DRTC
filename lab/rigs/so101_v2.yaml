@@ -1,0 +1,32 @@
+# Imported from the old lab config by drtc.compat.import_legacy (2026-11-18); edit freely.
+
+so101_v2:
+  notes: 'Zebronics Zeb Live Pro on the wrist (camera1), Android phone via DroidCam as the scene camera (camera2). Ports and
+    camera paths are per host: `default` is Linux (by-id paths, same on the laptop and the Pi), windows-laptop has its own.'
+  since: '2026-11-11'
+  robot:
+    type: so101_follower
+    port: {default: /dev/serial/by-id/usb-1a86_USB_Single_Serial_5B79017420-if00, windows-laptop: COM5}
+    id: follower
+    calibration: robots/so101_follower/follower.json
+  leader:
+    type: so101_leader
+    port: {default: /dev/serial/by-id/usb-1a86_USB_Single_Serial_5B79016953-if00, windows-laptop: COM6}
+    id: leader
+    calibration: teleoperators/so101_leader/leader.json
+  cameras:
+    camera1:
+      role: wrist
+      path: {default: /dev/v4l/by-id/usb-*ZEB_LIVE_PRO*-video-index0, windows-laptop: 0}
+      width: 800
+      height: 600
+      fps: 30
+      fourcc: MJPG
+    camera2:
+      role: scene
+      path: {default: /dev/video10, windows-laptop: 1}
+      width: 800
+      height: 600
+      fps: 30
+      source: phonecam
+  phonecam: {droidcam_port: 4747, device: /dev/video10}

@@ -1,0 +1,21 @@
+# Models carried over from the minor (the only ones that worked on the robot). Both were trained with the old
+# setup (LeRobot 0.4.3, tag minor-final) on untrimmed data, hence _raw.
+
+groot_cubebox_v1_lora_raw:
+  notes: ~80% placing in the minor robot evaluation (was groot_cubebox_v1_lora).
+  recipe: groot_n15_lora
+  dataset: so101_cubebox_v1_raw
+
+smolvla_cubebox_v0_lora_raw:
+  notes: ~90% placing in the minor, but only in the setup it was recorded in (was smolvla_train_new_1_lora).
+  recipe: smolvla_lora_20k
+  dataset: so101_cubebox_v0_raw
+
+# Not ours: Jack Vial's checkpoint, the model of the DRTC replication experiments (lab/experiments/replication).
+jack_smolvla_cube:
+  status: external
+  hub: jackvial/so101_smolvla_pickplaceorangecube_e100
+  policy: smolvla
+  fps: 60
+  task: Pick up the orange cube and place it on the black X marker with the white background
+  serve: {rtc_enabled: true}

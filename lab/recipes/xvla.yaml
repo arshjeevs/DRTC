@@ -1,0 +1,11 @@
+# Training recipes. `source`: who made this work and where it comes from.
+
+xvla_full_all:
+  source: Full fine-tune with vision and language encoders unfrozen (as for pi0/pi05 openpi style)
+  policy: xvla
+  finetune: full
+  base: lerobot/xvla-base
+  train: {epochs: 10, batch_size: 32, save_freq: 2000}
+  flags: {policy.dtype: bfloat16, policy.action_mode: auto, policy.freeze_vision_encoder: false, policy.freeze_language_encoder: false}
+  serve: {rtc_enabled: false, num_flow_matching_steps: null, actions_per_chunk: 30}
+  cameras: {scene: observation.images.image, wrist: observation.images.image2}

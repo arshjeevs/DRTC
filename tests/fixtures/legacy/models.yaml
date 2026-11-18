@@ -1,0 +1,909 @@
+# Model registry. Experiments refer to models by name (`model: <name>`); `lab/bin/run --model <name>`
+# swaps the model without touching the experiment.
+#
+# pretrained_name_or_path is resolved ON THE LAPTOP (server): a Hugging Face repo id, or a local
+# checkpoint path relative to the laptop repo root, e.g. outputs/train/<run>/checkpoints/last/pretrained_model
+#
+# Naming (checked by lab/bin/list and lab/bin/train; entries in _legacy are exempt):
+#   dataset   orangemoon599/so101_<task>_v<N>[_<variant>]   e.g. so101_cubebox_v1, so101_cubebox_v1_wrist
+#             bump vN whenever the setup changes (camera layout, scene, task wording)
+#   model     <policy>_<task>_v<N>_<full|lora>[_<variant>]   e.g. smolvla_cubebox_v1_lora_ep10
+#             variants: ep10 (episode subset), wrist / scene (camera), r16 (LoRA rank), s40k (steps)
+#   Hub repo  orangemoon599/<model name>: one entry, one repo, never shared
+#
+# Per model:
+#   fps          control rate = fps of the dataset the model was trained on
+#   task         default language instruction: the exact sentence used when recording
+#   rtc_enabled  only for flow-matching policies: smolvla, pi0, pi05
+#   finetune     full (default) or lora. Sent to the policy server, which loads a lora checkpoint as
+#                its base model (recorded in the adapter) + the adapter. lab/bin/train trains this way.
+#   train        (optional) what lab/bin/train trains; the result is pushed to pretrained_name_or_path
+#     dataset      Hub dataset repo id
+#     from         checkpoint to fine-tune (e.g. lerobot/smolvla_base); omit to train policy_type from scratch
+#                  repo@<commit> pins a Hub version: pi0 / pi05 base repos later gained processor
+#                  steps this LeRobot fork lacks; the pinned commits have the same weights and config
+#     steps, batch_size, save_freq   (or epochs: N instead of steps: passes over the training frames)
+#     flags        extra lerobot-train flags for this model, e.g. {policy.dtype: bfloat16}
+#     split        (optional) {total, held_out, seed}: seeded random held-out episodes, used for validation
+#     episodes     with split: a number N (random N of the training episodes); without: explicit
+#                  episodes "0-44", "0-9,20-29" or [0, 1, 2]
+#     lora         (finetune: lora) r (32), alpha (32), dropout (0.05), targets: expert (default) | vlm+expert
+#                  (presets exist for smolvla, pi0, pi05, xvla)
+
+# Entries from before the naming convention (datasets and Hub repos left as they are). Exempt from
+# the naming check; new entries go below the study header.
+_legacy: [jack_smolvla_cube, smolvla_train_1_lora_0, smolvla_train_1_lora_1, smolvla_train_5_full, smolvla_train_5_lora, smolvla_train_6_full, smolvla_train_6_lora, smolvla_train_5_train_6_full, smolvla_train_5_train_6_lora, smolvla_train_new_1_lora, pi05_train_new_1_full, pi0_train_new_1_full, xvla_train_new_1_full, pi05_train_new_1_lora, pi0_train_new_1_lora, xvla_train_new_1_lora, act_train_new_1_full]
+
+jack_smolvla_cube:
+  policy_type: smolvla
+  pretrained_name_or_path: jackvial/so101_smolvla_pickplaceorangecube_e100
+  fps: 60
+  task: Pick up the orange cube and place it on the black X marker with the white background
+  rtc_enabled: true
+
+# The same data with LoRA: compare against smolvla_test_run_1 (full) on the same experiments.
+smolvla_train_1_lora_0:
+  policy_type: smolvla
+  pretrained_name_or_path: orangemoon599/smolvla_train_1_lora
+  finetune: full
+  fps: 30
+  task: Pick the green cube and place it in the box
+  rtc_enabled: true
+  train:
+    dataset: orangemoon599/train_1
+    from: lerobot/smolvla_base
+    steps: 20000
+    batch_size: 128
+    lora: {r: 32, alpha: 32, targets: expert}
+
+smolvla_train_1_lora_1:
+  policy_type: smolvla
+  pretrained_name_or_path: orangemoon599/smolvla_train_1_lora
+  finetune: lora
+  fps: 30
+  task: Pick the green cube and place it in the box
+  rtc_enabled: true
+  train:
+    dataset: orangemoon599/train_1
+    from: lerobot/smolvla_base
+    steps: 20000
+    batch_size: 128
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
+
+smolvla_train_5_full:
+  policy_type: smolvla
+  pretrained_name_or_path: orangemoon599/smolvla_train_5_full
+  finetune: full
+  fps: 30
+  task: Pick the green cube and place it in the box
+  rtc_enabled: true
+  train:
+    dataset: orangemoon599/train_5
+    from: lerobot/smolvla_base
+    steps: 20000
+    batch_size: 64
+
+smolvla_train_5_lora:
+  policy_type: smolvla
+  pretrained_name_or_path: orangemoon599/smolvla_train_5_lora
+  finetune: lora
+  fps: 30
+  task: Pick the green cube and place it in the box
+  rtc_enabled: true
+  train:
+    dataset: orangemoon599/train_5
+    from: lerobot/smolvla_base
+    steps: 20000
+    batch_size: 64
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
+
+smolvla_train_6_full:
+  policy_type: smolvla
+  pretrained_name_or_path: orangemoon599/smolvla_train_6_full
+  finetune: full
+  fps: 30
+  task: Pick the green cube and place it in the box
+  rtc_enabled: true
+  train:
+    dataset: orangemoon599/train_6
+    from: lerobot/smolvla_base
+    steps: 20000
+    batch_size: 64
+
+smolvla_train_6_lora:
+  policy_type: smolvla
+  pretrained_name_or_path: orangemoon599/smolvla_train_6_lora
+  finetune: lora
+  fps: 30
+  task: Pick the green cube and place it in the box
+  rtc_enabled: true
+  train:
+    dataset: orangemoon599/train_6
+    from: lerobot/smolvla_base
+    steps: 20000
+    batch_size: 64
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
+
+smolvla_train_5_train_6_full:
+  policy_type: smolvla
+  pretrained_name_or_path: orangemoon599/train_5_train_6_combined
+  finetune: full
+  fps: 30
+  task: Pick the green cube and place it in the box
+  rtc_enabled: true
+  train:
+    dataset: orangemoon599/train_5_train_6_combined
+    from: lerobot/smolvla_base
+    steps: 20000
+    batch_size: 56
+
+smolvla_train_5_train_6_lora:
+  policy_type: smolvla
+  pretrained_name_or_path: orangemoon599/train_5_train_6_combined
+  finetune: lora
+  fps: 30
+  task: Pick the green cube and place it in the box
+  rtc_enabled: true
+  train:
+    dataset: orangemoon599/train_5_train_6_combined
+    from: lerobot/smolvla_base
+    steps: 40000
+    batch_size: 64
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
+
+smolvla_train_new_1_lora:
+  policy_type: smolvla
+  pretrained_name_or_path: orangemoon599/smolvla_train_new_1_lora
+  finetune: lora
+  fps: 30
+  task: Pick the green cube and place it in the box
+  rtc_enabled: true
+  train:
+    dataset: orangemoon599/train_new_1
+    from: lerobot/smolvla_base
+    steps: 20000
+    batch_size: 64
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
+
+# The base models name their cameras differently, so rename_map maps ours onto theirs: the phone
+# (camera2, scene) to the main view and the Zebronics (camera1, wrist) to a wrist view. The unused
+# third view is masked out by the model.
+# Larger VLAs on the same data. Batch sizes assume a 24 GB+ GPU: lower batch_size if it runs out of memory.
+# pi0 / pi05 need the patched transformers build (pip extra "pi"), in a venv separate from SmolVLA's.
+pi05_train_new_1_full:
+  policy_type: pi05
+  pretrained_name_or_path: orangemoon599/pi05_train_new_1_full
+  finetune: full
+  fps: 30
+  task: Pick the green cube and place it in the box
+  rtc_enabled: true
+  train:
+    dataset: orangemoon599/train_new_1
+    from: lerobot/pi05_base@a538eb273274eb30f126a118f39dbc0ee212c883
+    steps: 6000
+    batch_size: 32
+    save_freq: 2000
+    # train_expert_only freezes the PaliGemma VLM (as SmolVLA does); set false to train everything (40 GB+).
+    flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true, policy.train_expert_only: true, rename_map: {observation.images.camera2: observation.images.base_0_rgb, observation.images.camera1: observation.images.right_wrist_0_rgb}}
+
+pi0_train_new_1_full:
+  policy_type: pi0
+  pretrained_name_or_path: orangemoon599/pi0_train_new_1_full
+  finetune: full
+  fps: 30
+  task: Pick the green cube and place it in the box
+  rtc_enabled: true
+  train:
+    dataset: orangemoon599/train_new_1
+    from: lerobot/pi0_base@26b99b9439acb1e352439e34ee9c67af0d76efa3
+    steps: 6000
+    batch_size: 32
+    save_freq: 2000
+    flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true, policy.train_expert_only: true, rename_map: {observation.images.camera2: observation.images.base_0_rgb, observation.images.camera1: observation.images.right_wrist_0_rgb}}
+
+# X-VLA trains here, but the policy server does not serve it yet (not in SUPPORTED_POLICIES).
+xvla_train_new_1_full:
+  policy_type: xvla
+  pretrained_name_or_path: orangemoon599/xvla_train_new_1_full
+  finetune: full
+  fps: 30
+  task: Pick the green cube and place it in the box
+  rtc_enabled: false
+  num_flow_matching_steps: null
+  actions_per_chunk: 30          # X-VLA's chunk_size is 30 (the run default asks for 50)
+  train:
+    dataset: orangemoon599/train_new_1
+    from: lerobot/xvla-base
+    steps: 20000
+    batch_size: 16
+    flags: {policy.dtype: bfloat16, policy.action_mode: auto, rename_map: {observation.images.camera2: observation.images.image, observation.images.camera1: observation.images.image2}}
+
+# LoRA versions. targets: vlm+expert also adapts the language backbone (the point of LoRA on these
+# models); use targets: expert, or a smaller batch_size, if the GPU runs out of memory.
+pi05_train_new_1_lora:
+  policy_type: pi05
+  pretrained_name_or_path: orangemoon599/pi05_train_new_1_lora
+  finetune: lora
+  fps: 30
+  task: Pick the green cube and place it in the box
+  rtc_enabled: true
+  train:
+    dataset: orangemoon599/train_new_1
+    from: lerobot/pi05_base@a538eb273274eb30f126a118f39dbc0ee212c883
+    steps: 6000
+    batch_size: 16
+    save_freq: 2000
+    flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true, rename_map: {observation.images.camera2: observation.images.base_0_rgb, observation.images.camera1: observation.images.right_wrist_0_rgb}}
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: vlm+expert}
+
+pi0_train_new_1_lora:
+  policy_type: pi0
+  pretrained_name_or_path: orangemoon599/pi0_train_new_1_lora
+  finetune: lora
+  fps: 30
+  task: Pick the green cube and place it in the box
+  rtc_enabled: true
+  train:
+    dataset: orangemoon599/train_new_1
+    from: lerobot/pi0_base@26b99b9439acb1e352439e34ee9c67af0d76efa3
+    steps: 6000
+    batch_size: 16
+    save_freq: 2000
+    flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true, rename_map: {observation.images.camera2: observation.images.base_0_rgb, observation.images.camera1: observation.images.right_wrist_0_rgb}}
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: vlm+expert}
+
+xvla_train_new_1_lora:
+  policy_type: xvla
+  pretrained_name_or_path: orangemoon599/xvla_train_new_1_lora
+  finetune: lora
+  fps: 30
+  task: Pick the green cube and place it in the box
+  rtc_enabled: false
+  num_flow_matching_steps: null
+  actions_per_chunk: 30          # X-VLA's chunk_size is 30 (the run default asks for 50)
+  train:
+    dataset: orangemoon599/train_new_1
+    from: lerobot/xvla-base
+    steps: 20000
+    batch_size: 16
+    save_freq: 5000
+    flags: {policy.dtype: bfloat16, policy.action_mode: auto, rename_map: {observation.images.camera2: observation.images.image, observation.images.camera1: observation.images.image2}}
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: vlm+expert}
+
+# ACT: small (~50M), trained from scratch (ImageNet ResNet18 backbone). No language input, no RTC.
+# Small enough for CPU inference on the Pi: the candidate edge-fallback policy.
+act_train_new_1_full:
+  policy_type: act
+  pretrained_name_or_path: orangemoon599/act_train_new_1_full
+  finetune: full
+  fps: 30
+  task: Pick the green cube and place it in the box
+  rtc_enabled: false
+  num_flow_matching_steps: null
+  train:
+    dataset: orangemoon599/train_new_1
+    steps: 40000
+    batch_size: 64
+    save_freq: 10000
+
+# ===================================================================================================
+# Study on so101_cubebox_v1 (lab/PROPOSAL.md). Dataset, task and split are set ONCE here; every entry
+# below refers to them.
+# ===================================================================================================
+_study:
+  dataset: &study_ds orangemoon599/so101_cubebox_v1
+  # lab/bin/ablate-cameras orangemoon599/so101_cubebox_v1 scene  creates this single-camera copy
+  scene_only: &study_ds_scene orangemoon599/so101_cubebox_v1_scene   # camera2 (phone, scene) only
+  # Must be the dataset's exact sentence (meta/tasks.parquet): the robot sends this one at run time.
+  task: &study_task Pick up the green cube and put it inside the box.
+  # 110 episodes: 10 picked at random (seed 0) are held out for validation (eval/val_loss in wandb),
+  # the other 100 train. `episodes: N` in an entry trains on a random N of those 100 (nested subsets).
+  # lab/bin/train refuses to start until the dataset has all 110 episodes.
+  split: &study_split {total: 110, held_out: 10, seed: 0}
+  # Training length in epochs (passes over the training frames), so data subsets keep the same
+  # repetition: SmolVLA 45 (= LeRobot's official 20k steps x batch 64 for 100 episodes),
+  # pi0 / pi05 / X-VLA 10 (large pretrained models; community LoRA runs ~5-35), ACT 100 (trained
+  # from scratch). lab/bin/train converts to steps.
+  pi_cameras: &pi_rename {observation.images.camera2: observation.images.base_0_rgb, observation.images.camera1: observation.images.right_wrist_0_rgb}
+  xvla_cameras: &xvla_rename {observation.images.camera2: observation.images.image, observation.images.camera1: observation.images.image2}
+
+# --- SmolVLA: full vs LoRA (item 14); smolvla_cubebox_v1_lora is the reference for every study ---
+smolvla_cubebox_v1_full:
+  policy_type: smolvla
+  pretrained_name_or_path: orangemoon599/smolvla_cubebox_v1_full
+  finetune: full
+  fps: 30
+  task: *study_task
+  rtc_enabled: true
+  train:
+    dataset: *study_ds
+    split: *study_split
+    from: lerobot/smolvla_base
+    epochs: 45
+    batch_size: 64
+    save_freq: 1000      # ~2.4 epochs: stop (Ctrl-C) once val_loss rises; lab/bin/train <model> --push <best>
+
+smolvla_cubebox_v1_lora:
+  policy_type: smolvla
+  pretrained_name_or_path: orangemoon599/smolvla_cubebox_v1_lora
+  finetune: lora
+  fps: 30
+  task: *study_task
+  rtc_enabled: true
+  train:
+    dataset: *study_ds
+    split: *study_split
+    from: lerobot/smolvla_base
+    epochs: 45
+    batch_size: 64
+    save_freq: 1000      # ~2.4 epochs: stop (Ctrl-C) once val_loss rises; lab/bin/train <model> --push <best>
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
+
+# --- Data efficiency (item 15): same recipe and epochs, random 10 / 25 / 50 of the 100 training episodes ---
+smolvla_cubebox_v1_lora_ep10:
+  policy_type: smolvla
+  pretrained_name_or_path: orangemoon599/smolvla_cubebox_v1_lora_ep10
+  finetune: lora
+  fps: 30
+  task: *study_task
+  rtc_enabled: true
+  train:
+    dataset: *study_ds
+    split: *study_split
+    episodes: 10
+    from: lerobot/smolvla_base
+    epochs: 45
+    batch_size: 64
+    save_freq: 100    # same ~2.4 epochs as 1000 steps on all 100 episodes
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
+
+smolvla_cubebox_v1_lora_ep25:
+  policy_type: smolvla
+  pretrained_name_or_path: orangemoon599/smolvla_cubebox_v1_lora_ep25
+  finetune: lora
+  fps: 30
+  task: *study_task
+  rtc_enabled: true
+  train:
+    dataset: *study_ds
+    split: *study_split
+    episodes: 25
+    from: lerobot/smolvla_base
+    epochs: 45
+    batch_size: 64
+    save_freq: 250    # same ~2.4 epochs as 1000 steps on all 100 episodes
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
+
+smolvla_cubebox_v1_lora_ep50:
+  policy_type: smolvla
+  pretrained_name_or_path: orangemoon599/smolvla_cubebox_v1_lora_ep50
+  finetune: lora
+  fps: 30
+  task: *study_task
+  rtc_enabled: true
+  train:
+    dataset: *study_ds
+    split: *study_split
+    episodes: 50
+    from: lerobot/smolvla_base
+    epochs: 45
+    batch_size: 64
+    save_freq: 500    # same ~2.4 epochs as 1000 steps on all 100 episodes
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
+
+# --- Camera ablation (item 16): same recipe, scene camera only (vs both in smolvla_cubebox_v1_lora) ---
+smolvla_cubebox_v1_lora_scene:
+  policy_type: smolvla
+  pretrained_name_or_path: orangemoon599/smolvla_cubebox_v1_lora_scene
+  finetune: lora
+  fps: 30
+  task: *study_task
+  rtc_enabled: true
+  train:
+    dataset: *study_ds_scene
+    split: *study_split
+    from: lerobot/smolvla_base
+    epochs: 45
+    batch_size: 64
+    save_freq: 1000      # ~2.4 epochs: stop (Ctrl-C) once val_loss rises; lab/bin/train <model> --push <best>
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
+
+# --- Model comparison (item 13) ---
+act_cubebox_v1_full:
+  policy_type: act
+  pretrained_name_or_path: orangemoon599/act_cubebox_v1_full
+  finetune: full
+  fps: 30
+  task: *study_task
+  rtc_enabled: false
+  num_flow_matching_steps: null
+  train: {dataset: *study_ds, split: *study_split, epochs: 100, batch_size: 64, save_freq: 10000}
+
+xvla_cubebox_v1_lora:
+  policy_type: xvla
+  pretrained_name_or_path: orangemoon599/xvla_cubebox_v1_lora
+  finetune: lora
+  fps: 30
+  task: *study_task
+  rtc_enabled: false
+  num_flow_matching_steps: null
+  actions_per_chunk: 30          # X-VLA's chunk_size is 30 (the run default asks for 50)
+  train:
+    dataset: *study_ds
+    split: *study_split
+    from: lerobot/xvla-base
+    epochs: 10
+    batch_size: 32
+    flags: {policy.dtype: bfloat16, policy.action_mode: auto, rename_map: *xvla_rename}
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: vlm+expert}
+
+pi0_cubebox_v1_lora:           # H200 / A100; served from a server GPU (too big for the 8 GB laptop)
+  policy_type: pi0
+  pretrained_name_or_path: orangemoon599/pi0_cubebox_v1_lora
+  finetune: lora
+  fps: 30
+  task: *study_task
+  rtc_enabled: true
+  train:
+    dataset: *study_ds
+    split: *study_split
+    from: lerobot/pi0_base@26b99b9439acb1e352439e34ee9c67af0d76efa3
+    epochs: 10
+    batch_size: 32
+    save_freq: 2000
+    flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true, rename_map: *pi_rename}
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: vlm+expert}
+
+pi05_cubebox_v1_lora:          # H200 / A100; served from a server GPU (too big for the 8 GB laptop)
+  policy_type: pi05
+  pretrained_name_or_path: orangemoon599/pi05_cubebox_v1_lora
+  finetune: lora
+  fps: 30
+  task: *study_task
+  rtc_enabled: true
+  train:
+    dataset: *study_ds
+    split: *study_split
+    from: lerobot/pi05_base@a538eb273274eb30f126a118f39dbc0ee212c883
+    epochs: 10
+    batch_size: 32
+    save_freq: 2000
+    flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true, rename_map: *pi_rename}
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: vlm+expert}
+
+# --- New architectures (major project). LoRA, one shared setup: models trained from scratch (DOT,
+# Diffusion Policy, Streaming Flow Policy) put LoRA on their only pretrained part, the ImageNet ResNet18,
+# and train the rest in full (DOT's recipe; built from config, no base checkpoint). Pretrained models
+# (GR00T, pi0-FAST) put it on the model as pi0 does. Each fits ~2-5 h alone on the H200 (lab/H200.md);
+# train further later with: lab/bin/train <model> --resume --epochs=<new total>.
+
+# DOT (github.com/IliaLarchenko/dot_policy): 14M-parameter decoder-only transformer.
+# The author's real-task recipe: ~50 epochs at batch 12, LR 3e-5 -> 1e-5 (defaults in configuration_dot.py).
+# Each sample decodes a ~0.7 s video window (look-back frame), ~3x ACT's data loading: use --num_workers=8.
+dot_cubebox_v1_lora:
+  policy_type: dot
+  pretrained_name_or_path: orangemoon599/dot_cubebox_v1_lora
+  finetune: lora
+  fps: 30
+  task: *study_task
+  rtc_enabled: false
+  num_flow_matching_steps: null
+  train:
+    dataset: *study_ds
+    split: *study_split
+    epochs: 50
+    batch_size: 12
+    save_freq: 10000
+    flags: {policy.lora_rank: 0}   # the model's own backbone LoRA off: the LoRA pipeline adds it
+    lora: {r: 20, alpha: 20, dropout: 0.0, targets: backbone}
+
+# Ablation from the DOT report: the same with the ResNet trained in full (the author saw it overfit).
+dot_cubebox_v1_full:
+  policy_type: dot
+  pretrained_name_or_path: orangemoon599/dot_cubebox_v1_full
+  finetune: full
+  fps: 30
+  task: *study_task
+  rtc_enabled: false
+  num_flow_matching_steps: null
+  train:
+    dataset: *study_ds
+    split: *study_split
+    epochs: 50
+    batch_size: 12
+    save_freq: 10000
+    flags: {policy.lora_rank: 0}
+
+# pi0-FAST (Physical Intelligence; LeRobot v0.4.4 code): PaliGemma 3B decoding FAST action tokens one by one
+# (autoregressive: inference time grows with the chunk's token count, unlike pi0's flow matching).
+# Base pinned before the processor changes our LeRobot can't load (same weights as the latest revision).
+pi0fast_cubebox_v1_lora:       # H200 / A100; served from a server GPU
+  policy_type: pi0_fast
+  pretrained_name_or_path: orangemoon599/pi0fast_cubebox_v1_lora
+  finetune: lora
+  fps: 30
+  task: *study_task
+  rtc_enabled: false
+  train:
+    dataset: *study_ds
+    split: *study_split
+    from: lerobot/pi0fast-base@80f748308df08d1b3a6b480cabe039a35b2e6685
+    epochs: 10
+    batch_size: 32
+    save_freq: 2000
+    flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true, rename_map: *pi_rename}
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: vlm}
+
+# Diffusion Policy (Chi et al. 2023; in LeRobot): ResNet18 + 1D U-Net, trained from scratch like ACT.
+# DDIM, so the number of denoising steps can be changed at inference: the latency dial (10 here; 100 =
+# DDPM-like). Frames 600x800 -> 240x320 -> random 216x288 crop (LeRobot's 84x84 default is for 96x96 sim).
+# horizon 32 / 16 executed actions at 30 fps (~0.5 s); 2 observation steps.
+diffusion_cubebox_v1_lora:
+  policy_type: diffusion
+  pretrained_name_or_path: orangemoon599/diffusion_cubebox_v1_lora
+  finetune: lora
+  fps: 30
+  task: *study_task
+  rtc_enabled: false
+  num_flow_matching_steps: null
+  actions_per_chunk: 16          # the model predicts 16 actions per chunk (run default asks for 50)
+  s_min: 8                       # must stay below actions_per_chunk (default 20): next request at half a chunk
+  train:
+    dataset: *study_ds
+    split: *study_split
+    epochs: 100
+    batch_size: 64
+    save_freq: 10000
+    flags:
+      policy.resize_shape: [240, 320]
+      policy.crop_shape: [216, 288]
+      policy.pretrained_backbone_weights: ResNet18_Weights.IMAGENET1K_V1
+      policy.use_group_norm: false
+      policy.horizon: 32
+      policy.n_action_steps: 16
+      policy.drop_n_last_frames: 15
+      policy.noise_scheduler_type: DDIM
+      policy.num_inference_steps: 10
+    lora: {r: 20, alpha: 20, dropout: 0.0, targets: backbone}
+
+# Streaming Flow Policy (Jiang et al. 2025, arXiv:2505.21851; LeRobot code from Liyux3/lerobot_MLP-SFP):
+# learns a velocity field over the action trajectory and Euler-integrates it from the current state, one
+# step per emitted action (no denoising loop). Same encoder, frames, history and chunk as
+# diffusion_cubebox_v1_lora, so the two differ only in how actions are generated.
+sfp_cubebox_v1_lora:
+  policy_type: sfp
+  pretrained_name_or_path: orangemoon599/sfp_cubebox_v1_lora
+  finetune: lora
+  fps: 30
+  task: *study_task
+  rtc_enabled: false
+  num_flow_matching_steps: null
+  actions_per_chunk: 16          # the model predicts 16 actions per chunk (run default asks for 50)
+  s_min: 8                       # must stay below actions_per_chunk (default 20): next request at half a chunk
+  train:
+    dataset: *study_ds
+    split: *study_split
+    epochs: 100
+    batch_size: 64
+    save_freq: 10000
+    flags:
+      policy.resize_shape: [240, 320]
+      policy.crop_shape: [216, 288]
+      policy.n_obs_steps: 2
+      policy.horizon: 33
+      policy.n_action_steps: 16
+    lora: {r: 20, alpha: 20, dropout: 0.0, targets: backbone}
+
+# GR00T N1.5 (NVIDIA, 3B; in LeRobot): Eagle 2.5 VLM + flow-matching DiT action head. NVIDIA's fine-tune
+# recipe keeps the VLM frozen; here LoRA on the action head's transformers, its encoders/decoders in full.
+# Chunks are at most 16 actions (the pretrained action head). Own venv (.venv-groot, made on first use);
+# no flash-attn needed (falls back to PyTorch SDPA). H200 / A100.
+groot_cubebox_v1_lora:
+  policy_type: groot
+  pretrained_name_or_path: orangemoon599/groot_cubebox_v1_lora
+  finetune: lora
+  fps: 30
+  task: *study_task
+  rtc_enabled: false
+  num_flow_matching_steps: null
+  actions_per_chunk: 16          # the model predicts 16 actions per chunk (run default asks for 50)
+  s_min: 8                       # must stay below actions_per_chunk (default 20): next request at half a chunk
+  train:
+    dataset: *study_ds
+    split: *study_split
+    epochs: 10
+    batch_size: 32
+    save_freq: 2000
+    flags: {policy.chunk_size: 16, policy.n_action_steps: 16}
+    lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
+
+# MolmoAct2 (Allen AI, arXiv:2605.02881; https://huggingface.co/docs/lerobot/en/molmoact2): Molmo2-ER VLM +
+# flow-matching action expert conditioned on the VLM's per-layer key/values; up to 30 actions per chunk.
+# Fine-tuned from lerobot/MolmoAct2-SO100_101-LeRobot: already trained on SO-100/101 arms, in LeRobot format,
+# with the SO101 joint-calibration correction (joint_signs / joint_offsets) built into its processor.
+# NOT TRAINABLE YET: lerobot.policies.molmoact2 is in upstream LeRobot, not in this one (0.4.3); it has to be
+# ported first (like DOT / pi0-FAST), probably in its own venv (upstream `molmoact2` extra).
+# - The VLM is LoRA-trained by the policy itself (checkpoint: rank 64, alpha 16; the docs advise not to override
+#   policy.train_mode_vlm when loading this way), the action expert in full. The saved checkpoint is the whole
+#   model, so for the lab it is `finetune: full` (no lab LoRA adapter).
+# - ~22 GB per checkpoint: few saves (save_freq), and delete outputs/train/<model> once it is on the Hub.
+# - Normalization: quantiles (q01/q99), which our dataset's stats.json already has.
+# - Cameras: the checkpoint has cam0 / cam1 (two external views); ours are scene (camera2) and wrist (camera1).
+molmoact2_cubebox_v1_full:     # H200 / A100; served from a server GPU
+  policy_type: molmoact2
+  pretrained_name_or_path: orangemoon599/molmoact2_cubebox_v1_full
+  finetune: full
+  fps: 30
+  task: *study_task
+  rtc_enabled: false
+  num_flow_matching_steps: null
+  actions_per_chunk: 30          # the checkpoint's chunk_size (run default asks for 50)
+  train:
+    dataset: *study_ds
+    split: *study_split
+    from: lerobot/MolmoAct2-SO100_101-LeRobot@a4ab68081b84bb0659d96f454edbce6abbe8a1cd
+    epochs: 10                     # docs: batch 16-32 for datasets under ~200 demos
+    batch_size: 32
+    save_freq: 4000                # 22 GB each: checkpoints at 4000, 8000 and the end
+    flags:
+      policy.dtype: bfloat16       # bf16 VLM matrices, fp32 action expert
+      policy.gradient_checkpointing: true
+      rename_map: {observation.images.camera2: observation.images.cam0, observation.images.camera1: observation.images.cam1}
+
+# ===================================================================================================
+# Trimmed dataset: full fine-tuning of every model. From now on a dataset is trimmed before training
+# (idle lead-in / tail cropped, bad takes deleted) and only the trimmed copy is trained on.
+#   lab/bin/edit-dataset orangemoon599/so101_cubebox_v1          edit the local copy so101_cubebox_v1_trim
+#   lab/bin/edit-dataset orangemoon599/so101_cubebox_v1_trim --push   push it to the Hub before training
+# The entries above (untrimmed v1) are kept as they are; these are separate models and Hub repos (_trim).
+# Same epochs / batch size as the LoRA entries above, so trimmed+full vs. untrimmed+LoRA differ only in
+# those two factors. Training length is in epochs, so the step count follows the trimmed frame count.
+# ===================================================================================================
+_trim:
+  dataset: &trim_ds orangemoon599/so101_cubebox_v1_trim
+  # total MUST be the trimmed copy's episode count: set it after deleting episodes in the editor
+  # (lab/bin/train refuses to start while it is higher than the dataset's count). 10 held out (seed 0).
+  split: &trim_split {total: 110, held_out: 10, seed: 0}
+
+# SmolVLA: LeRobot's fine-tuning recipe (VLM and vision encoder frozen, action expert + projections trained),
+# the same as smolvla_cubebox_v1_full; set policy.train_expert_only: false to also train the VLM.
+smolvla_cubebox_v1_full_trim:
+  policy_type: smolvla
+  pretrained_name_or_path: orangemoon599/smolvla_cubebox_v1_full_trim
+  finetune: full
+  fps: 30
+  task: *study_task
+  rtc_enabled: true
+  train:
+    dataset: *trim_ds
+    split: *trim_split
+    from: lerobot/smolvla_base
+    epochs: 45
+    batch_size: 64
+    save_freq: 1000      # stop (Ctrl-C) once val_loss rises; lab/bin/train <model> --push <best>
+
+act_cubebox_v1_full_trim:
+  policy_type: act
+  pretrained_name_or_path: orangemoon599/act_cubebox_v1_full_trim
+  finetune: full
+  fps: 30
+  task: *study_task
+  rtc_enabled: false
+  num_flow_matching_steps: null
+  train: {dataset: *trim_ds, split: *trim_split, epochs: 100, batch_size: 64, save_freq: 10000}
+
+# pi0 / pi0.5 / pi0-FAST / X-VLA: everything trained (openpi-style full fine-tune: VLM, vision encoder and
+# action expert), bf16 + gradient checkpointing. ~40-60 GB per job on the H200: fewer jobs in parallel.
+xvla_cubebox_v1_full_trim:
+  policy_type: xvla
+  pretrained_name_or_path: orangemoon599/xvla_cubebox_v1_full_trim
+  finetune: full
+  fps: 30
+  task: *study_task
+  rtc_enabled: false
+  num_flow_matching_steps: null
+  actions_per_chunk: 30          # X-VLA's chunk_size is 30 (the run default asks for 50)
+  train:
+    dataset: *trim_ds
+    split: *trim_split
+    from: lerobot/xvla-base
+    epochs: 10
+    batch_size: 32
+    save_freq: 2000
+    flags: {policy.dtype: bfloat16, policy.action_mode: auto, policy.freeze_vision_encoder: false, policy.freeze_language_encoder: false, rename_map: *xvla_rename}
+
+pi0_cubebox_v1_full_trim:      # H200 / A100; served from a server GPU (too big for the 8 GB laptop)
+  policy_type: pi0
+  pretrained_name_or_path: orangemoon599/pi0_cubebox_v1_full_trim
+  finetune: full
+  fps: 30
+  task: *study_task
+  rtc_enabled: true
+  train:
+    dataset: *trim_ds
+    split: *trim_split
+    from: lerobot/pi0_base@26b99b9439acb1e352439e34ee9c67af0d76efa3
+    epochs: 10
+    batch_size: 32
+    save_freq: 2000
+    flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true, policy.train_expert_only: false, policy.freeze_vision_encoder: false, rename_map: *pi_rename}
+
+pi05_cubebox_v1_full_trim:     # H200 / A100; served from a server GPU (too big for the 8 GB laptop)
+  policy_type: pi05
+  pretrained_name_or_path: orangemoon599/pi05_cubebox_v1_full_trim
+  finetune: full
+  fps: 30
+  task: *study_task
+  rtc_enabled: true
+  train:
+    dataset: *trim_ds
+    split: *trim_split
+    from: lerobot/pi05_base@a538eb273274eb30f126a118f39dbc0ee212c883
+    epochs: 10
+    batch_size: 32
+    save_freq: 2000
+    flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true, policy.train_expert_only: false, policy.freeze_vision_encoder: false, rename_map: *pi_rename}
+
+pi0fast_cubebox_v1_full_trim:  # H200 / A100; served from a server GPU
+  policy_type: pi0_fast
+  pretrained_name_or_path: orangemoon599/pi0fast_cubebox_v1_full_trim
+  finetune: full
+  fps: 30
+  task: *study_task
+  rtc_enabled: false
+  train:
+    dataset: *trim_ds
+    split: *trim_split
+    from: lerobot/pi0fast-base@80f748308df08d1b3a6b480cabe039a35b2e6685
+    epochs: 10
+    batch_size: 32
+    save_freq: 2000
+    flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true, rename_map: *pi_rename}
+
+# DOT, Diffusion Policy, SFP: everything trained, ImageNet ResNet18 included (no backbone LoRA).
+dot_cubebox_v1_full_trim:
+  policy_type: dot
+  pretrained_name_or_path: orangemoon599/dot_cubebox_v1_full_trim
+  finetune: full
+  fps: 30
+  task: *study_task
+  rtc_enabled: false
+  num_flow_matching_steps: null
+  train:
+    dataset: *trim_ds
+    split: *trim_split
+    epochs: 50
+    batch_size: 12
+    save_freq: 10000
+    flags: {policy.lora_rank: 0}
+
+diffusion_cubebox_v1_full_trim:
+  policy_type: diffusion
+  pretrained_name_or_path: orangemoon599/diffusion_cubebox_v1_full_trim
+  finetune: full
+  fps: 30
+  task: *study_task
+  rtc_enabled: false
+  num_flow_matching_steps: null
+  actions_per_chunk: 16
+  s_min: 8
+  train:
+    dataset: *trim_ds
+    split: *trim_split
+    epochs: 100
+    batch_size: 64
+    save_freq: 10000
+    flags:
+      policy.resize_shape: [240, 320]
+      policy.crop_shape: [216, 288]
+      policy.pretrained_backbone_weights: ResNet18_Weights.IMAGENET1K_V1
+      policy.use_group_norm: false
+      policy.horizon: 32
+      policy.n_action_steps: 16
+      policy.drop_n_last_frames: 15
+      policy.noise_scheduler_type: DDIM
+      policy.num_inference_steps: 10
+
+sfp_cubebox_v1_full_trim:
+  policy_type: sfp
+  pretrained_name_or_path: orangemoon599/sfp_cubebox_v1_full_trim
+  finetune: full
+  fps: 30
+  task: *study_task
+  rtc_enabled: false
+  num_flow_matching_steps: null
+  actions_per_chunk: 16
+  s_min: 8
+  train:
+    dataset: *trim_ds
+    split: *trim_split
+    epochs: 100
+    batch_size: 64
+    save_freq: 10000
+    flags:
+      policy.resize_shape: [240, 320]
+      policy.crop_shape: [216, 288]
+      policy.n_obs_steps: 2
+      policy.horizon: 33
+      policy.n_action_steps: 16
+
+# GR00T N1.5: NVIDIA's fine-tune recipe (groot_finetune_script.py): Eagle VLM and vision tower frozen,
+# projector + flow-matching DiT action head trained in full (no LoRA). Own venv (.venv-groot).
+groot_cubebox_v1_full_trim:
+  policy_type: groot
+  pretrained_name_or_path: orangemoon599/groot_cubebox_v1_full_trim
+  finetune: full
+  fps: 30
+  task: *study_task
+  rtc_enabled: false
+  num_flow_matching_steps: null
+  actions_per_chunk: 16
+  s_min: 8
+  train:
+    dataset: *trim_ds
+    split: *trim_split
+    epochs: 10
+    batch_size: 32
+    save_freq: 2000
+    flags: {policy.chunk_size: 16, policy.n_action_steps: 16, policy.tune_llm: false, policy.tune_visual: false, policy.tune_projector: true, policy.tune_diffusion_model: true}
+
+# MolmoAct2: NOT TRAINABLE YET (port needed; see molmoact2_cubebox_v1_full). Already "full" by design.
+molmoact2_cubebox_v1_full_trim:  # H200 / A100; served from a server GPU
+  policy_type: molmoact2
+  pretrained_name_or_path: orangemoon599/molmoact2_cubebox_v1_full_trim
+  finetune: full
+  fps: 30
+  task: *study_task
+  rtc_enabled: false
+  num_flow_matching_steps: null
+  actions_per_chunk: 30
+  train:
+    dataset: *trim_ds
+    split: *trim_split
+    from: lerobot/MolmoAct2-SO100_101-LeRobot@a4ab68081b84bb0659d96f454edbce6abbe8a1cd
+    epochs: 10
+    batch_size: 32
+    save_freq: 4000
+    flags:
+      policy.dtype: bfloat16
+      policy.gradient_checkpointing: true
+      rename_map: {observation.images.camera2: observation.images.cam0, observation.images.camera1: observation.images.cam1}
+
+# GR00T N1.7 (NVIDIA, nvidia/GR00T-N1.7-3B): Qwen3-VL backbone + flow-matching DiT action head, 40-action chunks
+# by default (N1.5: 16), RTC support built in. NOT TRAINABLE YET: in upstream LeRobot (>= 0.6, which dropped N1.5),
+# not in this one (0.4.3); it needs transformers >= 5 (Qwen3-VL), so the port goes in its own venv like .venv-groot.
+# Recipe below = NVIDIA's (VLM frozen; projector, VL layer norm and DiT trained), the same as upstream's defaults.
+# GR00T N1.6 is in neither LeRobot (only NVIDIA's Isaac-GR00T and LoongForge), so it has no entry.
+grootn17_cubebox_v1_full_trim:   # H200 / A100; served from a server GPU
+  policy_type: groot_n17
+  pretrained_name_or_path: orangemoon599/grootn17_cubebox_v1_full_trim
+  finetune: full
+  fps: 30
+  task: *study_task
+  rtc_enabled: false
+  num_flow_matching_steps: null
+  actions_per_chunk: 40          # N1.7's chunk_size (run default asks for 50)
+  train:
+    dataset: *trim_ds
+    split: *trim_split
+    from: nvidia/GR00T-N1.7-3B
+    epochs: 10
+    batch_size: 32
+    save_freq: 2000
+    flags: {policy.chunk_size: 40, policy.n_action_steps: 40, policy.embodiment_tag: new_embodiment, policy.tune_llm: false, policy.tune_visual: false, policy.tune_projector: true, policy.tune_diffusion_model: true}
+
+# Template for our own models:
+# smolvla_cube_v1:
+#   policy_type: smolvla
+#   pretrained_name_or_path: <hf_user>/smolvla_cube_v1
+#   fps: 30
+#   task: <exact sentence used when recording>
+#   rtc_enabled: true
+#
+# act_cube_v1:
+#   policy_type: act
+#   pretrained_name_or_path: outputs/train/act_cube_v1/checkpoints/last/pretrained_model
+#   fps: 30
+#   task: <exact sentence used when recording>
+#   rtc_enabled: false
+#   num_flow_matching_steps: null

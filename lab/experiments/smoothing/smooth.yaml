@@ -1,4 +1,4 @@
 # Method C: smoothness guidance (server; rtc_guidance.smoothness_step)
 description: Jerk penalty applied to the predicted chunk at every denoising step
-model: groot_cubebox_v1_lora
+model: groot_cubebox_v1_lora_raw
 smoothness_guidance: 0.5

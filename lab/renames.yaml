@@ -1,0 +1,20 @@
+# Renames of the clean start (2026-11-18), on the Hub and locally. Old names on the Hub redirect to the new
+# ones until a new repo takes the old name. Used to map old results and configs to the new names.
+# Log of the operations: ~/Projects/drtc-snapshots/minor-final-2026-11-18/rename_hub.log
+datasets:
+  so101_cubebox_v1: so101_cubebox_v1_raw      # the untrimmed recording
+  so101_cubebox_v1_trim: so101_cubebox_v1     # trimmed: the v1 from now on
+  train_new_1: so101_cubebox_v0_raw
+models:
+  groot_cubebox_v1_lora: groot_cubebox_v1_lora_raw        # kept
+  smolvla_train_new_1_lora: smolvla_cubebox_v0_lora_raw   # kept
+  act_cubebox_v1_full: act_cubebox_v1_full_raw
+  smolvla_cubebox_v1_lora: smolvla_cubebox_v1_lora_raw
+  pi05_cubebox_v1_lora: pi05_cubebox_v1_lora_raw
+  xvla_cubebox_v1_lora: xvla_cubebox_v1_lora_raw
+  pi0fast_cubebox_v1_lora: pi0fast_cubebox_v1_lora_raw
+  diffusion_cubebox_v1_lora: diffusion_cubebox_v1_lora_raw
+  sfp_cubebox_v1_lora: sfp_cubebox_v1_lora_raw
+  dot_cubebox_v1_lora: dot_cubebox_v1_lora_raw
+deleted:
+  datasets: [so101_cubebox_v1_scene]   # camera ablation of the untrimmed v1; regenerate from v1 when needed

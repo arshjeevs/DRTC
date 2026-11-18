@@ -2,4 +2,4 @@
 # Same model and task in every file; one method changes at a time, then all together.
 # Compare with: lab/bin/analyze --experiment smoothing/... (stall %, jerk, max step, success)
 description: Reference for the smoothing study; fixed playback, no RTC, no smoothness guidance
-model: groot_cubebox_v1_lora
+model: groot_cubebox_v1_lora_raw

@@ -1,0 +1,7 @@
+# Training recipes. `source`: who made this work and where it comes from.
+
+act_100ep:
+  policy: act
+  finetune: full
+  train: {epochs: 100, batch_size: 64, save_freq: 10000}
+  serve: {rtc_enabled: false, num_flow_matching_steps: null}

@@ -1,0 +1,18 @@
+# Training recipes. `source`: who made this work and where it comes from.
+
+groot_n15_lora:
+  source: 'Our LoRA preset on the action expert (minor: ~80% placing on so101_cubebox_v1)'
+  policy: groot
+  finetune: lora
+  train: {epochs: 10, batch_size: 32, save_freq: 2000}
+  flags: {policy.chunk_size: 16, policy.n_action_steps: 16}
+  lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
+  serve: {rtc_enabled: false, num_flow_matching_steps: null, actions_per_chunk: 16, s_min: 8}
+groot_n15_nvidia:
+  source: 'NVIDIA''s GR00T N1.5 fine-tuning recipe: projector + DiT action head trained, LLM and vision encoder frozen'
+  policy: groot
+  finetune: full
+  train: {epochs: 10, batch_size: 32, save_freq: 2000}
+  flags: {policy.chunk_size: 16, policy.n_action_steps: 16, policy.tune_llm: false, policy.tune_visual: false, policy.tune_projector: true,
+    policy.tune_diffusion_model: true}
+  serve: {rtc_enabled: false, num_flow_matching_steps: null, actions_per_chunk: 16, s_min: 8}

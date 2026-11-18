@@ -1,0 +1,17 @@
+# Training recipes. `source`: who made this work and where it comes from.
+
+diffusion_full:
+  policy: diffusion
+  finetune: full
+  train: {epochs: 100, batch_size: 64, save_freq: 10000}
+  flags:
+    policy.resize_shape: [240, 320]
+    policy.crop_shape: [216, 288]
+    policy.pretrained_backbone_weights: ResNet18_Weights.IMAGENET1K_V1
+    policy.use_group_norm: false
+    policy.horizon: 32
+    policy.n_action_steps: 16
+    policy.drop_n_last_frames: 15
+    policy.noise_scheduler_type: DDIM
+    policy.num_inference_steps: 10
+  serve: {rtc_enabled: false, num_flow_matching_steps: null, actions_per_chunk: 16, s_min: 8}

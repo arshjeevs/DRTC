@@ -1,0 +1,16 @@
+# Training recipes. `source`: who made this work and where it comes from.
+
+smolvla_lora_20k:
+  policy: smolvla
+  finetune: lora
+  base: lerobot/smolvla_base
+  train: {steps: 20000, batch_size: 64}
+  lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
+  serve: {rtc_enabled: true}
+smolvla_full_45ep:
+  source: 'LeRobot''s SmolVLA recipe: action expert trained, VLM frozen'
+  policy: smolvla
+  finetune: full
+  base: lerobot/smolvla_base
+  train: {epochs: 45, batch_size: 64, save_freq: 1000}
+  serve: {rtc_enabled: true}
