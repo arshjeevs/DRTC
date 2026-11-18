@@ -89,6 +89,8 @@ def cmd_submit(argv: list[str]) -> int:
     ap.add_argument("model")
     ap.add_argument("--host", help="queue on this host (hosts.yaml) instead of here")
     ap.add_argument("--steps", type=int)
+    ap.add_argument("--gpu-mem", type=float, help="GPU memory the job needs, GB (default: estimate per policy at the "
+                                                    "recipe's batch size)")
     args, extra = ap.parse_known_args(argv)
     extra = [a for a in extra if a != "--"]
     reg = Registry()
@@ -97,6 +99,8 @@ def cmd_submit(argv: list[str]) -> int:
     except (RegistryError, subprocess.CalledProcessError) as e:
         print(f"lab submit: {e}", file=sys.stderr)
         return 1
+    if args.gpu_mem:
+        job["gpu_mem_gb"] = args.gpu_mem
     path = write_job(job)
     if args.host:
         h = reg.hosts.get(args.host)
