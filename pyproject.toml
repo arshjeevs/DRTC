@@ -13,6 +13,10 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "lerobot[core_scripts,feetech,remote]==0.7.0",
     "pyyaml>=6.0,<7",
+    # torch is pinned to the newest build for CUDA 13.0: the H200's driver (580) cannot be changed and supports
+    # CUDA up to 13.0. Linux x86_64 (laptop, H200) gets it from PyTorch's cu130 index; the Pi gets PyPI's build.
+    "torch==2.14.1",
+    "torchvision==0.29.1",
 ]
 
 [project.optional-dependencies]
@@ -33,3 +37,12 @@ dev = ["pytest>=8,<10"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu130", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" }
+torchvision = { index = "pytorch-cu130", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" }

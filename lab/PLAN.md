@@ -114,9 +114,12 @@ porting the old tools.
   - Done 2026-11-18. The vendored fork was removed from `major`. `pyproject.toml` (package `drtc-lab`) pins
     `lerobot==0.7.0`; `uv.lock` is committed.
   - Base install is the robot side (Pi); extra `gpu` is training and serving.
-  - One venv covers SmolVLA, π0/π0.5/π0-FAST, X-VLA and GR00T N1.7 (transformers 5.22.2, torch 2.15.0+cu132). It
-    works on the 4060. Still open: whether GR00T N1.5's Eagle code runs on transformers 5 (step 1.5), and whether
-    the H200 driver supports CUDA 13.2.
+  - One venv covers SmolVLA, π0/π0.5/π0-FAST, X-VLA and GR00T N1.7 (transformers 5.22.2, torch 2.14.1+cu130). It
+    works on the 4060. Still open: whether GR00T N1.5's Eagle code runs on transformers 5 (step 1.5).
+  - **The H200 cannot be changed** (no driver or system changes, not even cleaning caches). Its driver 580
+    supports CUDA up to 13.0, so torch is pinned to **2.14.1+cu130** (the newest CUDA 13.0 build) for Linux x86_64.
+    It is tested on the laptop (GPU, bf16, video decoding, all tests). The new setup uses its own dataset cache
+    folder on the servers, so old caches there are never read.
 - [x] 1.3 Finish the change table above (2026-11-18)
 - [ ] 1.4 Build `src/drtc/` on upstream `remote_inference` (DRTC's scheduling ideas, our fault injection and logging) and run it against a test policy on the laptop
 - [ ] 1.5 Policy plugins (DOT, SFP, GR00T N1.5)
