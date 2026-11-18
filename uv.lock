@@ -15,6 +15,7 @@ resolution-markers = [
 members = [
     "drtc-lab",
     "lerobot-policy-groot-n15",
+    "lerobot-robot-replay",
 ]
 
 [[package]]
@@ -431,6 +432,9 @@ gpu = [
     { name = "lerobot", extra = ["groot", "peft", "pi", "smolvla", "training", "xvla"] },
     { name = "lerobot-policy-groot-n15" },
 ]
+sim = [
+    { name = "lerobot-robot-replay" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -442,13 +446,14 @@ requires-dist = [
     { name = "lerobot", extras = ["core-scripts", "feetech", "remote"], specifier = "==0.7.0" },
     { name = "lerobot", extras = ["training", "peft", "smolvla", "pi", "xvla", "groot"], marker = "extra == 'gpu'", specifier = "==0.7.0" },
     { name = "lerobot-policy-groot-n15", marker = "extra == 'gpu'", editable = "plugins/lerobot_policy_groot_n15" },
+    { name = "lerobot-robot-replay", marker = "extra == 'sim'", editable = "plugins/lerobot_robot_replay" },
     { name = "pyyaml", specifier = ">=6.0,<7" },
     { name = "torch", marker = "platform_machine != 'x86_64' or sys_platform != 'linux'", specifier = "==2.14.1" },
     { name = "torch", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'", specifier = "==2.14.1", index = "https://download.pytorch.org/whl/cu130" },
     { name = "torchvision", marker = "platform_machine != 'x86_64' or sys_platform != 'linux'", specifier = "==0.29.1" },
     { name = "torchvision", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'", specifier = "==0.29.1", index = "https://download.pytorch.org/whl/cu130" },
 ]
-provides-extras = ["gpu"]
+provides-extras = ["gpu", "sim"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=8,<10" }]
@@ -788,6 +793,14 @@ core-scripts = [
     { name = "rerun-sdk" },
     { name = "torchcodec", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin') or (platform_machine == 'AMD64' and sys_platform == 'linux') or (platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'arm64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'win32'" },
 ]
+dataset = [
+    { name = "av" },
+    { name = "datasets" },
+    { name = "jsonlines" },
+    { name = "pandas" },
+    { name = "pyarrow" },
+    { name = "torchcodec", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin') or (platform_machine == 'AMD64' and sys_platform == 'linux') or (platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'arm64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'win32'" },
+]
 feetech = [
     { name = "pyserial" },
     { name = "rustypot" },
@@ -850,6 +863,17 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "lerobot", extras = ["groot"], specifier = "==0.7.0" }]
+
+[[package]]
+name = "lerobot-robot-replay"
+version = "0.1.0"
+source = { editable = "plugins/lerobot_robot_replay" }
+dependencies = [
+    { name = "lerobot", extra = ["dataset"] },
+]
+
+[package.metadata]
+requires-dist = [{ name = "lerobot", extras = ["dataset"], specifier = "==0.7.0" }]
 
 [[package]]
 name = "markdown-it-py"

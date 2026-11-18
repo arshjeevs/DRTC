@@ -25,6 +25,8 @@ gpu = [
     "lerobot[training,peft,smolvla,pi,xvla,groot]==0.7.0",
     "lerobot_policy_groot_n15",
 ]
+# Runs the robot-side control loop without hardware (lerobot_robot_replay: --robot.type=replay).
+sim = ["lerobot_robot_replay"]
 
 [project.scripts]
 lab = "drtc.cli:main"
@@ -48,5 +50,6 @@ members = ["plugins/*"]
 
 [tool.uv.sources]
 lerobot_policy_groot_n15 = { workspace = true }
+lerobot_robot_replay = { workspace = true }
 torch = { index = "pytorch-cu130", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" }
 torchvision = { index = "pytorch-cu130", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" }

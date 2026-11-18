@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+# The name must start with lerobot_robot_: LeRobot discovers plugins by distribution name.
+name = "lerobot_robot_replay"
+version = "0.1.0"
+description = "A LeRobot robot that replays a recorded episode: real camera frames, a state that follows commands"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.12,<3.13"
+dependencies = ["lerobot[dataset]==0.7.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/lerobot_robot_replay"]
