@@ -182,7 +182,25 @@ porting the old tools.
     - `lab list` and `lab check [--rig] [--data]` work: registry, devices, calibration (warns about LeRobot's
       default folder), episode counts
   - [x] clean start: renames, pinned datasets, registry reset, `lab check --data --online` (2026-11-18)
-  - [ ] `lab record` pipeline: raw → checks → autotrim (on LeRobot 0.7) → trimmed + raw pushed
+  - [x] `lab trim` (`drtc.data.trim`, 2026-11-18): the minor's autotrim detection, unchanged, with the crops
+    applied on LeRobot 0.7 into a new folder.
+    - **Method:** no re-encoding (each episode's video window moves), mp4 files hardlinked, numeric stats
+      recomputed with LeRobot's functions.
+    - **Parity:** on `so101_cubebox_v1_raw` (`tests/test_trim_parity.py`) it gives the same noise floor, the same
+      110 crops, the same data rows and episode windows as the old setup. The per-episode stats are exact; the old
+      editor's std was float32-imprecise, up to ~10% on the wrist roll.
+    - **Generic:** on `so101_cubebox_v0_raw` it measures its own noise (0.0058) and cuts 19%.
+    - **[open] Dataset quantiles:** LeRobot 0.4.3 (the minor, so the current v1) stores the frame-weighted mean of
+      the episodes' quantiles (q01 −22.9 on joint 1). LeRobot 0.7 keeps an envelope (−50.6). The true q01 is
+      −46.5. They matter for π0.5's QUANTILES normalization. `--quantiles lerobot|weighted_mean`; default: the
+      installed LeRobot's.
+  - [x] `lab record` (`drtc.data.record`): records `<name>_raw` with 0.7's `lerobot-record` (its terminal key
+    listener works on Wayland/SSH), checks it, trims into `<name>`, pushes both and writes pinned registry entries.
+    0.7's RecordConfig parses the generated command, with the right calibration folders and joint units. Not yet
+    run with the robot.
+  - **Found:** LeRobot 0.7's SO101 default is `use_degrees: true`. Every dataset and model so far is −100..100,
+    so the rig states `use_degrees: false` and every tool passes it. **[open]** whether future datasets switch
+    to degrees (upstream's default, and what `remote_inference`'s SO101 semantics expect). Not mixable with v1.
   - [ ] `lab` CLI with the old names as aliases (record, calibrate, preflight, session, run, bench, eval-offline, analyze, edit-dataset, list, logstats)
   - [ ] jobs + worker + `lab submit` (train, eval, bench, serve)
   - [ ] logging (wandb trials, lineage, Hub mirror), import of `results/index.csv`
