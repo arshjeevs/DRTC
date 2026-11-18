@@ -352,6 +352,33 @@ Findings so far (2026-11-18):
 - **1c: full fine-tunes on trimmed data wait** until Phase 1 is done (i).
 
 ## Phase 2: Shortlist
+**Started 2026-11-18, paused to finish Phase 1. Findings so far:**
+- **ArmnetBench v0.1** (arXiv 2607.24481), the strongest evidence.
+  - **Setup:** SO-101 arms, 3 cameras, 20 fps, **50 teleop demos per task**, trained per task, 12 tasks, 2,518
+    real rollouts.
+  - **Overall strict success:** π0.5 **47.6%**, π0 35.1%, GR00T N1.7 29.4%, Diffusion 26.7%, ACT 19.2%,
+    MolmoAct 2 18.9%, SmolVLA 15.0%.
+  - **Closest tasks to ours:** transfer_cube (π0.5 86%, π0 47%, GR00T N1.7 47%, ACT 0%) and eye_drops_to_basket
+    (π0 70%, π0.5 67%, GR00T N1.7 67%, ACT 63%).
+  - **Recipes are not in the paper,** but the trained checkpoints are on the Hub
+    (huggingface.co/collections/armnet/armnetbench-v01). **Next step:** read each checkpoint's `train_config.json`
+    for the exact recipe (steps, batch, learning rate, frozen parts, chunk size).
+- **Project-IRA π0.5 on SO-101** (Hub model cards): `lerobot/pi05_base`, batch 32, 30k steps, checkpoints every 2k.
+  The best checkpoints were at **8k–10k steps**; after ~20k they were unusable on the robot (overfitting, like
+  our minor's validation curves).
+- **SmolVLA:** the LeRobot docs recommend ~50 episodes and 20k steps. Community results are weak: 0–30% with
+  ~20–60 episodes; 89% *grasping* with 340 episodes.
+- **GR00T:** N1.5 and N1.7 SO-101 community cards (e.g. raymondlo84-nvidia, 10k steps, batch 8, lr 1e-4) have no
+  success rates. NVIDIA's N1.7 path: 16-step absolute action chunks, ≥40 GB to fine-tune.
+- **MolmoAct 2:** 56.7% on SO-100/101 in its paper (pretrained on 38k community SO-100/101 episodes), but 18.9% in
+  ArmnetBench.
+- **X-VLA, EVO1, LaWAM:** no SO-101 success rates found.
+- **Also pending:** "Benchmarking VLA models on SO-101: failure and recovery" (arXiv 2606.08881: ACT 33.75%,
+  SmolVLA 32.5% average), and "Does validation loss predict real-robot success?" (arXiv 2611.00283, on a low-cost
+  arm, relevant to checkpoint selection).
+- **Tentative shortlist (for the user to decide):** π0.5, π0, GR00T N1.7 (and N1.5 for continuity), Diffusion as
+  the strongest small model; ACT for the edge fallback. SmolVLA and MolmoAct 2 rank low in independent tests.
+
 - [ ] For each candidate: who made it work on an SO100/SO101-class arm, with which recipe (steps, batch, what was
       frozen, chunk length, data size), and how fast it runs at inference (does it fit DRTC's timing?)
 - [ ] **[open]** Selection criteria (results others got, architecture variety, inference speed, or a mix)
