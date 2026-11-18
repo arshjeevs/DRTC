@@ -618,7 +618,11 @@ RTC. The other five can be compared with and without RTC.
     correction's autograd graph. `drtc.control.chunk_adapters` rebuilds a cache holding inference tensors once, when
     called outside inference mode; ordinary tensors work in both modes. Test in `tests/test_chunk_adapters.py`
     (fails without the fix with the H200's error).
-  - [ ] Fourth run: MolmoAct 2 only.
+  - **Fourth run (2026-11-18, commit 1f503991), MolmoAct 2:** train ok, 406 s, eval 0.23, 55.8 GB. Serve
+    **admitted** chunk + rtc_guided (fix 7 works), but too slow: chunk 475.1 ms (15 steps), RTC 603.7 ms (p90 617.5,
+    19 steps) vs margin 10 (H 30, s_min 20): **does not fit**. Serve peak 13.6 GB.
+  - [ ] **[open]** MolmoAct 2's latency: options in the 2026-11-19 session (speed it up, lower s_min, retrain with
+    fewer image tokens, or keep it for Phase 4 only).
 - [x] GR00T N1.5 plugin: guided RTC on 0.7, with `supports_rtc()` (2026-11-18).
 
 **What LeRobot 0.7 covers:**
