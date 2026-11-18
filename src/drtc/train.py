@@ -8,6 +8,7 @@ adds only what 0.7 lacks:
 - refusing a stale local dataset copy (a different version cached under the same name);
 - a clean stop: Ctrl-C, SIGTERM or `lab stop <model>` saves a checkpoint at the next step, pushes it with its
   training state (resumable anywhere: `lab train <model> --resume`) and exits;
+- logging to Trackio (lab/lab.yaml: project and the shared Hugging Face Space);
 - pushing the final (or a chosen) checkpoint: model files at the repo root, the checkpoint for resuming under
   checkpoints/<step>/ (tagged).
 
@@ -172,8 +173,11 @@ def build(reg: Registry, model_id: str, steps: int | None = None, download: bool
         "batch_size": t.get("batch_size", 8),
         "save_freq": t.get("save_freq", 5_000),
         "trackio.enable": True,
-        "trackio.project": reg.settings.wandb_project,
+        "trackio.project": reg.settings.trackio_project,
     }
+    if reg.settings.trackio_space:
+        flags["trackio.space_id"] = reg.settings.trackio_space
+        flags["trackio.private"] = reg.settings.trackio_private
     if r.base:
         flags["policy.path"] = resolve_base(r.base) if download else r.base
     else:

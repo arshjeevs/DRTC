@@ -135,7 +135,9 @@ class Settings(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
     hub_account: str
-    wandb_project: str
+    trackio_project: str
+    trackio_space: str | None = None  # Hugging Face Space all machines log to; None = local database only
+    trackio_private: bool = True
 
 
 # --- recipes and models -------------------------------------------------------------------------------------------
