@@ -30,11 +30,12 @@ from drtc.registry import Registry, RegistryError
 QUEUE = Path(".queue")
 LOGS = Path("logs")
 STATES = ("pending", "running", "done", "failed")
-# Rough peak GPU memory per policy for a full fine-tune at the recipe's batch size, GB. Recipes can set their own
-# (train.gpu_mem_gb is not a lerobot flag; it only tells the worker how much to wait for). Estimates, refined from
-# measured runs.
-GPU_MEM_GB = {"act": 6, "diffusion": 12, "smolvla": 24, "pi0": 70, "pi05": 70, "pi0_fast": 70, "xvla": 45,
-              "groot_n15": 45, "groot": 45, "molmoact2": 70}
+# Peak GPU memory per policy for a full fine-tune at the recipe's batch size, GB: measured on the H200 on 2026-11-18
+# (tests/smoke/train.sh, LeRobot 0.7, 2 cameras 800x600) plus ~10% headroom. A job can override it
+# (lab submit --gpu-mem). act 44.6, diffusion 15.8, smolvla 14.7, xvla 32.0, pi0_fast 37.6, pi0 43.8, pi05 45.5,
+# groot_n15 20.5.
+GPU_MEM_GB = {"act": 50, "diffusion": 18, "smolvla": 17, "xvla": 36, "pi0_fast": 42, "pi0": 49, "pi05": 51,
+              "groot_n15": 23, "groot": 23, "molmoact2": 70}
 
 
 def git(*args: str) -> str:

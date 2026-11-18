@@ -166,9 +166,26 @@ porting the old tools.
     shortlisted).
   - [ ] **[open]** Logging: 0.7 has no wandb, only Trackio. Choose a Trackio Space, wandb through our wrapper,
     or both. Until then runs log to local Trackio, project `drtc-lab`.
-  - [ ] Short training runs on the H200 for the big recipes (SmolVLA, π0, π0.5, π0-FAST, X-VLA, GR00T N1.5
-    plugin, Diffusion), to confirm each trains on 0.7. Watch the old base-revision pins of π0/π0.5/π0-FAST: they
-    were a workaround for the old fork and may no longer fit 0.7.
+  - [x] **All 8 planned recipes train on LeRobot 0.7 on the H200** (2026-11-18, `tests/smoke/train.sh`: 30
+    steps + one held-out eval each, no checkpoints):
+
+    | Model | Held-out loss | Peak GPU | Time |
+    |---|---|---|---|
+    | ACT | 0.81 | 44.6 GB | 195 s |
+    | Diffusion | 1.01 | 15.8 GB | 175 s |
+    | SmolVLA | 0.46 | 14.7 GB | 162 s |
+    | X-VLA | 0.94 | 32.0 GB | 170 s |
+    | π0-FAST | 7.38 (token loss) | 37.6 GB | 390 s |
+    | π0 | 0.24 | 43.8 GB | 466 s |
+    | π0.5 | 0.26 | 45.5 GB | 344 s |
+    | GR00T N1.5 (plugin) | 0.22 | 20.5 GB | 250 s |
+
+    - The old base-revision pins of π0/π0.5/π0-FAST work on 0.7.
+    - The worker's GPU estimates are these peaks plus ~10%.
+    - The GR00T plugin had to become its own package (`plugins/lerobot_policy_groot_n15`), because LeRobot finds
+      plugins by distribution name.
+    - **For Phase 3:** in the H200 container, torchcodec cannot decode the videos and LeRobot falls back to PyAV,
+      so data loading is slower.
   - [ ] After training (later): pick the best checkpoint by held-out loss, then offline eval and benchmark.
 - [ ] 1.7 Lab system (see above), in this order:
   - [x] registry + checker + import of the old `models.yaml` / `rig.yaml` (2026-11-18)
