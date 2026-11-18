@@ -123,6 +123,29 @@ porting the old tools.
 - [x] 1.3 Finish the change table above (2026-11-18)
 - [ ] 1.4 Build `src/drtc/` on upstream `remote_inference` (DRTC's scheduling ideas, our fault injection and logging) and run it against a test policy on the laptop
 - [ ] 1.5 Policy plugins (DOT, SFP, GR00T N1.5)
+  - [x] GR00T N1.5 plugin `lerobot_policy_groot_n15` (type `groot_n15`, steps `groot_n15_*`), ported to
+    transformers 5. Changes:
+    - kw-only config dataclass
+    - `post_init`
+    - lazy Beta distribution (meta-device init)
+    - image-processor imports moved
+    - its own Eagle cache folder, so the old setup's stays untouched
+  - [x] Loading the kept models (`drtc.compat`): our old LoRA adapter format, config upgrade, N1.5 processor step
+    names mapped
+  - [x] **Old-vs-new parity of both kept models (2026-11-18)** (`tests/parity`; results in
+    `~/Projects/drtc-snapshots/parity/`):
+    - **Method:** same inputs and the same recorded random draws through the old setup (`minor-final` venvs)
+      and the new one.
+    - **Preprocessing:** bit-identical for both, including GR00T's Eagle pixel values and tokens.
+    - **Actions:** they differ only within the old setup's own GPU-to-GPU noise. That noise was measured as the
+      same old code on the laptop vs the H200 (`compare_refs.py`): GR00T 0.31°, SmolVLA 2.84° (largest at the
+      rest pose; 50-step chunks amplify rounding). Old vs new:
+      - GR00T: 0.29° on the H200
+      - SmolVLA: 1.86° on the H200, 1.06° on the laptop
+    - **Laptop GR00T N1.5 inference:** 613 ms median (636 mean, 765 p90), 7.27 GB peak. Too slow to serve the
+      robot from the laptop (a 16-action chunk is 533 ms), so it is served from the H200. This is the baseline for
+      the efficiency work.
+  - [ ] DOT, SFP plugins (only if shortlisted in Phase 2)
 - [ ] 1.6 Training wrapper (clean stop, progress line), recipes → 0.7 `lerobot-train` flags
 - [ ] 1.7 Lab system (see above), in this order:
   - [x] registry + checker + import of the old `models.yaml` / `rig.yaml` (2026-11-18)
@@ -141,6 +164,13 @@ porting the old tools.
   - [ ] jobs + worker + `lab submit` (train, eval, bench, serve)
   - [ ] logging (wandb trials, lineage, Hub mirror), import of `results/index.csv`
   - [ ] Zenoh serving across hosts (replaces `tunnel`), Pi and H200 setup
+    - 2026-11-18, for the parity check, done by Claude with the user's permission (no deletions):
+      - `~/drtc_major` was cloned on the H200, with `.server.env` and `.venv` from `uv.lock` (6.8 GB, `uv` 0.10.4
+        in the container).
+      - torch 2.14.1+cu130 runs on the H200 NVL with driver 580.
+      - The Hugging Face model cache is shared with `drtc_lab` (files only added).
+      - `/home` is 97% full: 94 GB free afterwards.
+      - Once the migration is done, the user will delete the whole DRTC space there and set up fresh.
     - H200 (cannot be changed; see `lab/H200.md` for the existing setup): the new setup lives in `~/drtc_major`
       (branch `major`), next to the old `~/drtc_lab`, inside the same `drtc_lab` container (the guide's image, which
       already mounts all of `/home/jayaraj`). It has its own `.venv` from `uv.lock`.

@@ -18,9 +18,22 @@ from pathlib import Path
 import torch
 
 REF = Path(os.environ.get("DRTC_PARITY_DIR", Path.home() / "Projects/drtc-snapshots/parity"))
-# Tolerances in the policy's normalized action units (chunk) and in robot units (actions: degrees / gripper %).
-# Old and new run different torch / transformers versions, so bit-exactness is not expected.
-TOL = {"chunk": 2e-2, "actions": 0.5}
+# Tolerances: how much the OLD setup differs from itself between two GPUs (laptop RTX 4060 vs H200) on the same
+# inputs and noise, measured with compare_refs.py on 2026-11-18 and rounded up. Old vs new must stay within it:
+# anything beyond is a change in what the model computes, not GPU numerics. Units: normalized (chunk) and robot
+# units, degrees / gripper % (actions). SmolVLA's 50-step chunks amplify rounding most at the rest pose (frame 0).
+NOISE_FLOOR = {  # measured: chunk, actions
+    "groot_cubebox_v1_lora_raw": {"chunk": 7.8e-3, "actions": 0.31},
+    "smolvla_cubebox_v0_lora_raw": {"chunk": 1.64e-1, "actions": 2.84},
+}
+DEFAULT_TOL = {"chunk": 2e-2, "actions": 0.5}
+
+
+def tolerance(model: str) -> dict:
+    floor = NOISE_FLOOR.get(model)
+    if floor is None:
+        return DEFAULT_TOL
+    return {k: max(DEFAULT_TOL[k], round(v * 1.1, 3)) for k, v in floor.items()}
 
 
 @contextlib.contextmanager
@@ -108,9 +121,10 @@ def main() -> int:
         d_act = (actions.float().cpu().reshape(s["actions"].shape) - s["actions"]).abs().max().item()
         worst = {"chunk": max(worst["chunk"], d_chunk), "actions": max(worst["actions"], d_act)}
         print(f"frame {s['index']:>6}: max |chunk diff| {d_chunk:.2e}  max |action diff| {d_act:.3f}")
-    ok = worst["chunk"] <= TOL["chunk"] and worst["actions"] <= TOL["actions"]
-    print(f"{'PASS' if ok else 'FAIL'}: worst chunk {worst['chunk']:.2e} (tol {TOL['chunk']}), "
-          f"worst action {worst['actions']:.3f} (tol {TOL['actions']})")
+    tol = tolerance(a.model)
+    ok = worst["chunk"] <= tol["chunk"] and worst["actions"] <= tol["actions"]
+    print(f"{'PASS' if ok else 'FAIL'}: worst chunk {worst['chunk']:.2e} (tol {tol['chunk']}), "
+          f"worst action {worst['actions']:.3f} (tol {tol['actions']}; old setup's own GPU-to-GPU noise)")
     return 0 if ok else 1
 
 
