@@ -9,7 +9,7 @@ nothing has to be redone. Items marked **[open]** are decisions still to make.*
 | 1 | Move to LeRobot 0.7, our code as a separate layer on top | The new setup runs everywhere | Done; its robot-side items moved to 3 and 5 |
 | 2 | Shortlist the models, each with its original recipe | Recipes fixed and sourced | Done; **recipes fixed for all training** |
 | 3 | Faster training, and the setup on every machine | One measured speed setup per active model | **Done** (2026-11-19) |
-| 4 | Data collection (the user) | New datasets finalised and on the Hub | Starting, **in parallel with 3** |
+| 4 | Data collection (the user) | New datasets finalised and on the Hub | Sorting A done (2026-11-19); B, stacking later |
 | 5 | Evaluation framework | One command for offline results; robot trials recorded with a fixed protocol | Built during 3-4 |
 | 6 | Train and choose | We know which models work | Round 1 running on the A100; round 2 after 4 |
 | 7 | Smoothing test bench, then smoothing methods | Any method compared on any model with one command | After 6 |
@@ -101,6 +101,11 @@ nothing has to be redone. Items marked **[open]** are decisions still to make.*
 model); robot protocol (marked cube-position grid, N trials per model in a fixed order, pick / place / fail and time;
 N and the grid decided with the user); DRTC metrics per trial (stalls, jerk, chunk jumps, latency); results recorded
 by one command, one report; Zenoh between the laptop and the GPU servers (from Phase 1).
+
+**Phase 6 round 2, sorting A (2026-11-19):** `so101_sort_one_v1` finished (80 episodes, 8 held out; trimmed 19,204
+frames). The user chose ACT, SmolVLA and GR00T N1.5 with the fixed recipes (`lab/models/sort_one_v1.yaml`), trained
+on the H200 at once (`lab prepare` first, so the three runs do not prepare the same copy together; H200 `cpu_budget`
+scaled from the A100's, not yet measured). Deferred models stay for later.
 
 **Phase 6:** round 1 (A100): SmolVLA and ACT on trimmed v0, GR00T N1.5 on trimmed v1, then offline ranking and
 robot trials against the kept minor models (GR00T 80%, SmolVLA 90%). Round 2 (after Phase 4): the user's training

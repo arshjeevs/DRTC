@@ -26,6 +26,11 @@ hosts:
     container: drtc_lab
     secrets: /workspace/drtc_lab/.secrets.env   # HF_TOKEN, WANDB_API_KEY (inside the container)
     repo: /home/jayaraj/drtc_major   # new setup (branch major); /workspace/drtc_major inside the drtc_lab container
+    # 48 CPUs. For several trainings at once: the A100's measured budget scaled to 48 CPUs (not yet measured here).
+    cpu_budget:
+      act: {threads: 4, workers: 3}
+      smolvla: {threads: 8, workers: 4}
+      groot_n15: {threads: 24, workers: 4}
     gpus:
     - {name: H200, memory_gb: 141}
     shared: true

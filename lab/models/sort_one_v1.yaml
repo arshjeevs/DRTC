@@ -1,0 +1,9 @@
+# Sorting A (Phase 4, 2026-11-19): one cube (red or blue, fixed position), the two squares swap sides.
+# Trained with each model's original recipe (lab/PLAN.md, Phase 2).
+
+act_sort_one_v1_full: {recipe: act_original, dataset: so101_sort_one_v1, status: planned,
+  notes: 'ACT on so101_sort_one_v1; original recipe'}
+smolvla_sort_one_v1_full: {recipe: smolvla_authors, dataset: so101_sort_one_v1, status: planned,
+  notes: 'SmolVLA on so101_sort_one_v1; original recipe (action expert only)'}
+groot_sort_one_v1_full: {recipe: groot_n15_nvidia, dataset: so101_sort_one_v1, status: planned,
+  notes: 'GR00T N1.5 on so101_sort_one_v1; original recipe'}

@@ -1,0 +1,29 @@
+# Written by lab record / lab data; review and commit.
+
+so101_sort_one_v1_raw:
+  repo: orangemoon599/so101_sort_one_v1_raw
+  revision: f660ab7861f3a31a13685dafda35cf808aaef854
+  rig: so101_v2
+  task: Put the cube in the square of the same color.
+  fps: 30
+  episodes: 80
+  frames: 23328
+  use_degrees: true
+so101_sort_one_v1:
+  repo: orangemoon599/so101_sort_one_v1
+  revision: 1133e339f0e170965d8756b05e21c7ea6146de77
+  rig: so101_v2
+  task: Put the cube in the square of the same color.
+  fps: 30
+  episodes: 80
+  frames: 19204
+  use_degrees: true
+  parents:
+  - so101_sort_one_v1_raw
+  derivation:
+    kind: autotrim
+    params:
+      tool: drtc.data.trim
+  split:
+    held_out: 8
+    seed: 0
