@@ -37,3 +37,4 @@ diffusion_original:
   # Speed (Phase 3): frames decoded once and resized to resize_shape with the model's own Resize, so the model
   # input is the same up to uint8 rounding; see drtc.data.prepare. Remove to decode the videos while training.
   data: {frames: [240, 320]}
+  speed: {num_workers: 16}   # H200 2026-11-19, with the cache: 8 workers 0.239 s (data 41%), 16 workers 0.103 s

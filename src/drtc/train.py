@@ -235,6 +235,12 @@ def build(reg: Registry, model_id: str, steps: int | None = None, download: bool
         n = len(episodes) + len(held_out)
         flags["dataset.eval_split"] = (len(held_out) - 0.5) / n  # ceil(n * x) == len(held_out), robust to rounding
     flags.update({k: v for k, v in r.flags.items()})
+    speed = dict(r.recipe.speed) if r.recipe else {}
+    clash = sorted(set(speed) & set(r.flags))
+    if clash:
+        raise RegistryError(f"{model_id!r}: speed settings {clash} are also recipe flags; a speed setting must not "
+                            f"change the recipe")
+    flags.update(speed)
     # What the recipe needs beyond the recorded dataset (relative-action stats, a frame cache): one prepared
     # variant folder.
     from drtc.data import prepare
@@ -258,7 +264,7 @@ def build(reg: Registry, model_id: str, steps: int | None = None, download: bool
     info = {"model": model_id, "recipe": r.recipe.id, "dataset": f"{r.dataset.id}@{r.dataset.revision[:10]}",
             "episodes": len(episodes) if episodes is not None else "all", "held_out": held_out,
             "frames": frames, "epochs": t.get("epochs"), "unknown_flags": unknown_policy_flags(r.policy, flags),
-            "variants": variants,
+            "variants": variants, "speed": speed,
             "resolved": r}
     return flags, info
 
@@ -390,6 +396,8 @@ def print_summary(flags: dict, info: dict) -> None:
     r: Resolved = info["resolved"]
     print(f"\nmodel {info['model']}: recipe {info['recipe']}, dataset {info['dataset']}, policy {r.policy} "
           f"({r.finetune}), push to {r.hub}")
+    if info.get("speed"):
+        print(f"speed settings (not part of the recipe): {', '.join(f'{k}={v}' for k, v in info['speed'].items())}")
     if info["variants"]:
         print(f"dataset prepared for this recipe: {', '.join(info['variants'])} (--dataset.root)")
     if info["held_out"]:

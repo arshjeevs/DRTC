@@ -168,6 +168,9 @@ class Recipe(Entry):
     lora: dict[str, Any] | None = None
     serve: dict[str, Any] = Field(default_factory=dict)  # rtc_enabled, num_flow_matching_steps, ...
     data: dict[str, Any] = Field(default_factory=dict)  # frames: [H, W] (a frame cache, drtc.data.prepare)
+    # Speed settings (Phase 3): lerobot-train flags that change how fast training runs, not what it learns
+    # (compile, workers). Kept apart from `flags` so the recipe itself stays fixed.
+    speed: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def _keys(self):

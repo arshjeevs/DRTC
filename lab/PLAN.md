@@ -42,8 +42,8 @@ nothing has to be redone. Items marked **[open]** are decisions still to make.*
 - [ ] A100 round 1 trainings (Phase 6) as soon as it is set up.
 - [ ] Old models on LeRobot 0.7: a serve check (load, warm up, chunk time) of `groot_cubebox_v1_lora_raw` and
   `smolvla_cubebox_v0_lora_raw` on the A100 (they were trained with 0.4.3).
-- [ ] H200: FFmpeg, the frame-cache checks, the full comparison round (all models; while data is collected the H200
-  is for testing), then one speed setup per active model in its recipe.
+- [x] H200: FFmpeg, the frame-cache checks, the full comparison round, one speed setup per active model (Phase 3
+  section, 2026-11-19).
 - [ ] Later, while models train (not now): **easy serving on either GPU server.** Today serving on the A100 or the
   H200 means logging in, starting the container/environment and `lab serve <model>` by hand, before the robot
   client connects. Idea to work out: the client asks for a model and the chosen server starts it on demand (a small
@@ -905,7 +905,33 @@ RTC. The other five can be compared with and without RTC.
     optimizer, checkpointing only on the vision tower), which our rounds measure. Try LoongForge itself only if
     those two stay the longest runs, or with several GPUs, and only after a check that its π0.5/N1.7 training
     matches our recipe (relative actions, EMA, stats) and that its checkpoints serve in LeRobot.
-- [ ] Settle on one setup per model, recorded in `models.yaml`
+- H200 round 1 (2026-11-19, commit 73d175b8, FFmpeg installed, torchcodec). Cache checks on the H200: Diffusion
+  max 0.5/255, DataLoader 346 -> 1922 samples/s; GR00T N1.5 eagle_pixel_values identical, Eagle preprocessing
+  1325 -> 155 ms per batch of 32.
+
+  | Model | Setting | Step (baseline) | Full run (baseline) |
+  |---|---|---|---|
+  | SmolVLA | compile | **0.205 s** (0.323), peak 4.6 GB (14.7) | **1.1 h** (1.8) |
+  | GR00T N1.5 | frame cache | 1.032 s (1.080); preprocessing 0.690 s (0.773) | 2.9 h (3.0) |
+  | ACT | with Diffusion and SmolVLA on the GPU | 0.162 s (0.107 alone); GPU 97% | 4.5 h (3.0) |
+  | Diffusion | cache, 8 workers / **16 workers** | 0.239 / **0.103 s** (0.317) | 14.2 / **6.2 h** (18.8) |
+  | Diffusion | compile (no cache) | 0.244 s | 14.5 h |
+  | MolmoAct 2 | gradient checkpointing off | 1.636 s (2.185), peak **124 GB** | 22.7 h (30.3) |
+  | MolmoAct 2 | augmentation on the GPU / 16 workers | 2.324 / 2.178 s | no gain |
+  | π0.5 | checkpointing off / compile | **out of memory** (>140 GB) at batch 64 | stays 27.2 h |
+
+  - Three jobs on the one GPU (ACT + Diffusion + SmolVLA) reach 97% GPU use; each is slower than alone, together
+    faster than one after another.
+  - GR00T N1.5: the cache makes the model input identical and removes most of the Eagle image work, yet training's
+    preprocessing stays at 0.69 s per step: another part of its CPU preprocessing dominates. [ ] Profile it
+    (later, while models train).
+- [x] One setup per active model (2026-11-19), in the recipes' `speed:` section (lerobot-train flags that change only
+  the speed; `lab train` refuses one that is also a recipe flag, and prints them separately):
+  - SmolVLA: `policy.compile_model: true`.
+  - GR00T N1.5: the frame cache (`data: frames`).
+  - ACT: none; train it next to another job.
+  - Deferred, for when they return: Diffusion `num_workers: 16` with its cache (set); MolmoAct 2 checkpointing off
+    only on the H200 (124 GB, more than the A100's 80); π0.5 no gain that fits one H200.
 
 ## Phase 6: Train and choose
 - [ ] Train each shortlisted model once (`*_full_trim`) with the Phase 3 setup
