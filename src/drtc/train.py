@@ -522,10 +522,11 @@ def main(argv: list[str] | None = None) -> int:
             apply_cpu_budget(budget)
         print(f"cpu budget (other trainings run here): {budget}", flush=True)
     cmd = command(flags) + extra
-    from drtc.compat import frame_cache, molmoact2, wandb_mirror
+    from drtc.compat import frame_cache, molmoact2, resume_processors, wandb_mirror
 
     molmoact2.install()  # LoRA fine-tuning from a full-weight MolmoAct 2 checkpoint
     frame_cache.install()  # cached frames for variants that have them (recipe data.frames)
+    resume_processors.install()  # --resume for policies without a normalizer step (GR00T N1.5)
     if reg.settings.wandb_project and flags.get("trackio.enable", True) and \
             "--trackio.enable=false" not in extra and not args.no_wandb:
         wandb_mirror.install(reg.settings.wandb_project, reg.settings.wandb_entity)  # wandb next to Trackio
