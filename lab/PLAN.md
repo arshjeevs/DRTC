@@ -537,6 +537,26 @@ The best checkpoint is chosen by held-out action error, as decided earlier.
   `diffusion_full` therefore trained without its crop; `diffusion_original` uses `crop_ratio: 0.9` (216×288).
 - `null` in a recipe reached lerobot-train as the string "None"; `flag_value` now writes `null`.
 
+**Test run of the original recipes (H200, commit cc1ccc6e):**
+
+| Model | Train (30 steps) | Peak train GPU | Serve check |
+|---|---|---|---|
+| ACT | ok, 87 s, eval 0.85 | 6.2 GB | chunk 13.2 ms (1 step) vs margin 80 |
+| Diffusion | ok, 102 s, eval 1.00 | 10.0 GB | chunk 55.8 ms (2 steps) vs margin 16 (H 24) |
+| SmolVLA | ok, 115 s, eval 0.46 | 14.7 GB | chunk 193 ms (6) / RTC 319 ms (10) vs margin 30 |
+| π0.5 | **failed**: the pinned `pi05_base` processors have no `relative_actions_processor` step | — | — |
+| GR00T N1.5 | ok, 298 s, eval 0.22 | 20.5 GB | chunk 77 ms (3) / RTC 98.5 ms (3) vs margin 8 |
+| GR00T N1.7 | ok, 185 s, eval 1.14 (relative stats) | 40.2 GB | chunk 119.7 ms (4) vs margin 8. "rtc_guided" 119.8 ms: the same time, as expected with its native RTC off for relative actions |
+| MolmoAct 2 | **failed**: "Error(s) in loading state_dict" (LoRA) | — | — |
+
+Fixes:
+- π0.5: base pin moved to `22c30e5b`. Hub diff against `a538eb27`: only README and the two processor files changed
+  (upstream "Add relative action processor steps", 2026-06-03); the weights are identical.
+- MolmoAct 2: 0.7 applies LoRA in `__init__` and then loads the checkpoint strictly, so a full-weight checkpoint
+  (our base) does not fit the adapter-wrapped model. `drtc.compat.molmoact2` (installed by `lab train`) loads as
+  fft, then applies the adapters exactly as `__init__` would, then compiles. LoRA checkpoints load unchanged.
+- [ ] Rerun: π0.5 and MolmoAct 2.
+
 ### Dataset preparation (2026-11-19)
 `drtc.data.prepare` makes what a recipe needs beyond the recorded dataset. Today that is relative-action stats:
 LeRobot needs action stats computed in relative space over chunks of the policy's `chunk_size`, with the same joints

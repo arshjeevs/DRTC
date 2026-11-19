@@ -396,6 +396,9 @@ def main(argv: list[str] | None = None) -> int:
             print(f"lab train: {out} exists; continue it with --resume", file=sys.stderr)
             return 1
     cmd = command(flags) + extra
+    from drtc.compat import molmoact2
+
+    molmoact2.install()  # LoRA fine-tuning from a full-weight MolmoAct 2 checkpoint
     state = install_clean_stop(lerobot_train, args.model)
     sys.argv = cmd
     try:

@@ -67,3 +67,47 @@ def test_none_flags_reach_draccus_as_none():
     assert flag_value(None) == "null"
     assert flag_value([216, 288]) == "[216, 288]"
     assert flag_value(True) == "true"
+
+
+def test_molmoact2_lora_from_full_weights_loads_before_wrapping():
+    # Stand-in with MolmoAct2Policy's order: __init__ wraps for LoRA, then from_pretrained loads strictly.
+    from types import SimpleNamespace
+
+    from drtc.compat.molmoact2 import load_then_lora
+
+    events = []
+
+    class Base:
+        @classmethod
+        def from_pretrained(cls, path, *, config=None, **kwargs):
+            policy = cls(config)
+            if policy.wrapped:
+                raise RuntimeError("Error(s) in loading state_dict")  # plain keys into a wrapped model
+            events.append("load")
+            return policy
+
+    class Policy(Base):
+        def __init__(self, config):
+            self.config = config
+            self.wrapped = config.train_mode_vlm == "lora"
+            events.append(f"init {config.train_mode_vlm} compile={config.compile_model}")
+
+        def _apply_lora_adapters(self):
+            self.wrapped = True
+            events.append("lora")
+
+        def _apply_compile(self):
+            events.append(f"compile={self.config.compile_model}")
+
+    cfg = lambda: SimpleNamespace(train_mode_vlm="lora", compile_model=True, lora_rank=64)
+    with pytest.raises(RuntimeError):
+        Policy.from_pretrained("full", config=cfg())  # upstream order fails
+    events.clear()
+    Policy.from_pretrained = load_then_lora(Policy, Base.from_pretrained.__func__, has_lora=lambda p, r: p == "lora")
+    p = Policy.from_pretrained("full", config=cfg())
+    assert events == ["init fft compile=False", "load", "lora", "compile=True"]
+    assert p.wrapped and p.config.train_mode_vlm == "lora" and p.config.compile_model
+    events.clear()
+    with pytest.raises(RuntimeError):  # a LoRA checkpoint takes the upstream path unchanged
+        Policy.from_pretrained("lora", config=cfg())
+    assert events == ["init lora compile=True"]

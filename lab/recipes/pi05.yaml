@@ -6,7 +6,9 @@ pi05_openpi:
     joints + absolute gripper, quantile norm, chunk 50 (github.com/Physical-Intelligence/openpi, training/config.py)'
   policy: pi05
   finetune: full
-  base: lerobot/pi05_base@a538eb273274eb30f126a118f39dbc0ee212c883
+  # 22c30e5b: same weights as the earlier pin a538eb27; its saved processors have the relative_actions step (added
+  # upstream 2026-06-03), which LeRobot needs to fine-tune with use_relative_actions.
+  base: lerobot/pi05_base@22c30e5b34f9e7ab738b1b34fc2fc5ecfe2d28f0
   train: {steps: 20000, batch_size: 64, save_freq: 1000}
   flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true, policy.train_expert_only: false,
     policy.freeze_vision_encoder: false, policy.chunk_size: 50, policy.n_action_steps: 50,
