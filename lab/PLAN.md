@@ -906,11 +906,11 @@ RTC. The other five can be compared with and without RTC.
     matches our recipe (relative actions, EMA, stats) and that its checkpoints serve in LeRobot.
 - [ ] Settle on one setup per model, recorded in `models.yaml`
 
-## Phase 4: Train and choose
+## Phase 6: Train and choose
 - [ ] Train each shortlisted model once (`*_full_trim`) with the Phase 3 setup
 - [ ] Rank offline (`eval-offline`), then robot trials with a fixed protocol (trial count, cube positions)
 
-## Phase 5: Smoothing
+## Phase 7: Smoothing
 - [ ] Test bench:
   - replay recorded observations and chunks offline, with simulated latency
   - the same metrics for every run: stalls, jerk, jumps between chunks, action error
@@ -918,7 +918,7 @@ RTC. The other five can be compared with and without RTC.
 - [ ] Baselines: no smoothing; upstream alignment, blending and RTC
 - [ ] Methods: A (adaptive playback), B (RTC), C (smoothness guidance); new ones later
 
-## Phase 6: DRTC experiments
+## Phase 8: DRTC experiments
 - [ ] Fault conditions (spikes, drops, duplicates, reordering, disconnects), on the chosen model(s)
 - [ ] Latency estimators, offline on the logged runs
 - [ ] Comparison with upstream remote inference
