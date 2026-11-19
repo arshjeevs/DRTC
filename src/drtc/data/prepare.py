@@ -112,8 +112,18 @@ def _want(repo: str, revision: str | None, need: list) -> dict:
             d = asdict(n)
             if d.get("method") == "resize":
                 del d["method"]  # the default; caches made before methods existed stay valid
+            if isinstance(n, FrameCache):
+                d["decoder"] = video_backend()  # frames as this host's training decodes them
             want.setdefault("extra", []).append({"type": type(n).__name__, **d})
     return want
+
+
+def video_backend() -> str:
+    """The decoder lerobot-train uses on this host (dataset.video_backend's default): torchcodec, or pyav where
+    torchcodec cannot load FFmpeg. torchcodec and pyav can differ slightly, so a cache is made with this one."""
+    from lerobot.utils.import_utils import get_safe_default_video_backend
+
+    return get_safe_default_video_backend()
 
 
 def ensure(repo: str, revision: str | None, need) -> Path:
@@ -165,7 +175,7 @@ def ensure(repo: str, revision: str | None, need) -> Path:
 
 def build_frames(ds, out: Path, need: FrameCache, batch: int = 64) -> None:
     """drtc_frames/: one uint8 array (frames, 3, H, W) per camera, row = the dataset's frame `index`, decoded with
-    LeRobot's own decoder (as training reads them) and resized with torchvision's Resize (as Diffusion does)."""
+    LeRobot's own decoder and this host's backend (as training reads them), resized as the policy does."""
     from concurrent.futures import ThreadPoolExecutor
 
     import numpy as np
@@ -204,6 +214,8 @@ def build_frames(ds, out: Path, need: FrameCache, batch: int = 64) -> None:
     else:
         raise RegistryError(f"unknown frame cache method {need.method!r}")
     tolerance = float(getattr(ds, "tolerance_s", 1e-4))
+    backend = video_backend()
+    print(f"  frames: decoding with {backend} (as training on this host does)", flush=True)
     arrays = {k: np.lib.format.open_memmap(tmp / f"{k}.npy", mode="w+", dtype=np.uint8,
                                            shape=(n, 3, need.height, need.width)) for k in meta.video_keys}
 
@@ -224,7 +236,7 @@ def build_frames(ds, out: Path, need: FrameCache, batch: int = 64) -> None:
             for s in range(0, len(rows), batch):
                 part = rows[s:s + batch]
                 ts = shift_timestamps(ts_col[part].tolist(), ep[f"videos/{key}/from_timestamp"])
-                raw = decode_video_frames(path, ts, tolerance, "torchcodec", return_uint8=True)
+                raw = decode_video_frames(path, ts, tolerance, backend, return_uint8=True)
                 arrays[key][index[part]] = resize(raw).numpy()
         return len(eps)
 
@@ -238,7 +250,7 @@ def build_frames(ds, out: Path, need: FrameCache, batch: int = 64) -> None:
     del arrays
     (tmp / "meta.json").write_text(json.dumps({"height": need.height, "width": need.width, "frames": n,
                                                "fps": fps, "keys": list(meta.video_keys),
-                                               "method": need.method},
+                                               "method": need.method, "decoder": backend},
                                               indent=1))
     shutil.rmtree(out, ignore_errors=True)
     tmp.rename(out)

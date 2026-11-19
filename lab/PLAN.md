@@ -819,6 +819,11 @@ RTC. The other five can be compared with and without RTC.
   unchanged, so the model input is **bit-identical**: eagle_pixel_values equal in 2/2 batches of 32 (laptop). Laptop:
   Eagle preprocessing per batch 954 → 82 ms; DataLoader 618 → 3918 samples/s; 7.1 GB. Expected on the H200: step
   ≈ 1.08 → ≈ 0.4 s.
+- **The H200 container has no FFmpeg libraries** (2026-11-19): torchcodec cannot load there, so LeRobot decodes
+  every training video with PyAV (the laptop: 3.5 ms per frame with torchcodec, 8.7 ms with PyAV). This is part of
+  why Diffusion's data loading was slow on the H200. Caches are now decoded with the host's training decoder
+  (recorded in the cache; rebuilt if it changes). On our data the two decoders give identical frames (20 random
+  frames, laptop). Installing FFmpeg in the container (`apt-get install -y ffmpeg`) would let torchcodec load.
 - Building a cache decodes in the training process, so `build_frames` closes LeRobot's decoders afterwards; forked
   DataLoader workers inheriting them fail with "Could not push packet to decoder".
 - Laptop, ACT (2026-11-19, commit 3de1880e): step 0.500 s, data 4%, GPU 99.8%, peak 6.1 GB, full recipe ≈ 13.9 h

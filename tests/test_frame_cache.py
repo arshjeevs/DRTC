@@ -52,7 +52,8 @@ def test_variant_names_combine_and_keep_the_relative_stats_name():
     assert prepare.variant_root("u/ds", "3ef1f445d952ae6b", [rel, fc]).name.endswith("rel_c50_xgripper_frames240x320")
     old_marker = {"repo": "u/ds", "revision": "r", "relative_action": True, "chunk_size": 50, "exclude_joints": ["gripper"]}
     assert prepare._want("u/ds", "r", [rel]) == old_marker
-    assert prepare._want("u/ds", "r", [fc])["extra"] == [{"type": "FrameCache", "height": 240, "width": 320}]
+    extra = prepare._want("u/ds", "r", [fc])["extra"]
+    assert extra == [{"type": "FrameCache", "height": 240, "width": 320, "decoder": prepare.video_backend()}]
 
 
 def test_cached_frames_are_read_by_episode_and_timestamp(tmp_path):
