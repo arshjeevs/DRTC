@@ -295,6 +295,43 @@ def push(checkpoint_dir: Path, repo_id: str, model_from: Path | None = None) -> 
           flush=True)
 
 
+def other_trainings() -> int:
+    """Other `lab train` processes running on this machine (main processes, not their DataLoader workers)."""
+    import os
+
+    me, n = os.getpid(), 0
+    for d in Path("/proc").iterdir():
+        if not d.name.isdigit() or int(d.name) == me:
+            continue
+        try:
+            argv = (d / "cmdline").read_bytes().split(b"\0")
+        except OSError:
+            continue
+        if len(argv) > 2 and argv[1].endswith(b"/lab") and argv[2] == b"train":
+            n += 1
+    return n
+
+
+def cpu_budget(reg: Registry, policy: str, sharing: bool) -> dict[str, int]:
+    """This host's CPU share for the policy (hosts.yaml cpu_budget), when other trainings share the machine."""
+    host = reg.current_host()
+    if not sharing or host is None:
+        return {}
+    return dict(host.cpu_budget.get(policy, {}))
+
+
+def apply_cpu_budget(budget: dict[str, int]) -> None:
+    import os
+
+    import torch
+
+    threads = budget.get("threads")
+    if threads:
+        for var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "TORCHINDUCTOR_COMPILE_THREADS"):
+            os.environ[var] = str(threads)
+        torch.set_num_threads(threads)
+
+
 KEEP_LAST = 2  # checkpoints kept besides the best one
 
 
@@ -466,6 +503,13 @@ def main(argv: list[str] | None = None) -> int:
         if out.exists():
             print(f"lab train: {out} exists; continue it with --resume", file=sys.stderr)
             return 1
+    budget = {} if args.resume else cpu_budget(reg, r.policy, sharing=other_trainings() > 0)
+    if budget:
+        if "workers" in budget and not any(e.startswith("--num_workers") for e in extra):
+            flags["num_workers"] = budget["workers"]
+        if not any(k in __import__("os").environ for k in ("OMP_NUM_THREADS",)):
+            apply_cpu_budget(budget)
+        print(f"cpu budget (other trainings run here): {budget}", flush=True)
     cmd = command(flags) + extra
     from drtc.compat import frame_cache, molmoact2, wandb_mirror
 

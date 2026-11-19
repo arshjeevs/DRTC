@@ -85,6 +85,9 @@ class Host(Entry):
     gpus: list[Gpu] = Field(default_factory=list)
     shared: bool = False  # other people's jobs use the GPUs too
     secrets: str | None = None  # KEY=VALUE file with HF_TOKEN, WANDB_API_KEY (drtc.secrets; not in git)
+    # CPU share per policy type when training jobs share this machine: {policy: {threads, workers}}. Applied by
+    # lab train when another lab train already runs here (drtc.train.cpu_budget); a job alone gets the machine.
+    cpu_budget: dict[str, dict[str, int]] = Field(default_factory=dict)
 
 
 class Network(BaseModel):

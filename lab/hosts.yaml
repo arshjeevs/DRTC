@@ -39,6 +39,12 @@ hosts:
     roles: [serve, train]
     ssh: b230968ee@192.168.5.13
     secrets: ~/.drtc.env   # HF_TOKEN, WANDB_API_KEY
+    # 24 CPUs. Measured 2026-11-19 with ACT, SmolVLA and GR00T N1.5 training at once: without a budget the load
+    # was 28 and GR00T N1.5's preprocessing took 3.8 s per step; with this one 1.1 s, load ~6.
+    cpu_budget:
+      act: {threads: 2, workers: 2}
+      smolvla: {threads: 4, workers: 4}
+      groot_n15: {threads: 12, workers: 2}
     repo: /home/b230968ee/drtc_major   # new setup on the host, no container (lab/bin/a100-setup)
     gpus:
     - {name: A100 80GB PCIe, memory_gb: 80}

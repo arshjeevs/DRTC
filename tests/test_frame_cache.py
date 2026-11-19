@@ -83,3 +83,15 @@ def test_comparison_variants_resolve():
             assert model in models, (name, model)
             assert env["LABEL"] == (f"{name}/{model}" if v.get("parallel") else name)
     assert dict(rnd.jobs("compile", variants["compile"]))["pi05_cubebox_v1_full"]["EXTRA"] == "--policy.compile_model=true"
+
+
+def test_cached_reader_survives_spawned_workers(tmp_path):
+    """lerobot-train's workers are spawned: the reader's class, not a patch, must carry the cache across a pickle."""
+    import pickle
+
+    from drtc.compat.frame_cache import CachedDatasetReader
+
+    r = CachedDatasetReader.__new__(CachedDatasetReader)
+    r.root = tmp_path
+    clone = pickle.loads(pickle.dumps(r))
+    assert type(clone) is CachedDatasetReader
