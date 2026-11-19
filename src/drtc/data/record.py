@@ -152,7 +152,9 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         print(f"{raw_repo}: {done} episodes recorded, {a.episodes - done} to go (total {a.episodes})", flush=True)
     display = a.display if a.display is not None else bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
-    flags = {**rig_flags(reg), "dataset.repo_id": raw_repo, "dataset.single_task": a.task, "dataset.fps": fps,
+    flags = {**rig_flags(reg), "dataset.repo_id": raw_repo,
+             "dataset.root": str(raw_root),  # the default location, explicit: 0.7's resume requires a root
+             "dataset.single_task": a.task, "dataset.fps": fps,
              "dataset.num_episodes": a.episodes - done, "dataset.episode_time_s": a.episode_time,
              "dataset.reset_time_s": a.reset_time, "dataset.push_to_hub": False, "resume": a.resume,
              "dataset.no_stamp": True,  # lab manages the names (0.7 otherwise appends the date and time)
