@@ -102,6 +102,11 @@ model); robot protocol (marked cube-position grid, N trials per model in a fixed
 N and the grid decided with the user); DRTC metrics per trial (stalls, jerk, chunk jumps, latency); results recorded
 by one command, one report; Zenoh between the laptop and the GPU servers (from Phase 1).
 
+**Recording standard (2026-11-19, the user): held-out episodes come on top.** `lab record <name> --episodes N
+--held-out K` records N + K episodes; N train, K are held out (seeded split, never trained on). `--resume` continues
+up to N + K. `so101_sort_one_v1` was recorded before this (80 = 72 + 8); it becomes 80 + 8 with 8 more episodes
+(`--episodes 80 --held-out 8 --resume`).
+
 **Phase 6 round 2, sorting A (2026-11-19):** `so101_sort_one_v1` finished (80 episodes, 8 held out; trimmed 19,204
 frames). The user chose ACT, SmolVLA and GR00T N1.5 with the fixed recipes (`lab/models/sort_one_v1.yaml`), trained
 on the H200 at once (`lab prepare` first, so the three runs do not prepare the same copy together; H200 `cpu_budget`
