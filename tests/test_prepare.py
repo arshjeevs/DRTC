@@ -1,5 +1,7 @@
 """Dataset preparation (drtc.data.prepare), checkpoint pruning and flag values (drtc.train)."""
 
+from pathlib import Path
+
 import pytest
 
 from drtc.data import prepare
@@ -134,3 +136,37 @@ def test_molmoact2_lora_from_full_weights_loads_before_wrapping():
     with pytest.raises(RuntimeError):  # a LoRA checkpoint takes the upstream path unchanged
         Policy.from_pretrained("lora", config=cfg())
     assert events == ["init lora compile=True"]
+
+
+def test_update_last_checkpoint_with_a_relative_dir(tmp_path, monkeypatch):
+    """lerobot-train passes a relative checkpoint dir; pruning returns resolved paths (round 1 crashed on this)."""
+    import types
+
+    from drtc import train
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(train, "stop_file", lambda model: tmp_path / "stop")
+    ckpts = tmp_path / "outputs" / "checkpoints"
+    for step in ("005000", "010000"):
+        (ckpts / step / "pretrained_model").mkdir(parents=True)
+        (ckpts / step / "training_state").mkdir()
+    fake = types.SimpleNamespace(should_save_checkpoint=lambda *a: False, update_last_checkpoint=lambda d: None)
+    import signal
+
+    old = signal.getsignal(signal.SIGINT), signal.getsignal(signal.SIGTERM)
+    try:
+        train.install_clean_stop(fake, "m")
+        fake.update_last_checkpoint(Path("outputs/checkpoints/010000"))
+    finally:
+        signal.signal(signal.SIGINT, old[0])
+        signal.signal(signal.SIGTERM, old[1])
+    assert not (ckpts / "005000" / "training_state").exists()
+
+
+def test_eval_losses_survive_a_resume(tmp_path):
+    import logging
+
+    f = tmp_path / "eval_losses.json"
+    h = EvalLosses(f)
+    h.emit(logging.LogRecord("x", logging.INFO, "", 0, "step 5000: eval_loss=0.3417", None, None))
+    assert EvalLosses(f).losses == {5000: 0.3417}

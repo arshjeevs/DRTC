@@ -336,18 +336,26 @@ KEEP_LAST = 2  # checkpoints kept besides the best one
 
 
 class EvalLosses(logging.Handler):
-    """Collects lerobot-train's held-out losses ("step N: eval_loss=X") as {step: loss}."""
+    """Collects lerobot-train's held-out losses ("step N: eval_loss=X") as {step: loss}. With a `path` they are also
+    kept on disk (outputs/train/<model>/eval_losses.json), so a resumed run still knows the earlier ones when it
+    picks the best checkpoint."""
 
     PATTERN = re.compile(r"step (\d+): eval_loss=([0-9.eE+-]+|nan|inf)")
 
-    def __init__(self):
+    def __init__(self, path: Path | None = None):
         super().__init__(logging.INFO)
+        self.path = path
         self.losses: dict[int, float] = {}
+        if path is not None and path.is_file():
+            self.losses = {int(k): float(v) for k, v in json.loads(path.read_text()).items()}
 
     def emit(self, record):
         m = self.PATTERN.search(record.getMessage())
         if m:
             self.losses[int(m.group(1))] = float(m.group(2))
+            if self.path is not None:
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                self.path.write_text(json.dumps({str(k): v for k, v in sorted(self.losses.items())}, indent=1))
 
 
 def best_checkpoint(ckpts_dir: Path, losses: dict[int, float]) -> Path | None:
@@ -385,9 +393,9 @@ def prune_checkpoints(latest: Path, losses: dict[int, float], keep_last: int = K
     return removed
 
 
-def install_clean_stop(lerobot_train, model: str) -> dict:
+def install_clean_stop(lerobot_train, model: str, losses_file: Path | None = None) -> dict:
     """At the next step after a stop request: save a checkpoint, then stop (the caller pushes it)."""
-    state = {"requested": False, "saved": None, "eval": EvalLosses()}
+    state = {"requested": False, "saved": None, "eval": EvalLosses(losses_file)}
     logging.getLogger().addHandler(state["eval"])
     stop = stop_file(model)
     stop.parent.mkdir(parents=True, exist_ok=True)
@@ -415,7 +423,7 @@ def install_clean_stop(lerobot_train, model: str) -> dict:
     def update_last_checkpoint(checkpoint_dir):
         update_last(checkpoint_dir)
         for gone in prune_checkpoints(Path(checkpoint_dir), state["eval"].losses):
-            print(f"checkpoints: removed {gone.relative_to(Path(checkpoint_dir).parent)}", flush=True)
+            print(f"checkpoints: removed {gone.relative_to(Path(checkpoint_dir).resolve().parent)}", flush=True)
         if state["requested"]:
             state["saved"] = Path(checkpoint_dir)
             raise StopTraining
@@ -464,7 +472,9 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     if args.push:
-        push(out / "checkpoints" / args.push, r.hub)
+        losses = EvalLosses(out / "eval_losses.json").losses
+        best = best_checkpoint(out / "checkpoints", losses) if args.push == "last" else None
+        push(out / "checkpoints" / args.push, r.hub, model_from=best)
         return 0
 
     from lerobot.scripts import lerobot_train
@@ -503,9 +513,10 @@ def main(argv: list[str] | None = None) -> int:
         if out.exists():
             print(f"lab train: {out} exists; continue it with --resume", file=sys.stderr)
             return 1
-    budget = {} if args.resume else cpu_budget(reg, r.policy, sharing=other_trainings() > 0)
+    budget = cpu_budget(reg, r.policy, sharing=other_trainings() > 0)
     if budget:
-        if "workers" in budget and not any(e.startswith("--num_workers") for e in extra):
+        # a resumed run keeps its saved num_workers (train_config.json); its threads are set again here
+        if "workers" in budget and not args.resume and not any(e.startswith("--num_workers") for e in extra):
             flags["num_workers"] = budget["workers"]
         if not any(k in __import__("os").environ for k in ("OMP_NUM_THREADS",)):
             apply_cpu_budget(budget)
@@ -518,7 +529,7 @@ def main(argv: list[str] | None = None) -> int:
     if reg.settings.wandb_project and flags.get("trackio.enable", True) and \
             "--trackio.enable=false" not in extra and not args.no_wandb:
         wandb_mirror.install(reg.settings.wandb_project, reg.settings.wandb_entity)  # wandb next to Trackio
-    state = install_clean_stop(lerobot_train, args.model)
+    state = install_clean_stop(lerobot_train, args.model, out / "eval_losses.json")
     sys.argv = cmd
     try:
         lerobot_train.main()
