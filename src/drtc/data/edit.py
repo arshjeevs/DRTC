@@ -1,17 +1,16 @@
-"""Dataset operations: `lab data show|view|delete|trim|label|undo|push|remove <name>`.
+"""Dataset operations: `lab data show|view|delete|trim|undo|push|remove <name>`.
 
 One rule makes every operation simple: **the raw recording (<name>_raw) is the only copy that is edited**. The
 trimmed copy (<name>, the one to train on) is derived from it and rebuilt after every change, never edited by hand:
-autotrim (drtc.data.trim) plus the manual trims you set. What belongs to a dataset besides LeRobot's files is kept
-inside the raw copy, in meta/drtc.json, so it travels with it to the Hub:
+autotrim (drtc.data.trim) plus the manual trims you set. The manual trims are kept inside the raw copy, in
+meta/drtc.json, so they travel with it to the Hub:
 
-    {"layouts": {"<episode>": "<layout>"},      which layout an episode was recorded with (lab/layouts.yaml)
-     "trim": {"<episode>": [start, end]}}         manual crop in frames, instead of autotrim's
+    {"trim": {"<episode>": [start, end]}}         manual crop in frames, instead of autotrim's
 
 Edits stay local until `lab data push` (it uploads both copies and updates lab/datasets/recorded.yaml; each GPU
 server prepares the dataset for its recipes at its first `lab train`, or ahead of time with `lab prepare`). One undo level: before each edit the raw copy is snapshotted (hardlinks, so it costs almost
 no disk) in $HF_LEROBOT_HOME/.drtc_edit/<repo>/undo; the snapshot is dropped at the next push or recording.
-Deleting episodes renumbers the later ones (LeRobot keeps indices 0..N-1); layouts and manual trims follow.
+Deleting episodes renumbers the later ones (LeRobot keeps indices 0..N-1); manual trims follow.
 """
 
 from __future__ import annotations
@@ -30,7 +29,6 @@ import yaml
 from drtc.registry import Registry
 
 SIDECAR = "meta/drtc.json"
-LAYOUTS_FILE = "layouts.yaml"
 
 
 # --- where a dataset lives ---------------------------------------------------------------------------------------
@@ -84,13 +82,11 @@ def _write_atomic(path: Path, text: str) -> None:
 def read_sidecar(raw: Path) -> dict:
     f = raw / SIDECAR
     d = json.loads(f.read_text()) if f.is_file() else {}
-    return {"layouts": {int(k): v for k, v in d.get("layouts", {}).items()},
-            "trim": {int(k): tuple(v) for k, v in d.get("trim", {}).items()}}
+    return {"trim": {int(k): tuple(v) for k, v in d.get("trim", {}).items()}}
 
 
 def write_sidecar(raw: Path, d: dict) -> None:
-    out = {"layouts": {str(k): v for k, v in sorted(d["layouts"].items())},
-           "trim": {str(k): list(v) for k, v in sorted(d["trim"].items())}}
+    out = {"trim": {str(k): list(v) for k, v in sorted(d["trim"].items())}}
     _write_atomic(raw / SIDECAR, json.dumps(out, indent=1) + "\n")
 
 
@@ -118,34 +114,10 @@ def snapshot(p: Paths, change: str) -> None:
     _write_atomic(p.undo / "change.txt", change)
 
 
-# --- layouts (lab/layouts.yaml) -------------------------------------------------------------------------
-
-
-def layouts_for(reg: Registry, name: str) -> list[str]:
-    f = reg.lab / LAYOUTS_FILE
-    d = yaml.safe_load(f.read_text()) if f.is_file() else {}
-    return list((d or {}).get(name, []) or [])
-
-
-def next_layout(rotation: list[str], labels: dict[int, str]) -> str | None:
-    """The layout recorded least so far; on a tie, the next one in the rotation after the last episode's."""
-    if not rotation:
-        return None
-    counts = {lay: 0 for lay in rotation}
-    for lay in labels.values():
-        if lay in counts:
-            counts[lay] += 1
-    low = min(counts.values())
-    last = labels[max(labels)] if labels else None
-    start = (rotation.index(last) + 1) % len(rotation) if last in rotation else 0
-    order = rotation[start:] + rotation[:start]
-    return next(lay for lay in order if counts[lay] == low)
-
-
 def remap(d: dict, deleted: set[int], n: int) -> dict:
     """meta/drtc.json after deleting episodes: the kept ones are renumbered 0..; entries of deleted ones go."""
     new_index = {old: new for new, old in enumerate(i for i in range(n) if i not in deleted)}
-    return {key: {new_index[i]: v for i, v in d[key].items() if i in new_index} for key in ("layouts", "trim")}
+    return {"trim": {new_index[i]: v for i, v in d["trim"].items() if i in new_index}}
 
 
 def parse_episodes(spec: list[str], n: int) -> list[int]:
@@ -273,8 +245,6 @@ def cmd_show(reg: Registry, p: Paths, a) -> int:
     need_raw(p)
     ds, results, _, _, _ = trim_results(p.raw)
     fps = ds.fps
-    side = read_sidecar(p.raw)
-    rotation = layouts_for(reg, p.name)
     issues = check_recording(p.raw, fps)
     by_ep: dict[int, list[str]] = {}
     for i in issues:
@@ -282,22 +252,12 @@ def cmd_show(reg: Registry, p: Paths, a) -> int:
             by_ep.setdefault(int(i.split()[1].rstrip(":")), []).append(i.split(" ", 2)[2])
     print(f"{p.raw_repo}: {len(results)} episodes, {int(ds.episodes['length'].sum()) / fps / 60:.1f} min, "
           f"task {task_of(p.raw)!r}")
-    print(f"\n{'ep':>3}  {'raw s':>6}  {'kept s':>13}  {'trim':<8}  layout")
+    print(f"\n{'ep':>3}  {'raw s':>6}  {'kept s':>13}  trim")
     for r in results:
         kept = f"{r.start / fps:5.1f}-{r.end / fps:5.1f}" if r.status == "trim" else "all"
-        lay = side["layouts"].get(r.episode, "-")
         warn = ("  ! " + "; ".join(by_ep[r.episode])) if r.episode in by_ep else ""
         status = r.note or r.status
-        print(f"{r.episode:>3}  {r.length / fps:6.1f}  {kept:>13}  {status:<8}  {lay}{warn}")
-    if rotation:
-        counts = {lay: 0 for lay in rotation}
-        for lay in side["layouts"].values():
-            counts[lay] = counts.get(lay, 0) + 1
-        print("\nlayouts: " + ", ".join(f"{lay} {n}" for lay, n in counts.items()))
-        missing = [r.episode for r in results if r.episode not in side["layouts"]]
-        if missing:
-            print(f"  without a layout: {fmt_ranges(missing)} (lab data label {p.name} <episodes> <layout number>)")
-        print(f"  next to record: {next_layout(rotation, side['layouts'])}")
+        print(f"{r.episode:>3}  {r.length / fps:6.1f}  {kept:>13}  {status}{warn}")
     ch = pending(p)
     print(f"\nnot pushed yet: {'; '.join(ch)} (lab data push {p.name})" if ch else "\nlocal copy = what was pushed last")
     if p.undo.exists():
@@ -386,29 +346,6 @@ def cmd_trim(reg: Registry, p: Paths, a) -> int:
     return 0
 
 
-def cmd_label(reg: Registry, p: Paths, a) -> int:
-    need_raw(p)
-    rotation = layouts_for(reg, p.name)
-    if not rotation:
-        raise SystemExit(f"lab data: no layouts for {p.name} in lab/{LAYOUTS_FILE}")
-    n = json.loads((p.raw / "meta/info.json").read_text())["total_episodes"]
-    eps = parse_episodes(a.episodes, n)
-    if not 1 <= a.layout <= len(rotation):
-        raise SystemExit("lab data: layouts are numbered " + ", ".join(f"{i + 1} {lay}" for i, lay in enumerate(rotation)))
-    side = read_sidecar(p.raw)
-    for k, ep in enumerate(eps):
-        # --rotate: the first gets the given layout, the next ones follow the rotation
-        side["layouts"][ep] = rotation[(a.layout - 1 + (k if a.rotate else 0)) % len(rotation)]
-    change = f"layouts of episode(s) {fmt_ranges(eps)}"
-    snapshot(p, change)
-    write_sidecar(p.raw, side)
-    add_pending(p, change)
-    for ep in eps:
-        print(f"  {ep:>3}  {side['layouts'][ep]}")
-    print(f"next to record: {next_layout(rotation, side['layouts'])}")
-    return 0
-
-
 def cmd_undo(reg: Registry, p: Paths, a) -> int:
     if not p.undo.exists():
         print(f"lab data: nothing to undo for {p.name} (one level; dropped at each push or recording)")
@@ -466,7 +403,7 @@ def cmd_remove(reg: Registry, p: Paths, a) -> int:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="lab data", description=__doc__.split("\n\n")[0], allow_abbrev=False)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    s = sub.add_parser("show", help="episodes, trims, layouts, warnings; what is not pushed yet")
+    s = sub.add_parser("show", help="episodes, trims, warnings; what is not pushed yet")
     s.add_argument("name")
     s = sub.add_parser("view", help="open one episode in the Rerun viewer")
     s.add_argument("name")
@@ -482,12 +419,6 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--start", type=float, help="seconds from the episode's start (default 0)")
     s.add_argument("--end", type=float, help="seconds from the episode's start (default: its end)")
     s.add_argument("--auto", action="store_true", help="drop the manual trim; autotrim again")
-    s = sub.add_parser("label", help="set the layout of episodes (number from lab/layouts.yaml)")
-    s.add_argument("name")
-    s.add_argument("episodes", nargs="+", help="e.g. 0-10 or 4 7")
-    s.add_argument("--layout", type=int, required=True, help="layout number, 1 = the first in layouts.yaml")
-    s.add_argument("--rotate", action="store_true", help="the first episode gets --layout, the next ones follow "
-                                                         "the rotation (as recorded)")
     s = sub.add_parser("undo", help="undo the last edit (one level, until the next push)")
     s.add_argument("name")
     s = sub.add_parser("push", help="upload both copies and update the registry")
@@ -499,7 +430,7 @@ def main(argv: list[str] | None = None) -> int:
     a = ap.parse_args(argv)
     reg = Registry()
     p = paths(reg, a.name)
-    return {"show": cmd_show, "view": cmd_view, "delete": cmd_delete, "trim": cmd_trim, "label": cmd_label,
+    return {"show": cmd_show, "view": cmd_view, "delete": cmd_delete, "trim": cmd_trim,
             "undo": cmd_undo, "push": cmd_push, "remove": cmd_remove}[a.cmd](reg, p, a)
 
 

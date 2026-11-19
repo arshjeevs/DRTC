@@ -9,8 +9,6 @@
 - The untrimmed recording is <name>_raw; the trimmed copy, the one to train on, is <name> (lab trim).
 - Both are pushed (public, like every dataset here), and their entries, pinned to the pushed revision, are written
   to lab/datasets/recorded.yaml for you to review and commit. Later edits: `lab data` (drtc.data.edit).
-- Datasets with layouts in lab/layouts.yaml: before each episode the layout to set up is shown (the least
-  recorded one), and each episode's layout is stored with the dataset.
 """
 
 from __future__ import annotations
@@ -130,6 +128,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="continue an existing <name>_raw recording up to --episodes; the trimmed copy is rebuilt")
     ap.add_argument("--no-push", action="store_true", help="keep both datasets local")
     ap.add_argument("--display", action=argparse.BooleanOptionalAction, default=None)
+    ap.add_argument("--sounds", action=argparse.BooleanOptionalAction, default=True,
+                    help="spoken prompts (\"Recording episode 3\", \"Reset the environment\"; spd-say)")
     ap.add_argument("--dry-run", action="store_true")
     a, extra = ap.parse_known_args(argv)
     reg = Registry()
@@ -161,7 +161,7 @@ def main(argv: list[str] | None = None) -> int:
              "dataset.reset_time_s": a.reset_time, "dataset.push_to_hub": False, "resume": a.resume,
              "dataset.no_stamp": True,  # lab manages the names (0.7 otherwise appends the date and time)
              **video.encoder_flags(),  # the same AV1 settings for every recording (drtc.data.video)
-             "display_data": display, "play_sounds": False}
+             "display_data": display, "play_sounds": a.sounds}
     cmd = ["lerobot-record", *(f"--{k}={flag_value(v)}" for k, v in flags.items()), *extra]
     print(" \\\n    ".join(shlex.quote(p) for p in cmd), flush=True)
     print(f"\nrecord {raw_repo} -> trim -> {trimmed_repo}" + ("" if a.no_push else " -> push both"))
@@ -186,10 +186,6 @@ def main(argv: list[str] | None = None) -> int:
 
     p = edit.paths(reg, a.name)
     edit.clear_state(p)  # a recording session drops the undo snapshot (lerobot-record appends in place)
-    rotation = edit.layouts_for(reg, a.name)
-    if rotation:
-        labels = edit.read_sidecar(raw_root)["layouts"] if raw_root.exists() else {}
-        install_layout_prompts(lerobot_record, rotation, labels)
     sys.argv = cmd
     lerobot_record.main()
 
@@ -206,56 +202,6 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     edit.publish(reg, p, a.held_out)
     return 0
-
-
-def install_layout_prompts(lerobot_record, rotation: list[str], labels: dict[int, str]) -> None:
-    """Before each episode, say which layout to set up (the least recorded one; lab/layouts.yaml), and
-    store the layout of every saved episode in meta/drtc.json. A re-recorded episode keeps its layout."""
-    from lerobot.datasets import LeRobotDataset
-
-    from drtc.data import edit
-
-    state = {"planned": None, "episode": None, "events": None}
-    say, listen, save = lerobot_record.log_say, lerobot_record.init_keyboard_listener, LeRobotDataset.save_episode
-
-    def banner(text: str) -> None:
-        print(f"\n{'=' * 70}\n  {text}\n{'=' * 70}", flush=True)
-
-    def log_say(text, *args, **kwargs):
-        out = say(text, *args, **kwargs)
-        if text.startswith("Recording episode"):
-            state["episode"] = int(text.split()[-1])
-            state["planned"] = edit.next_layout(rotation, labels)
-            banner(f"episode {state['episode']}: {state['planned']}")
-        elif text == "Reset the environment":
-            if state["events"] is not None and state["events"].get("rerecord_episode"):
-                banner(f"re-record episode {state['episode']}: same layout, {state['planned']}")
-            else:
-                banner(f"reset, then set up episode {state['episode'] + 1}: "
-                       f"{edit.next_layout(rotation, {**labels, state['episode']: state['planned']})}")
-        return out
-
-    def init_keyboard_listener(*args, **kwargs):
-        listener, events = listen(*args, **kwargs)
-        state["events"] = events
-        return listener, events
-
-    def save_episode(self, *args, **kwargs):
-        out = save(self, *args, **kwargs)
-        labels[self.num_episodes - 1] = state["planned"]
-        side = edit.read_sidecar(Path(self.root))
-        side["layouts"].update(labels)
-        edit.write_sidecar(Path(self.root), side)
-        return out
-
-    lerobot_record.log_say = log_say
-    lerobot_record.init_keyboard_listener = init_keyboard_listener
-    LeRobotDataset.save_episode = save_episode
-    missing = [] if not labels else [i for i in range(max(labels) + 1) if i not in labels]
-    if missing:
-        print(f"WARNING: episodes without a layout: {edit.fmt_ranges(missing)}; the balance counts only labelled "
-              f"ones (lab data label)", flush=True)
-    banner(f"set up the first episode of this session: {edit.next_layout(rotation, labels)}")
 
 
 if __name__ == "__main__":
