@@ -8,8 +8,8 @@ adds only what 0.7 lacks:
 - refusing a stale local dataset copy (a different version cached under the same name);
 - checkpoints: the weights of every one are kept, the training state only for the latest (see
   prune_training_state);
-- recipes that need more than the recorded dataset (relative-action stats) train on a prepared variant
-  (drtc.data.prepare);
+- recipes that need more than the recorded dataset (relative-action stats, a frame cache) train on a prepared
+  variant (drtc.data.prepare; drtc.compat.frame_cache reads the cached frames);
 - a clean stop: Ctrl-C, SIGTERM or `lab stop <model>` saves a checkpoint at the next step, pushes it with its
   training state (resumable anywhere: `lab train <model> --resume`) and exits;
 - logging to Trackio (lab/lab.yaml: project and the shared Hugging Face Space);
@@ -230,15 +230,16 @@ def build(reg: Registry, model_id: str, steps: int | None = None, download: bool
         n = len(episodes) + len(held_out)
         flags["dataset.eval_split"] = (len(held_out) - 0.5) / n  # ceil(n * x) == len(held_out), robust to rounding
     flags.update({k: v for k, v in r.flags.items()})
-    # What the recipe needs beyond the recorded dataset (relative-action stats): a prepared variant folder.
+    # What the recipe needs beyond the recorded dataset (relative-action stats, a frame cache): one prepared
+    # variant folder.
     from drtc.data import prepare
 
-    variants = []
-    for need in prepare.needs(r.flags, r.policy):
-        root = prepare.ensure(r.dataset.repo, r.dataset.revision, need) if download else \
-            prepare.variant_root(r.dataset.repo, r.dataset.revision, need)
+    needs = prepare.needs(flags, r.policy, r.recipe.data if r.recipe else None)
+    variants = [n.tag for n in needs]
+    if needs:
+        root = prepare.ensure(r.dataset.repo, r.dataset.revision, needs) if download else \
+            prepare.variant_root(r.dataset.repo, r.dataset.revision, needs)
         flags["dataset.root"] = str(root)
-        variants.append(need.tag)
     frames = None
     if steps is not None:
         flags["steps"] = steps
@@ -396,9 +397,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"lab train: {out} exists; continue it with --resume", file=sys.stderr)
             return 1
     cmd = command(flags) + extra
-    from drtc.compat import molmoact2
+    from drtc.compat import frame_cache, molmoact2
 
     molmoact2.install()  # LoRA fine-tuning from a full-weight MolmoAct 2 checkpoint
+    frame_cache.install()  # cached frames for variants that have them (recipe data.frames)
     state = install_clean_stop(lerobot_train, args.model)
     sys.argv = cmd
     try:

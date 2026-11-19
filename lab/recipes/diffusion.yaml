@@ -34,3 +34,6 @@ diffusion_original:
     policy.scheduler_warmup_steps: 500
     ema.type: warmup
   serve: {rtc_enabled: false, num_flow_matching_steps: null, actions_per_chunk: 24, s_min: 8}
+  # Speed (Phase 3): frames decoded once and resized to resize_shape with the model's own Resize, so the model
+  # input is the same up to uint8 rounding; see drtc.data.prepare. Remove to decode the videos while training.
+  data: {frames: [240, 320]}

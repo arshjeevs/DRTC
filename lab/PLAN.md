@@ -791,6 +791,39 @@ RTC. The other five can be compared with and without RTC.
   - `torch.compile` of the policy
   - LoongForge (π0.5, X-VLA, GR00T N1.6/N1.7; its speedups were measured on 8 GPUs; DCP checkpoints need
     conversion)
+- H200 baseline (2026-11-19, commit 5ac3fa7b; π0.5, GR00T and MolmoAct 2 still to run):
+
+  | Model | Step | Waiting on data | GPU | Full recipe run |
+  |---|---|---|---|---|
+  | ACT | 0.107 s | 2% | 45% | 3.0 h |
+  | Diffusion | 0.317 s | **75%** | 21% | **18.8 h** (update alone 0.074 s: ≈ 4.4 h if data kept up) |
+  | SmolVLA | 0.323 s | 2% | 69% | 1.8 h |
+
+  Diffusion needs 64 / 0.074 ≈ 865 samples/s; the H200 container delivered 207 with 8 workers (the laptop 1167 with
+  Diffusion's timestamps), so its CPUs are the limit (machine details pending).
+- [x] Frame cache (2026-11-19), recipe `data: {frames: [240, 320]}`, on for Diffusion: `drtc.data.prepare` decodes
+  every frame once with LeRobot's decoder, resizes it with Diffusion's own `Resize`, and stores uint8 arrays in the
+  variant (11 GB, 97 s on the laptop); `drtc.compat.frame_cache` reads them in training. The model's Resize then
+  leaves the frame unchanged. Laptop check (`tests/bench/check_frame_cache.py`): largest difference 0.5/255 (the
+  uint8 rounding), mean 0.19/255; DataLoader 1167 → 2714 samples/s. Serving is unchanged.
+- [x] Comparison rounds: `tests/bench/variants.yaml` (per model: flags, workers; `parallel` for jobs side by side),
+  run with `tests/bench/round.py [variant ...]`; results next to the baseline.
+- LoongForge (read 2026-11-19: homepage, π0.5 tutorial, README; v0.1.0, 2026-05):
+  - Models: π0.5, GR00T N1.6 and N1.7, X-VLA and others. Not SmolVLA, MolmoAct 2, GR00T N1.5, ACT or Diffusion.
+  - Reported speedups: π0.5 2.80×, GR00T N1.7 1.85× "over mainstream open-source baselines". GPU type, GPU count
+    and any single-GPU figure are not stated; the π0.5 tutorial runs 8 GPUs.
+  - How: bf16, fused AdamW, torch.compile (max-autotune-no-cudagraphs), activation checkpointing only on SigLIP,
+    DDP tuning, FSDP2, optional FP8 communication, per-model I/O work. No breakdown by technique.
+  - Recipe match: reads LeRobot v3.0 datasets, quantile (q99) normalization, π-style relative actions
+    (`use_aloha_pi_delta_actions`, anchored on the chunk's start state). EMA is not mentioned; LoRA for VLAs is
+    unverified. Checkpoints: "no conversion needed" for its own evaluation; loading them in LeRobot 0.7 for our
+    server is unverified.
+  - Install: a Docker image (`loongforge/loongforge`); our H200 is itself a container, so it would be a source
+    install there, with its CUDA/PyTorch needs unstated.
+  - Use for us: only π0.5 and GR00T N1.7. First take its single-GPU techniques inside LeRobot (compile, fused
+    optimizer, checkpointing only on the vision tower), which our rounds measure. Try LoongForge itself only if
+    those two stay the longest runs, or with several GPUs, and only after a check that its π0.5/N1.7 training
+    matches our recipe (relative actions, EMA, stats) and that its checkpoints serve in LeRobot.
 - [ ] Settle on one setup per model, recorded in `models.yaml`
 
 ## Phase 4: Train and choose

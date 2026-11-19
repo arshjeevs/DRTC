@@ -151,6 +151,7 @@ class Settings(BaseModel):
 
 SERVE_KEYS = {"rtc_enabled", "num_flow_matching_steps", "actions_per_chunk", "s_min"}
 TRAIN_KEYS = {"epochs", "steps", "batch_size", "save_freq", "episodes", "split"}
+DATA_KEYS = {"frames"}  # dataset preparation for speed (drtc.data.prepare)
 
 
 class Recipe(Entry):
@@ -166,9 +167,13 @@ class Recipe(Entry):
     cameras: dict[str, str] = Field(default_factory=dict)
     lora: dict[str, Any] | None = None
     serve: dict[str, Any] = Field(default_factory=dict)  # rtc_enabled, num_flow_matching_steps, ...
+    data: dict[str, Any] = Field(default_factory=dict)  # frames: [H, W] (a frame cache, drtc.data.prepare)
 
     @model_validator(mode="after")
     def _keys(self):
+        bad = set(self.data) - DATA_KEYS
+        if bad:
+            raise ValueError(f"unknown data keys {sorted(bad)} (known: {sorted(DATA_KEYS)})")
         bad = set(self.serve) - SERVE_KEYS
         if bad:
             raise ValueError(f"unknown serve keys {sorted(bad)} (known: {sorted(SERVE_KEYS)})")
