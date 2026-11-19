@@ -33,3 +33,11 @@ hosts:
     roles: [record, client, serve]
     gpus:
     - {name: RTX 4060 Laptop, memory_gb: 8}
+  a100:
+    label: GPUserver
+    roles: [serve, train]
+    ssh: b230968ee@192.168.5.13
+    repo: /home/b230968ee/drtc_major   # new setup on the host, no container (lab/bin/a100-setup)
+    gpus:
+    - {name: A100 80GB PCIe, memory_gb: 80}
+    shared: true

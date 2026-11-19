@@ -1,0 +1,59 @@
+#!/bin/bash
+# A100 server (GPUserver, 192.168.5.13): the major setup on the host, no container. Run once, and again after a
+# lock change: `cd ~/drtc_major && lab/bin/a100-setup`.
+#
+# Differences from the other hosts, all forced by the machine:
+# - driver 570 supports CUDA up to 12.8, but the lock pins torch 2.14.1 for CUDA 13.0 (the H200's driver). The same
+#   versions are installed here in their CUDA 12.6 builds (the newest 12.x build PyTorch publishes for 2.14.1):
+#   torch 2.14.1+cu126, torchvision 0.29.1+cu126, torchcodec 0.17.0+cu126. Everything else comes from the lock.
+# - no FFmpeg and no sudo: torchcodec gets FFmpeg's shared libraries from conda-forge (micromamba, in .ffmpeg/);
+#   .server.env puts them on LD_LIBRARY_PATH.
+# - everything lives in ~/drtc_major (caches included); /home is shared and nearly full.
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+REPO="$PWD"
+[ -f .server.env ] || cat > .server.env <<EOF
+# A100 settings (written by lab/bin/a100-setup); sourced by every lab command here.
+export UV_CACHE_DIR=$REPO/.cache/uv
+export HF_HOME=$REPO/.cache/huggingface
+export HF_LEROBOT_HOME=$REPO/.cache/lerobot
+export DRTC_CACHE=$REPO/.cache/drtc
+export LD_LIBRARY_PATH=$REPO/.ffmpeg/lib\${LD_LIBRARY_PATH:+:\$LD_LIBRARY_PATH}
+export PATH=$REPO/.venv/bin:\$HOME/.local/bin:\$PATH
+[ -f \$HOME/.drtc.env ] && { set -a; . \$HOME/.drtc.env; set +a; }   # HF_TOKEN, WANDB_API_KEY (not in git)
+EOF
+. ./.server.env
+mkdir -p .tools "$UV_CACHE_DIR" "$HF_HOME" "$HF_LEROBOT_HOME" "$DRTC_CACHE" logs
+
+# 1. FFmpeg shared libraries (conda-forge), for torchcodec.
+if [ ! -x .tools/micromamba ]; then
+    curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xj -C .tools --strip-components=1 bin/micromamba
+fi
+if [ ! -e .ffmpeg/lib/libavutil.so ]; then
+    MAMBA_ROOT_PREFIX="$REPO/.tools/mamba" .tools/micromamba create -y -q -p "$REPO/.ffmpeg" -c conda-forge "ffmpeg=7.1"
+    rm -rf .tools/mamba/pkgs
+fi
+
+# 2. The environment: the lock without its CUDA 13 torch stack, then the CUDA 12.6 builds of the same versions.
+CU13=$(grep -oE '^name = "(nvidia-[a-z0-9-]+|triton)"' uv.lock | cut -d'"' -f2 | grep -v '^nvidia-ml-py$' | sort -u |
+    sed 's/^/--no-install-package /')
+# shellcheck disable=SC2086
+uv sync --frozen --extra gpu --python 3.12 --no-install-package torch --no-install-package torchvision \
+    --no-install-package torchcodec $CU13
+uv pip install --python .venv/bin/python --index-url https://download.pytorch.org/whl/cu126 \
+    --extra-index-url https://pypi.org/simple \
+    torch==2.14.1+cu126 torchvision==0.29.1+cu126 torchcodec==0.17.0+cu126
+uv cache prune -q || true
+
+# 3. Check: GPU, versions, the video decoder.
+.venv/bin/python - <<'EOF'
+import torch, torchvision, torchcodec
+from drtc.data.video import check_decoder
+print(f"torch {torch.__version__} (CUDA {torch.version.cuda}), torchvision {torchvision.__version__}, "
+      f"torchcodec {torchcodec.__version__}")
+print(f"GPU: {torch.cuda.get_device_name(0)}, bf16 {torch.cuda.is_bf16_supported()}")
+x = torch.randn(1024, 1024, device="cuda"); print("matmul ok:", float((x @ x).sum()) == float((x @ x).sum()))
+print("video decoder:", check_decoder())
+EOF
+.venv/bin/lab check
+echo "a100-setup: done. Use: cd $REPO && . ./.server.env"
