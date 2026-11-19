@@ -152,8 +152,19 @@ def cmd_stop(args) -> int:
     return 0
 
 
+def use_own_bin() -> None:
+    """Put this environment's bin/ first on PATH, so programs LeRobot launches by name (the Rerun viewer while
+    recording) are found when lab runs as .venv/bin/lab without an activated environment."""
+    import os
+
+    own = str(Path(sys.executable).parent)
+    if own not in os.environ.get("PATH", "").split(os.pathsep):
+        os.environ["PATH"] = own + os.pathsep + os.environ.get("PATH", "")
+
+
 def main(argv: list[str] | None = None) -> None:
     argv = sys.argv[1:] if argv is None else argv
+    use_own_bin()
     if argv and argv[0] == "train":  # its own argument parser; unknown flags go to lerobot-train
         from drtc.train import main as train_main
 
