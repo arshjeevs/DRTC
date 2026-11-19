@@ -824,6 +824,11 @@ RTC. The other five can be compared with and without RTC.
   why Diffusion's data loading was slow on the H200. Caches are now decoded with the host's training decoder
   (recorded in the cache; rebuilt if it changes). On our data the two decoders give identical frames (20 random
   frames, laptop). Installing FFmpeg in the container (`apt-get install -y ffmpeg`) would let torchcodec load.
+- [x] One video setup on every machine (2026-11-19, `drtc.data.video`): recordings are written with PyAV (LeRobot's
+  only encoder) as AV1 / yuv420p / keyframe every 2 / CRF 30, passed explicitly by `lab record` (LeRobot's defaults,
+  as so101_cubebox_v1 was recorded); training, caches and checks read with torchcodec. `lab train` checks that
+  torchcodec loads and stops with instructions otherwise (`--dataset.video_backend=pyav` to use PyAV deliberately),
+  so no machine falls back to PyAV silently again.
 - Building a cache decodes in the training process, so `build_frames` closes LeRobot's decoders afterwards; forked
   DataLoader workers inheriting them fail with "Could not push packet to decoder".
 - Laptop, ACT (2026-11-19, commit 3de1880e): step 0.500 s, data 4%, GPU 99.8%, peak 6.1 GB, full recipe ≈ 13.9 h

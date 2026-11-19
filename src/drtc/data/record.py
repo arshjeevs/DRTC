@@ -21,6 +21,7 @@ from pathlib import Path
 
 import yaml
 
+from drtc.data import video
 from drtc.registry import Registry, for_host, resolve_device
 
 REGISTRY_FILE = "recorded.yaml"
@@ -140,6 +141,7 @@ def main(argv: list[str] | None = None) -> int:
     flags = {**rig_flags(reg), "dataset.repo_id": raw_repo, "dataset.single_task": a.task, "dataset.fps": fps,
              "dataset.num_episodes": a.episodes, "dataset.episode_time_s": a.episode_time,
              "dataset.reset_time_s": a.reset_time, "dataset.push_to_hub": False, "resume": a.resume,
+             **video.encoder_flags(),  # the same AV1 settings for every recording (drtc.data.video)
              "display_data": display, "play_sounds": False}
     cmd = ["lerobot-record", *(f"--{k}={flag_value(v)}" for k, v in flags.items()), *extra]
     print(" \\\n    ".join(shlex.quote(p) for p in cmd), flush=True)

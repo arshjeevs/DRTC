@@ -8,6 +8,7 @@ adds only what 0.7 lacks:
 - refusing a stale local dataset copy (a different version cached under the same name);
 - checkpoints: the weights of every one are kept, the training state only for the latest (see
   prune_training_state);
+- one video decoder everywhere (torchcodec, drtc.data.video): checked before training, no silent PyAV fallback;
 - recipes that need more than the recorded dataset (relative-action stats, a frame cache) train on a prepared
   variant (drtc.data.prepare; drtc.compat.frame_cache reads the cached frames);
 - a clean stop: Ctrl-C, SIGTERM or `lab stop <model>` saves a checkpoint at the next step, pushes it with its
@@ -32,6 +33,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from drtc.data import video
 from drtc.registry import Registry, RegistryError, Resolved
 
 OUTPUTS = Path("outputs/train")
@@ -214,6 +216,7 @@ def build(reg: Registry, model_id: str, steps: int | None = None, download: bool
         "batch_size": t.get("batch_size", 8),
         "save_freq": t.get("save_freq", 5_000),
         "trackio.enable": True,
+        "dataset.video_backend": video.DECODER,  # one decoder everywhere (drtc.data.video), checked in main()
         "trackio.project": reg.settings.trackio_project,
     }
     if reg.settings.trackio_space:
@@ -393,6 +396,12 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         if args.dry_run:
             return 0
+        if not any(e.startswith("--dataset.video_backend") for e in extra):
+            try:
+                video.check_decoder()
+            except RegistryError as e:
+                print(f"lab train: {e}", file=sys.stderr)
+                return 1
         if out.exists():
             print(f"lab train: {out} exists; continue it with --resume", file=sys.stderr)
             return 1

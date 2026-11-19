@@ -119,11 +119,10 @@ def _want(repo: str, revision: str | None, need: list) -> dict:
 
 
 def video_backend() -> str:
-    """The decoder lerobot-train uses on this host (dataset.video_backend's default): torchcodec, or pyav where
-    torchcodec cannot load FFmpeg. torchcodec and pyav can differ slightly, so a cache is made with this one."""
-    from lerobot.utils.import_utils import get_safe_default_video_backend
+    """The decoder training uses (drtc.data.video.DECODER, checked to load here); a cache is decoded with it."""
+    from drtc.data import video
 
-    return get_safe_default_video_backend()
+    return video.check_decoder()
 
 
 def ensure(repo: str, revision: str | None, need) -> Path:
