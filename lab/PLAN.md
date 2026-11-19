@@ -8,10 +8,10 @@ nothing has to be redone. Items marked **[open]** are decisions still to make.*
 |---|---|---|---|
 | 1 | Move to LeRobot 0.7, our code as a separate layer on top | The new setup runs everywhere | Done; its robot-side items moved to 3 and 5 |
 | 2 | Shortlist the models, each with its original recipe | Recipes fixed and sourced | Done; **recipes fixed for all training** |
-| 3 | Faster training, and the setup on every machine | One measured speed setup per active model | In progress, **in parallel with 4** |
+| 3 | Faster training, and the setup on every machine | One measured speed setup per active model | **Done** (2026-11-19) |
 | 4 | Data collection (the user) | New datasets finalised and on the Hub | Starting, **in parallel with 3** |
 | 5 | Evaluation framework | One command for offline results; robot trials recorded with a fixed protocol | Built during 3-4 |
-| 6 | Train and choose | We know which models work | Round 1 on the A100 now; round 2 after 4 |
+| 6 | Train and choose | We know which models work | Round 1 running on the A100; round 2 after 4 |
 | 7 | Smoothing test bench, then smoothing methods | Any method compared on any model with one command | After 6 |
 | 8 | DRTC experiments | — | After 6, 7 |
 | Later | Edge fallback (ACT); the deferred models | — | Only if time is left |
@@ -57,8 +57,9 @@ nothing has to be redone. Items marked **[open]** are decisions still to make.*
 - [x] GR00T N1.5 on the A100 restarted with the cache fix (2026-11-19 18:20; the first run decoded full-size videos):
   preprocessing 1.14 -> 0.23 s, step 2.65 -> 1.79 s (~4.9 h); loss at step 200 0.322 in both runs (same input).
 - [x] Old models on LeRobot 0.7 (A100, 2026-11-19, measured with three trainings on the GPU, so the times are high):
-  both admitted in chunk and rtc_guided mode. GR00T 379 ms chunk / 466 ms RTC, SmolVLA 571 / 928 ms. [ ] Retime on
-  a free GPU before the robot trials.
+  both admitted in chunk and rtc_guided mode. GR00T 379 ms chunk / 466 ms RTC, SmolVLA 571 / 928 ms.
+  [x] On a free H200: GR00T 109 / 137 ms (4 / 5 steps, margin 8: fits); SmolVLA 272 / 445 ms (9 / 14, margin 30:
+  fits). Both are usable references for the robot trials.
 - [x] H200: FFmpeg, the frame-cache checks, the full comparison round, one speed setup per active model (Phase 3
   section, 2026-11-19).
 - [ ] Later, while models train (not now): **easy serving on either GPU server.** Today serving on the A100 or the
@@ -83,23 +84,30 @@ order on the new datasets (A100, H200; laptop for ACT), each run evaluated with 
 
 ---
 
-## Status at the end of the 2026-11-18 session (handover)
-**Phase 1 is done except for what needs other machines. These items wait until the user says the hardware is
-available:**
-- **D7:** Zenoh across machines (an H200 server with the laptop client), the GR00T N1.5 kept-model serving test
-  on the H200, and the Pi as the client. Needs H200 access, then the robot.
-- **Pi:** the new setup's Pi install (`uv sync`), then Zenoh to the laptop or H200 server.
-- **Robot-side checks:**
-  - `lab check --rig` with everything plugged in;
-  - `lab calibrate` against the explicit `so101_*` calibration files;
-  - a short `lab record` test (record → trim → push);
-  - real `lab run` trials, including the replication conditions with option (b).
+## Status at the end of the 2026-11-19 session (handover)
+**Done:** Phases 1-3. Phase 3's outcome: one speed setup per active model (recipes' `speed:` and `data:`; hosts'
+`cpu_budget`): SmolVLA compile (H200 1.8 -> 1.1 h), GR00T N1.5 frame cache (H200 3.0 -> 1.4 h), ACT shares a GPU.
+Logging standard: wandb (`drtc-lab`) + Trackio local. Video: AV1 recordings, torchcodec decoding everywhere.
 
-Small open items: robot-run logging to the Trackio Space plus a results mirror; DOT and SFP plugins (only if
-shortlisted); best-checkpoint selection after training.
+**Running (Phase 6 round 1, A100, started 2026-11-19 ~18:00):** `act_cubebox_v0_full` (~3 h), `smolvla_cubebox_v0_full`
+(~5 h), `groot_cubebox_v1_full` (~4.9 h, restarted 18:20 with the cache fix), with the fixed recipes. A100 `tmux`
+session `drtc`, windows act / smolvla / groot; logs `~/drtc_major/logs/train_<model>.log`; wandb project `drtc-lab`.
+Each pushes to `orangemoon599/<model>` at the end (best checkpoint by held-out loss at the repo root). Claude
+reaches the A100 over SSH (`b230968ee@192.168.5.13`, key login); the user runs everything on the H200.
 
-**Next session:** Phase 2, the shortlist. The findings so far are in the Phase 2 section below. Then start the
-trainings on the H200 (`lab submit` / `lab worker`, or `lab train`; all 8 recipes train there).
+**Ready:** Phase 4 recording (`lab record so101_cubebox_v2 --task "..." --episodes N`; tested 2026-11-19). The user
+records; task instruction and size per dataset are the user's.
+
+**Next session, in order:**
+1. Check round 1 finished and pushed; note the held-out losses.
+2. Phase 5, the evaluation framework: offline first (held-out action error per checkpoint, one table), so round 1
+   can be ranked; then the robot protocol (ask the user for N trials per model and the cube-position grid), DRTC
+   metrics per trial, results report; Zenoh between the laptop and the A100/H200 (Phase 1 D7).
+3. Round 1 robot trials against the kept minor models (both fit DRTC's margin on a free H200).
+
+**Small open items:** H200 `lab check --logging` (after `git pull`, `uv sync`, `LAB_HOST=h200`, PATH with
+`.venv/bin` in its `.server.env`); Diffusion's 0.162 vs 0.103 s (deferred); later: easy serving on either GPU server,
+the deferred models, the presentation date.
 
 ## Phase 1: LeRobot upgrade (option c: LeRobot as a dependency, our code on top)
 
@@ -948,7 +956,10 @@ RTC. The other five can be compared with and without RTC.
   - [x] GR00T N1.5 preprocessing profiled (laptop, real batches, `tests/bench/profile_preprocessing.py`): with the
     cache 118 ms per batch of 32 (Eagle encode 36 ms, collate 70 ms: tokenizer and Eagle's image processor), against
     0.69 s inside H200 training without it.
-  - [ ] Remeasure on the H200 with the fix: `round.py frames frames_w16`.
+  - [x] Remeasured on the H200 with the fix (2026-11-19, round2): GR00T N1.5 **0.518 s** per step (1.080), **1.4 h**
+    (3.0); Diffusion 0.162 s at 8 workers, 0.173 s at 16 (data 2%), 9.6 h (18.8). Open, for when Diffusion
+    returns: slower than the 0.103 s measured earlier with 16 decoding workers although it no longer waits for data
+    (other jobs on the shared H200 at one of the two times?).
 - [x] One setup per active model (2026-11-19), in the recipes' `speed:` section (lerobot-train flags that change only
   the speed; `lab train` refuses one that is also a recipe flag, and prints them separately):
   - SmolVLA: `policy.compile_model: true`.
