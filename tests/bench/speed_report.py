@@ -101,6 +101,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", type=Path, default=Path("logs/bench"))
     a = ap.parse_args(argv)
     gpu = parse_gpu(a.gpu_csv.read_text()) if a.gpu_csv and a.gpu_csv.is_file() else None
+    if not a.log.is_file():
+        print(f"{a.model}: no log at {a.log} (not run yet?)", flush=True)
+        return 1
     text = a.log.read_text(errors="replace")
     try:
         res = summarize(parse_log(text), a.warmup, gpu)
