@@ -26,9 +26,11 @@ import yaml
 from .schema import Dataset, Host, HostsFile, Model, Recipe, Rig, Settings
 
 ROBOT = "so101"
-DATASET_NAME = re.compile(rf"^{ROBOT}_(?P<base>[a-z0-9]+_v\d+)(?:_(?P<variant>[a-z0-9]+))?$")
+# The task part may have underscores (so101_sort_one_v1): policy prefixes never do, and _v<N> ends the task.
+TASK = r"[a-z0-9]+(?:_[a-z0-9]+)*?"
+DATASET_NAME = re.compile(rf"^{ROBOT}_(?P<base>{TASK}_v\d+)(?:_(?P<variant>[a-z0-9]+))?$")
 MODEL_NAME = re.compile(
-    r"^(?P<policy>[a-z0-9]+)_(?P<base>[a-z0-9]+_v\d+)_(?P<method>full|lora)(?P<variants>(?:_[a-z0-9]+)*)$"
+    rf"^(?P<policy>[a-z0-9]+)_(?P<base>{TASK}_v\d+)_(?P<method>full|lora)(?P<variants>(?:_[a-z0-9]+)*)$"
 )
 # Model-name prefixes per policy where it is not the policy type without underscores: GR00T N1.5 models were always
 # named groot_* and N1.7 ones grootn17_*. LeRobot 0.7's `groot` is N1.7, but the minor's kept N1.5 checkpoints

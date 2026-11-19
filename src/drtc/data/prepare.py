@@ -23,13 +23,15 @@ All needs of a recipe become one variant folder next to LeRobot's cache:
 holding symlinks to every file of the pinned dataset, its own meta/stats.json if the stats change, and
 drtc_frames/ if frames are cached. The dataset itself is never written. `lab train` passes the variant as
 --dataset.root, so a new dataset needs no manual step: the variant is made on first use on any host (or ahead of
-time with `lab prepare`, which `lab record` runs after pushing).
+time with `lab prepare`, e.g. on a GPU server after a new push). Variants of older revisions of the same repo are
+deleted when a new one is made (unless a running process reads them).
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import sys
 from dataclasses import asdict, dataclass
@@ -169,7 +171,43 @@ def ensure(repo: str, revision: str | None, need) -> Path:
     if frames is not None:
         build_frames(ds, root / FRAMES_DIR, frames)
     marker.write_text(json.dumps(want, indent=1))
+    prune_old_revisions(repo, revision)
     return root
+
+
+def in_use(path: Path) -> bool:
+    """Whether a process of this user has a file under `path` open or memory-mapped (a training reading its frame
+    cache). Other users' processes are not readable, and they never read our cache."""
+    prefix = str(path.resolve())
+    for proc in Path("/proc").iterdir():
+        if not proc.name.isdigit():
+            continue
+        try:
+            if prefix in (proc / "maps").read_text():
+                return True
+            for fd in (proc / "fd").iterdir():
+                if os.readlink(fd).startswith(prefix):
+                    return True
+        except OSError:
+            continue
+    return False
+
+
+def prune_old_revisions(repo: str, revision: str | None) -> list[Path]:
+    """Delete this repo's variants made for other revisions (each push makes a new one; the old ones are never read
+    again, and a frame cache is GBs), except one a running process still reads."""
+    keep = f"{(revision or 'local')[:10]}_"
+    parent = variant_root(repo, revision, []).parent
+    removed = []
+    for d in sorted(parent.iterdir()) if parent.is_dir() else []:
+        if d.is_dir() and not d.name.startswith(keep):
+            if in_use(d):
+                print(f"  kept {d.name}: a running process reads it", flush=True)
+                continue
+            shutil.rmtree(d)
+            removed.append(d)
+            print(f"  removed {d.name} (an older revision of {repo})", flush=True)
+    return removed
 
 
 def build_frames(ds, out: Path, need: FrameCache, batch: int = 64) -> None:

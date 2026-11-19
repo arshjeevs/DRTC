@@ -8,8 +8,8 @@ inside the raw copy, in meta/drtc.json, so it travels with it to the Hub:
     {"layouts": {"<episode>": "<layout>"},      which layout an episode was recorded with (lab/layouts.yaml)
      "trim": {"<episode>": [start, end]}}         manual crop in frames, instead of autotrim's
 
-Edits stay local until `lab data push` (it uploads both copies, updates lab/datasets/recorded.yaml, prepares the
-dataset for training). One undo level: before each edit the raw copy is snapshotted (hardlinks, so it costs almost
+Edits stay local until `lab data push` (it uploads both copies and updates lab/datasets/recorded.yaml; each GPU
+server prepares the dataset for its recipes at its first `lab train`, or ahead of time with `lab prepare`). One undo level: before each edit the raw copy is snapshotted (hardlinks, so it costs almost
 no disk) in $HF_LEROBOT_HOME/.drtc_edit/<repo>/undo; the snapshot is dropped at the next push or recording.
 Deleting episodes renumbers the later ones (LeRobot keeps indices 0..N-1); layouts and manual trims follow.
 """
@@ -231,7 +231,9 @@ def task_of(raw: Path) -> str:
 
 
 def publish(reg: Registry, p: Paths, held_out: int | None = None) -> None:
-    """Push both copies, write their registry entries (pinned to the pushed revisions), prepare for training."""
+    """Push both copies and write their registry entries (pinned to the pushed revisions). Not prepared here: the
+    prepared copies (frame caches, relative stats) only serve the machine that makes them, so each training host
+    makes its own at its first `lab train` (or `lab prepare <name>` ahead of time)."""
     from drtc.data.record import REGISTRY_FILE, check_recording, registry_entries
 
     info = json.loads((p.raw / "meta/info.json").read_text())
@@ -253,10 +255,8 @@ def publish(reg: Registry, p: Paths, held_out: int | None = None) -> None:
     path.write_text("# Written by lab record / lab data; review and commit.\n\n" + yaml.safe_dump(existing, sort_keys=False))
     print(f"registry: {', '.join(entries)} in {path} (review and commit)")
     clear_state(p)
-    from drtc.data.prepare import prepare, recipes_in_use
-
-    reg = Registry()
-    prepare(reg, p.name, recipes_in_use(reg))
+    print(f"ready to train: commit lab/datasets/{REGISTRY_FILE}, git pull on the GPU server; its first lab train "
+          f"prepares the dataset there (or ahead of time: lab prepare {p.name})")
 
 
 # --- commands -------------------------------------------------------------------------------------------------------
@@ -490,7 +490,7 @@ def main(argv: list[str] | None = None) -> int:
                                                          "the rotation (as recorded)")
     s = sub.add_parser("undo", help="undo the last edit (one level, until the next push)")
     s.add_argument("name")
-    s = sub.add_parser("push", help="upload both copies, update the registry, prepare for training")
+    s = sub.add_parser("push", help="upload both copies and update the registry")
     s.add_argument("name")
     s.add_argument("--held-out", type=int, help="held-out episodes (default: as registered, else 10%%)")
     s = sub.add_parser("remove", help="delete the whole dataset locally (--hub: also on the Hub)")

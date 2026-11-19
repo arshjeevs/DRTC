@@ -68,3 +68,18 @@ def test_record_prompts_store_each_episodes_layout_and_keep_it_on_rerecord(tmp_p
     out = capsys.readouterr().out
     assert "re-record episode 1: same layout, b" in out and "set up episode 2: c" in out
     assert read_sidecar(tmp_path)["layouts"] == {0: "a", 1: "b", 2: "c"}
+
+
+def test_prune_old_revisions_keeps_the_current_and_ones_in_use(tmp_path, monkeypatch):
+    import mmap
+
+    from drtc.data import prepare
+
+    monkeypatch.setattr(prepare, "variant_root", lambda repo, rev, need: tmp_path / repo / f"{rev[:10]}_x")
+    repo = tmp_path / "acc/ds"
+    for name in ("aaaaaaaaaa_frames", "aaaaaaaaaa_rel", "bbbbbbbbbb_frames", "cccccccccc_frames"):
+        (repo / name).mkdir(parents=True)
+        (repo / name / "f.bin").write_bytes(b"\0" * 4096)
+    with open(repo / "cccccccccc_frames" / "f.bin", "rb") as f, mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ):
+        prepare.prune_old_revisions("acc/ds", "aaaaaaaaaa1234")  # a training memory-maps c's frames
+    assert sorted(d.name for d in repo.iterdir()) == ["aaaaaaaaaa_frames", "aaaaaaaaaa_rel", "cccccccccc_frames"]
