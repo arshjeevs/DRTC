@@ -581,8 +581,11 @@ Fixes:
   - Each flow step costs about 17 ms in chunk mode and about 31 ms in RTC mode (guided RTC runs a backward pass per
     step). About 120 ms per call is fixed: the VLM and preprocessing.
   - The check times only the server. Network time between robot and server comes on top, so 1 spare step is thin.
-- [ ] MolmoAct 2 flow steps for serving: decide after the real training, from held-out action error at 10 / 6 / 5 / 4
-  steps. `lab serve` also needs the same config override as the check.
+- [ ] MolmoAct 2 flow steps for serving (**decided 2026-11-19**, applied in Phase 4): after the real training,
+  compare held-out action error at 10 / 6 / 5 / 4 flow steps and serve with the fewest whose error stays close to
+  10 steps, preferring 4. If the error drops noticeably at 5 or fewer, fall back to option C: lower s_min for
+  MolmoAct 2 (s_min 16 gives margin 14, and 10 flow steps then fits with RTC). `lab serve` gets the same config
+  override as the check once the count is chosen.
 
 ### Dataset preparation (2026-11-19)
 `drtc.data.prepare` makes what a recipe needs beyond the recorded dataset. Today that is relative-action stats:
@@ -754,6 +757,11 @@ RTC. The other five can be compared with and without RTC.
 - [ ] **[open]** Hardware available (H200 only, or the A100 too; one GPU or several)
 - [ ] Measure the time per step for each shortlisted model on 0.7 as-is: bf16, compiled image transforms,
       dataloader workers, video decoding
+  - Baseline tool (2026-11-19): `tests/bench/train_speed.sh` runs each recipe for 200 steps (no eval, no
+    checkpoint), averages LeRobot's logged step times after step 50 (data wait, preprocessing, update) with GPU
+    utilization from nvidia-smi, and projects the full recipe run. `LABEL=... EXTRA=...` compares a setting.
+  - The data share of a step says where to look: high = data loading / video decoding (workers, decoder), low with
+    low GPU utilization = small kernels (compile, batch), high utilization = the model itself (multi-GPU, LoongForge).
 - [ ] Options to compare:
   - upstream FSDP2/DDP (`--parallelism.*`), if there is more than one GPU
   - `torch.compile` of the policy
