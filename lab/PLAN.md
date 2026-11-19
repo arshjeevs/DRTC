@@ -26,8 +26,8 @@ nothing has to be redone. Items marked **[open]** are decisions still to make.*
 - **Machines:** the A100 (192.168.5.13; cleaned 2026-11-19; Claude has SSH access) trains now and serves for the
   robot trials; the H200 tests everything during data collection, afterwards it trains the active models; the
   laptop records and runs the robot.
-- **A100 and Hugging Face:** downloads from the A100 run at ~2 KB/s, so base models and datasets are copied from the
-  laptop over the LAN, and checkpoints are pushed from where the Hub is reachable.
+- **A100 and Hugging Face:** a first test showed ~2 KB/s, a second one 23.5 MB/s for a large file and 0.4-0.6 s for API
+  calls: the Hub works from the A100. The base models and datasets were copied from the laptop anyway (faster).
 - **New datasets (Phase 4):** a new task, the same scene positions and rig as v1 (`so101_v2`: camera1 wrist,
   camera2 scene, 800x600 at 30 fps), names `so101_cubebox_v2`, `v3`, ...; size (episodes, lengths, held-out)
   decided per task. Joints in **degrees** (LeRobot 0.7's default): old and new datasets are not merged, and units are
@@ -37,7 +37,7 @@ nothing has to be redone. Items marked **[open]** are decisions still to make.*
 
 ## Plan by phase (2026-11-19)
 **Phase 3 (with 4):**
-- [ ] A100 setup (`lab/bin/a100-setup`), then base models and datasets copied from the laptop.
+- [ ] A100 setup (`lab/bin/a100-setup`); base models and datasets copied from the laptop.
 - [ ] A100 round 1 trainings (Phase 6) as soon as it is set up.
 - [ ] Old models on LeRobot 0.7: a serve check (load, warm up, chunk time) of `groot_cubebox_v1_lora_raw` and
   `smolvla_cubebox_v0_lora_raw` on the A100 (they were trained with 0.4.3).
