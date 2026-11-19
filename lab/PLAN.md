@@ -801,6 +801,9 @@ RTC. The other five can be compared with and without RTC.
 
   Diffusion needs 64 / 0.074 ≈ 865 samples/s; the H200 container delivered 207 with 8 workers (the laptop 1167 with
   Diffusion's timestamps), so its CPUs are the limit (machine details pending).
+- Laptop, ACT (2026-11-19, commit 3de1880e): step 0.500 s, data 4%, GPU 99.8%, peak 6.1 GB, full recipe ≈ 13.9 h
+  (H200: 3.0 h at 45% GPU). The laptop GPU is the limit, so ACT fits there only as an overnight run; on the H200 it
+  can share the GPU (round `together`).
 - [x] Frame cache (2026-11-19), recipe `data: {frames: [240, 320]}`, on for Diffusion: `drtc.data.prepare` decodes
   every frame once with LeRobot's decoder, resizes it with Diffusion's own `Resize`, and stores uint8 arrays in the
   variant (11 GB, 97 s on the laptop); `drtc.compat.frame_cache` reads them in training. The model's Resize then
