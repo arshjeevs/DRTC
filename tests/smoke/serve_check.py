@@ -11,7 +11,12 @@ session is opened. Then it times `runner.predict` (preprocess + policy + postpro
 on random camera images, in each mode, and compares the median with the DRTC margin H - s_min (in actions at the
 dataset's fps): the next chunk must arrive before the queue runs out.
 
-Prints one summary line and writes logs/smoke/serve_<model>.json. Exit code 1 if the deployment is refused.
+`--set key=value` (repeatable) serves a copy of the checkpoint with those keys of its config.json changed, to time
+inference settings without retraining, e.g. `--set num_inference_steps=5` for MolmoAct 2's flow steps. The copy is
+a temporary folder of symlinks plus the edited config.json; the checkpoint is not written. `--tag` names the output
+(serve_<model>_<tag>.json) so several settings can be compared.
+
+Prints one summary line and writes logs/smoke/serve_<model>[_<tag>].json. Exit code 1 if the deployment is refused.
 """
 
 from __future__ import annotations
@@ -30,6 +35,30 @@ import numpy as np
 import yaml
 
 
+def parse_sets(items: list[str]) -> dict:
+    out = {}
+    for item in items:
+        key, sep, value = item.partition("=")
+        if not sep or not key:
+            raise SystemExit(f"--set wants KEY=VALUE, got {item!r}")
+        out[key] = yaml.safe_load(value)
+    return out
+
+
+def with_config(checkpoint: Path, overrides: dict, dst: Path) -> Path:
+    """`dst`: symlinks to every file of `checkpoint` and its config.json with `overrides` applied."""
+    cfg = json.loads((checkpoint / "config.json").read_text())
+    unknown = sorted(set(overrides) - set(cfg))
+    if unknown:
+        raise SystemExit(f"not in {checkpoint / 'config.json'}: {', '.join(unknown)}")
+    cfg.update(overrides)
+    for f in checkpoint.iterdir():
+        if f.name != "config.json":
+            (dst / f.name).symlink_to(f.resolve())
+    (dst / "config.json").write_text(json.dumps(cfg, indent=4))
+    return dst
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("model")
@@ -39,6 +68,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--s-min", type=int, help="DRTC s_min (default: the recipe's serve.s_min, else 20)")
     ap.add_argument("--rtc-horizon", type=int, default=10, help="execution.rtc.execution_horizon for rtc_guided")
     ap.add_argument("--out", type=Path, default=Path("logs/smoke"))
+    ap.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
+                    help="change a key of the checkpoint's config.json for this check (value parsed as YAML)")
+    ap.add_argument("--tag", help="suffix for the output file name")
     a = ap.parse_args(argv)
 
     import draccus
@@ -59,15 +91,20 @@ def main(argv: list[str] | None = None) -> int:
     install_chunk_adapters()  # as `lab serve` does
     reg = Registry()
     r = reg.resolve(a.model)
+    overrides = parse_sets(a.set)
+    checkpoint = a.checkpoint.resolve()
+    if overrides:
+        checkpoint = with_config(checkpoint, overrides, Path(tempfile.mkdtemp(prefix="serve_check_")))
     rtc = r.policy in RTC_POLICIES
     modes = ["chunk", "rtc_guided"] if rtc else ["chunk"]
-    cfg = server_config(reg, a.model, str(a.checkpoint.resolve()), a.device, modes=modes)
+    cfg = server_config(reg, a.model, str(checkpoint), a.device, modes=modes)
     if rtc:
         cfg["execution"]["rtc"] = {"enabled": True, "mode": "guided", "execution_horizon": a.rtc_horizon}
     s_min = a.s_min or int(r.serve.get("s_min") or 20)
     fps = cfg["execution"]["action_fps"]
     result = {"model": a.model, "policy": r.policy, "checkpoint": str(a.checkpoint), "modes": modes, "s_min": s_min,
-              "fps": fps, "admitted": False}
+              "fps": fps, "config_overrides": overrides, "admitted": False}
+    out_name = f"serve_{a.model}{'_' + a.tag if a.tag else ''}.json"
     a.out.mkdir(parents=True, exist_ok=True)
 
     with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as f:
@@ -80,8 +117,8 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as e:  # noqa: BLE001 - the refusal is the result
         result["error"] = f"{type(e).__name__}: {e}"
         result["traceback"] = traceback.format_exc()
-        print(f"{a.model}: REFUSED  {result['error']}", flush=True)
-        (a.out / f"serve_{a.model}.json").write_text(json.dumps(result, indent=1))
+        print(f"{a.model}{' ' + str(overrides) if overrides else ''}: REFUSED  {result['error']}", flush=True)
+        (a.out / out_name).write_text(json.dumps(result, indent=1))
         return 1
 
     caps = runner.capabilities
@@ -124,14 +161,15 @@ def main(argv: list[str] | None = None) -> int:
     if torch.cuda.is_available():
         result["peak_gpu_gb"] = round(torch.cuda.max_memory_allocated() / 1e9, 2)
 
-    parts = [f"{a.model}: admitted {'+'.join(m.value for m in caps.modes)}  H={H} (predicts {caps.prediction_steps})"]
+    label = a.model + (f" [{', '.join(f'{k}={v}' for k, v in overrides.items())}]" if overrides else "")
+    parts = [f"{label}: admitted {'+'.join(m.value for m in caps.modes)}  H={H} (predicts {caps.prediction_steps})"]
     for mode in caps.modes:
         m = result[mode.value]
         parts.append(f"{mode.value} {m['median_ms']} ms (p90 {m['p90_ms']}) = {m['latency_steps']} steps vs "
                      f"H-s_min {m['margin_steps']}: {'fits' if m['fits'] else 'DOES NOT FIT'}")
     parts.append(f"peak {result['peak_gpu_gb']} GB")
     print("  |  ".join(parts), flush=True)
-    (a.out / f"serve_{a.model}.json").write_text(json.dumps(result, indent=1))
+    (a.out / out_name).write_text(json.dumps(result, indent=1))
     return 0
 
 

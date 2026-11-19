@@ -555,7 +555,20 @@ Fixes:
 - MolmoAct 2: 0.7 applies LoRA in `__init__` and then loads the checkpoint strictly, so a full-weight checkpoint
   (our base) does not fit the adapter-wrapped model. `drtc.compat.molmoact2` (installed by `lab train`) loads as
   fft, then applies the adapters exactly as `__init__` would, then compiles. LoRA checkpoints load unchanged.
-- [ ] Rerun: π0.5 and MolmoAct 2.
+- [x] Rerun (commit 1fd7db08), both ok:
+
+  | Model | Train (30 steps) | Peak train GPU | Serve check |
+  |---|---|---|---|
+  | π0.5 | ok, 457 s, eval 0.087 (relative stats) | 76.5 GB | chunk 178.4 ms (6) / RTC 257.5 ms (8) vs margin 30: fits. The server's relative-chunk RTC path works |
+  | MolmoAct 2 (LoRA) | ok, 391 s, eval 0.33 | 25.2 GB (55.8 GB full FT) | chunk 286.7 ms (9) fits margin 10 (barely); RTC 420.4 ms (13) **does not fit** |
+
+  MolmoAct 2 serves 40% faster than the full fine-tune (475 / 604 ms). The likely reason: the checkpoint's config
+  now has `compile_model: true`, so the server compiles the same blocks training does. LoRA itself only adds work
+  (the adapters are not merged).
+- [ ] MolmoAct 2 latency, option A (serve settings, no retraining): `serve_check.py --set` times a copy of the
+  checkpoint with config keys changed. Sweep `num_inference_steps` 10 (the default) / 8 / 6 / 5 / 4, plus
+  `compile_model=false` to confirm the compile explanation. RTC fits margin 10 at ≤ 10 steps (≤ 333 ms).
+  Fewer flow steps can cost accuracy, so a setting that fits also needs a held-out action-error check.
 
 ### Dataset preparation (2026-11-19)
 `drtc.data.prepare` makes what a recipe needs beyond the recorded dataset. Today that is relative-action stats:
