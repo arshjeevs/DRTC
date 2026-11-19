@@ -56,6 +56,18 @@ def _log(d: dict, step: int | None, mode: str) -> None:
         logging.warning(f"wandb log failed ({e}); continuing")
 
 
+def problem() -> str | None:
+    """Why wandb cannot log on this machine (package, key), or None. No network call."""
+    try:
+        import wandb
+    except ImportError:
+        return "wandb is not installed here (uv sync --extra gpu; on the A100 rerun lab/bin/a100-setup)"
+    if not (os.environ.get("WANDB_API_KEY") or wandb.api.api_key):
+        return ("no wandb key here: `wandb login` (laptop), or WANDB_API_KEY in this host's secrets file "
+                "(lab/hosts.yaml `secrets`)")
+    return None
+
+
 def install(project: str, entity: str | None = None) -> None:
     from lerobot.common import trackio_utils
 

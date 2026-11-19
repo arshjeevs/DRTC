@@ -414,6 +414,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--dry-run", action="store_true", help="print the lerobot-train command and exit")
     ap.add_argument("--steps", type=int, help="override the run length (e.g. a short test run)")
     ap.add_argument("--no-push", action="store_true", help="keep the model local")
+    ap.add_argument("--no-wandb", action="store_true", help="log to Trackio only (wandb is the standard)")
     ap.add_argument("--resume", action="store_true", help="continue outputs/train/<model> (or the Hub checkpoint)")
     ap.add_argument("--push", nargs="?", const="last", metavar="CHECKPOINT", help="only push a saved checkpoint")
     args, extra = ap.parse_known_args(argv)
@@ -448,6 +449,14 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         if args.dry_run:
             return 0
+        trackio_on = flags.get("trackio.enable", True) and "--trackio.enable=false" not in extra
+        if reg.settings.wandb_project and trackio_on and not args.no_wandb:
+            from drtc.compat.wandb_mirror import problem
+
+            why = problem()
+            if why:
+                print(f"lab train: every run logs to wandb and Trackio; {why}. Or pass --no-wandb.", file=sys.stderr)
+                return 1
         if not any(e.startswith("--dataset.video_backend") for e in extra):
             try:
                 video.check_decoder()
@@ -463,7 +472,7 @@ def main(argv: list[str] | None = None) -> int:
     molmoact2.install()  # LoRA fine-tuning from a full-weight MolmoAct 2 checkpoint
     frame_cache.install()  # cached frames for variants that have them (recipe data.frames)
     if reg.settings.wandb_project and flags.get("trackio.enable", True) and \
-            "--trackio.enable=false" not in extra:
+            "--trackio.enable=false" not in extra and not args.no_wandb:
         wandb_mirror.install(reg.settings.wandb_project, reg.settings.wandb_entity)  # wandb next to Trackio
     state = install_clean_stop(lerobot_train, args.model)
     sys.argv = cmd

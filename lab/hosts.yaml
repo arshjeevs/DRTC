@@ -24,6 +24,7 @@ hosts:
     roles: [serve, train]
     ssh: jayaraj@192.168.41.118
     container: drtc_lab
+    secrets: /workspace/drtc_lab/.secrets.env   # HF_TOKEN, WANDB_API_KEY (inside the container)
     repo: /home/jayaraj/drtc_major   # new setup (branch major); /workspace/drtc_major inside the drtc_lab container
     gpus:
     - {name: H200, memory_gb: 141}
@@ -37,6 +38,7 @@ hosts:
     label: GPUserver
     roles: [serve, train]
     ssh: b230968ee@192.168.5.13
+    secrets: ~/.drtc.env   # HF_TOKEN, WANDB_API_KEY
     repo: /home/b230968ee/drtc_major   # new setup on the host, no container (lab/bin/a100-setup)
     gpus:
     - {name: A100 80GB PCIe, memory_gb: 80}

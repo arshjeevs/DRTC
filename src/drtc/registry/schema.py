@@ -84,6 +84,7 @@ class Host(Entry):
     repo: str | None = None  # checkout path on that host
     gpus: list[Gpu] = Field(default_factory=list)
     shared: bool = False  # other people's jobs use the GPUs too
+    secrets: str | None = None  # KEY=VALUE file with HF_TOKEN, WANDB_API_KEY (drtc.secrets; not in git)
 
 
 class Network(BaseModel):

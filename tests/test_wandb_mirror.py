@@ -53,3 +53,10 @@ def test_trackio_calls_reach_wandb(fake_wandb, monkeypatch):
     assert ("log", {"train/loss": 0.5}, 200) in fake_wandb
     assert ("log", {"eval/eval_loss": 0.2}, 1000) in fake_wandb
     assert fake_wandb[-1] == ("finish",)
+
+
+def test_secrets_file_lines():
+    from drtc.secrets import parse
+
+    text = "# tokens\nexport HF_TOKEN=hf_abc\nWANDB_API_KEY='k123'\n\nnot a line\nBAD-KEY=x\n"
+    assert parse(text) == {"HF_TOKEN": "hf_abc", "WANDB_API_KEY": "k123"}

@@ -122,6 +122,29 @@ def check_data(reg: Registry, online: bool = False) -> list[str]:
     return problems
 
 
+def check_logging(reg: Registry) -> list[str]:
+    """Training logs here: wandb (logs in, project) and Trackio (local database)."""
+    import os
+
+    from drtc.compat.wandb_mirror import problem
+
+    host = reg.current_host()
+    print(f"logging on host {host.id if host else 'unknown (set LAB_HOST)'}")
+    why = problem()
+    if why:
+        return [f"wandb: {why}"]
+    try:
+        import wandb
+
+        user = wandb.Api().viewer.username
+    except Exception as e:  # noqa: BLE001
+        return [f"wandb: the key does not log in ({type(e).__name__}: {e})"]
+    print(f"  wandb   logged in as {user}; runs go to project {reg.settings.wandb_project}")
+    home = Path(os.environ.get("HF_HOME", Path.home() / ".cache" / "huggingface")) / "trackio"
+    print(f"  trackio local database {home} (project {reg.settings.trackio_project})")
+    return []
+
+
 def cmd_check(args) -> int:
     reg = _registry()
     problems = reg.check()
@@ -131,6 +154,8 @@ def cmd_check(args) -> int:
         problems += check_rig(reg)
     if args.data:
         problems += check_data(reg, online=args.online)
+    if args.logging:
+        problems += check_logging(reg)
     for p in problems:
         print(f"  PROBLEM {p}")
     return 1 if problems else 0
@@ -165,6 +190,9 @@ def use_own_bin() -> None:
 def main(argv: list[str] | None = None) -> None:
     argv = sys.argv[1:] if argv is None else argv
     use_own_bin()
+    from drtc import secrets
+
+    secrets.load()  # this host's HF_TOKEN, WANDB_API_KEY (lab/hosts.yaml `secrets`)
     if argv and argv[0] == "train":  # its own argument parser; unknown flags go to lerobot-train
         from drtc.train import main as train_main
 
@@ -215,6 +243,7 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--rig", action="store_true")
     p.add_argument("--data", action="store_true")
     p.add_argument("--online", action="store_true", help="with --data: also check the Hub revision")
+    p.add_argument("--logging", action="store_true", help="wandb logs in here, and where Trackio writes")
     p.set_defaults(fn=cmd_check)
     sub.add_parser("train", help="train a registry model (lab train <model> -h)")
     sub.add_parser("submit", help="queue a training job here or on a host (lab submit <model> --host h200)")
