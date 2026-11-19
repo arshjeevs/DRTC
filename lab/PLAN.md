@@ -762,7 +762,31 @@ RTC. The other five can be compared with and without RTC.
     utilization from nvidia-smi, and projects the full recipe run. `LABEL=... EXTRA=...` compares a setting.
   - The data share of a step says where to look: high = data loading / video decoding (workers, decoder), low with
     low GPU utilization = small kernels (compile, batch), high utilization = the model itself (multi-GPU, LoongForge).
+- [x] Hardware (2026-11-19): the H200 now (141 GB, 48 CPUs); the A100 later (not available yet); the laptop (RTX
+  4060 8 GB, 24 CPUs); more GPUs possible later.
+- Data loading, measured on the laptop (2026-11-19), so101_cubebox_v1: 2 cameras, AV1 800×600, keyframe every 2
+  frames (seeking is already cheap), 0.4 GB of video. One random frame decodes in 3.5 ms (torchcodec; pyav 8.7 ms).
+  DataLoader at batch 64:
+
+  | Images as | Workers | Samples/s |
+  |---|---|---|
+  | float32 (LeRobot 0.4.3, the minor phase) | 8 | 180 |
+  | uint8 (LeRobot 0.7's training default) | 8 | 555 |
+  | uint8 | 16 | 633 |
+
+  0.7 already sends uint8 images (3× faster than the minor phase's loading). More workers help little. The rest
+  of the cost is moving full 800×600 frames between processes; every model uses a smaller image (224 to 512 px).
+  Whether data still limits a model depends on its step time (H200 baseline): it needs batch / step_s samples/s.
 - [ ] Options to compare:
+  - Data: more workers; MolmoAct 2's augmentation on the GPU (`dataset.image_transforms.backend: gpu`, same
+    transforms) instead of in the workers at full resolution; a decoded or pre-resized frame cache as a dataset
+    variant (`drtc.data.prepare`), only for models the baseline shows waiting on data (pre-resizing uses a
+    different resize than serving does, so it needs checking).
+  - Memory knobs that do not change the result: gradient checkpointing off where memory allows (π0.5, MolmoAct 2).
+  - Compile: `policy.compile_model` (π0.5, SmolVLA, Diffusion; MolmoAct 2 already on).
+  - One GPU, several jobs: ACT (6 GB) and Diffusion (10 GB) next to a VLA on the H200; ACT on the laptop.
+  - bf16 mixed precision for ACT and Diffusion (`accelerator.mixed_precision`): changes the numbers, so it is a
+    recipe change to confirm with the user.
   - upstream FSDP2/DDP (`--parallelism.*`), if there is more than one GPU
   - `torch.compile` of the policy
   - LoongForge (π0.5, X-VLA, GR00T N1.6/N1.7; its speedups were measured on 8 GPUs; DCP checkpoints need
