@@ -54,7 +54,8 @@ nothing has to be redone. Items marked **[open]** are decisions still to make.*
     on v0); a one-time cost.
 - [x] Per-machine CPU budget (hosts.yaml `cpu_budget`, threads and workers per policy): `lab train` applies it when
   another `lab train` already runs on that machine; a job alone gets the whole machine. A100 values as measured.
-- [x] GR00T N1.5 on the A100 restarted with the cache fix (2026-11-19 18:20; the first run decoded full-size videos).
+- [x] GR00T N1.5 on the A100 restarted with the cache fix (2026-11-19 18:20; the first run decoded full-size videos):
+  preprocessing 1.14 -> 0.23 s, step 2.65 -> 1.79 s (~4.9 h); loss at step 200 0.322 in both runs (same input).
 - [x] Old models on LeRobot 0.7 (A100, 2026-11-19, measured with three trainings on the GPU, so the times are high):
   both admitted in chunk and rtc_guided mode. GR00T 379 ms chunk / 466 ms RTC, SmolVLA 571 / 928 ms. [ ] Retime on
   a free GPU before the robot trials.
