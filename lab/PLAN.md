@@ -72,6 +72,24 @@ nothing has to be redone. Items marked **[open]** are decisions still to make.*
 - [x] Robot-side checks (rig, calibration files present; no recalibration) and a 2-episode `lab record` test
   (2026-11-19: 29.9 Hz, no late ticks, degrees, AV1; fixes: Rerun viewer on PATH, `dataset.no_stamp`).
 - [ ] Recording sessions; each finished dataset is trimmed, pushed, registered and prepared automatically.
+- **Tasks (decided with the user, 2026-11-19).** Printed 7x7 cm colour squares as targets; one dataset per task, in
+  this order. The squares, cubes and cube spots sit on taped marks, so every layout is exactly repeatable (and the
+  robot trials use the same marks). Each layout combination is recorded equally often, in a fixed rotation, so no
+  shortcut ("always go right") fits the data. Fixed order of moves within an episode (no mixed strategies).
+
+  | Dataset | Setup | Instruction | Episodes (held out) | Episode / reset |
+  |---|---|---|---|---|
+  | `so101_sort_one_v1` (A) | One cube (red or blue) on one fixed spot; the red and blue squares swap between two fixed spots | "Put the cube in the square of the same color." | 80 (8) | 30 / 10 s |
+  | `so101_sort_two_v1` (B) | Both cubes on two fixed spots, swapping; the squares swap as in A; red first, then blue | "Put the red cube in the red square and the blue cube in the blue square." | 100 (10) | 45 / 15 s |
+  | `so101_stack_v1` | Red cube onto the blue cube (layout decided at its session) | "Put the red cube on top of the blue cube." | 100 (10) | 30 / 10 s |
+
+  - A's rotation (x20): red cube / blue square left; blue cube / blue left; red / blue right; blue / blue right.
+  - B's rotation (x25): red cube left / blue square left; red left / blue right; red right / blue left; red right /
+    blue right.
+  - Later: C (both cubes, the instruction names one; language-conditioned, so not for ACT; needs per-episode tasks
+    in `lab record`); A/B with varied cube positions; stacking with three cubes.
+  - First session: `lab record so101_sort_one_v1 --task "Put the cube in the square of the same color." --episodes 80 --held-out 8`
+    (`--resume` adds episodes in a later session).
 
 **Phase 5:** offline evaluation (held-out action error per checkpoint, best checkpoint, one table per dataset x
 model); robot protocol (marked cube-position grid, N trials per model in a fixed order, pick / place / fail and time;
@@ -88,6 +106,12 @@ order on the new datasets (A100, H200; laptop for ACT), each run evaluated with 
 **Done:** Phases 1-3. Phase 3's outcome: one speed setup per active model (recipes' `speed:` and `data:`; hosts'
 `cpu_budget`): SmolVLA compile (H200 1.8 -> 1.1 h), GR00T N1.5 frame cache (H200 3.0 -> 1.4 h), ACT shares a GPU.
 Logging standard: wandb (`drtc-lab`) + Trackio local. Video: AV1 recordings, torchcodec decoding everywhere.
+
+**Round 1 crash (2026-11-19 18:30):** checkpoint pruning crashed `lab train` at each run's 2nd checkpoint (a
+relative vs resolved path in a log line; fixed in a02cc21f, with a test). The checkpoints were saved first: ACT was
+resumed from 10000, SmolVLA and GR00T N1.5 from 2000 (by `logs/resume_after_crash.sh` in A100 tmux window `watch`).
+Held-out losses now persist in `outputs/train/<model>/eval_losses.json` (seeded from the logs for the resumes), and
+`--resume` keeps the CPU threads.
 
 **Running (Phase 6 round 1, A100, started 2026-11-19 ~18:00):** `act_cubebox_v0_full` (~3 h), `smolvla_cubebox_v0_full`
 (~5 h), `groot_cubebox_v1_full` (~4.9 h, restarted 18:20 with the cache fix), with the fixed recipes. A100 `tmux`
