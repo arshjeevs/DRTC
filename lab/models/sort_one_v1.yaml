@@ -7,3 +7,5 @@ smolvla_sort_one_v1_full: {recipe: smolvla_authors, dataset: so101_sort_one_v1, 
   notes: 'SmolVLA on so101_sort_one_v1; original recipe (action expert only)'}
 groot_sort_one_v1_full: {recipe: groot_n15_nvidia, dataset: so101_sort_one_v1, status: planned,
   notes: 'GR00T N1.5 on so101_sort_one_v1; original recipe'}
+diffusion_sort_one_v1_full: {recipe: diffusion_original, dataset: so101_sort_one_v1, status: planned,
+  notes: 'Diffusion on so101_sort_one_v1; original recipe'}
