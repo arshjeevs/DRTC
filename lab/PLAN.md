@@ -791,16 +791,26 @@ RTC. The other five can be compared with and without RTC.
   - `torch.compile` of the policy
   - LoongForge (π0.5, X-VLA, GR00T N1.6/N1.7; its speedups were measured on 8 GPUs; DCP checkpoints need
     conversion)
-- H200 baseline (2026-11-19, commit 5ac3fa7b; π0.5, GR00T and MolmoAct 2 still to run):
+- H200 baseline (2026-11-19, commits 5ac3fa7b / 6f6622f1; 200 steps, 8 workers). Machine: 2× Xeon 6505P, 48
+  threads, no CPU quota, 251 GB RAM (about 150 GB free).
 
-  | Model | Step | Waiting on data | GPU | Full recipe run |
-  |---|---|---|---|---|
-  | ACT | 0.107 s | 2% | 45% | 3.0 h |
-  | Diffusion | 0.317 s | **75%** | 21% | **18.8 h** (update alone 0.074 s: ≈ 4.4 h if data kept up) |
-  | SmolVLA | 0.323 s | 2% | 69% | 1.8 h |
+  | Model | Step | Data wait | Preprocessing | Model update | GPU | Full recipe run |
+  |---|---|---|---|---|---|---|
+  | MolmoAct 2 | 2.185 s | 0% | **0.467 s** | 1.708 s | 71% | **30.3 h** |
+  | π0.5 | 4.901 s | 0% | 0.026 s | 4.864 s | 97% | **27.2 h** |
+  | Diffusion | 0.317 s | **75%** | 0.003 s | 0.074 s | 21% | 18.8 h |
+  | GR00T N1.7 | 0.600 s | 1% | 0.063 s | 0.529 s | 61% | 3.3 h |
+  | GR00T N1.5 | 1.080 s | 0% | **0.773 s** | 0.302 s | 20% | 3.0 h |
+  | ACT | 0.107 s | 2% | 0.001 s | 0.102 s | 45% | 3.0 h |
+  | SmolVLA | 0.323 s | 2% | 0.008 s | 0.306 s | 69% | 1.8 h |
 
-  Diffusion needs 64 / 0.074 ≈ 865 samples/s; the H200 container delivered 207 with 8 workers (the laptop 1167 with
-  Diffusion's timestamps), so its CPUs are the limit (machine details pending).
+  One after another: about 87 h. The long runs are MolmoAct 2 and π0.5.
+  - Diffusion workers (decoding): 16 → 0.174 s (data 49%), **24 → 0.149 s (data 7%, 8.9 h)**, 32 → 0.175 s. More
+    workers also slow the update (0.074 → 0.155 s at 32): the main process competes with them for the CPUs.
+  - π0.5 is compute-bound (97% GPU). LeRobot's π0.5 uses eager attention (softmax(QK^T)) on purpose, to keep the
+    original numerics; switching to SDPA/flash would change them, so that is a recipe question.
+  - GR00T N1.5 and MolmoAct 2 lose a quarter to three quarters of each step in their CPU preprocessing (HF image
+    processors in the main process), not in the model.
 - Laptop, ACT (2026-11-19, commit 3de1880e): step 0.500 s, data 4%, GPU 99.8%, peak 6.1 GB, full recipe ≈ 13.9 h
   (H200: 3.0 h at 45% GPU). The laptop GPU is the limit, so ACT fits there only as an overnight run; on the H200 it
   can share the GPU (round `together`).

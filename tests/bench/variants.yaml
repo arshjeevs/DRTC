@@ -10,6 +10,10 @@ frames:         # Diffusion with its frame cache (recipe data.frames, on since 2
   models:
     diffusion_cubebox_v1_full: {}
 
+frames_w16:     # the same with 16 workers (decoding needed 24; more workers also slowed the update)
+  models:
+    diffusion_cubebox_v1_full: {workers: 16}
+
 no_grad_ckpt:   # gradient checkpointing trades speed for memory; the recipes turn it on, the result is the same
   models:
     pi05_cubebox_v1_full: {flags: {policy.gradient_checkpointing: false}}
@@ -27,7 +31,6 @@ gpu_aug:        # MolmoAct 2's image augmentation on the GPU (same transforms) i
 
 workers16:
   models:
-    diffusion_cubebox_v1_full: {workers: 16}
     molmoact2_cubebox_v1_lora: {workers: 16}
 
 together:       # small jobs next to a large one on the same GPU
