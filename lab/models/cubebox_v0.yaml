@@ -1,0 +1,7 @@
+# Trimmed v0 (2026-11-19): the earlier setup where SmolVLA worked (smolvla_cubebox_v0_lora_raw, ~90% placing in
+# its own setup). Trained with each model's original recipe (lab/PLAN.md, Phase 2), on the A100.
+
+smolvla_cubebox_v0_full: {recipe: smolvla_authors, dataset: so101_cubebox_v0, status: planned,
+  notes: 'SmolVLA on trimmed v0; original recipe (action expert only)'}
+act_cubebox_v0_full: {recipe: act_original, dataset: so101_cubebox_v0, status: planned,
+  notes: 'ACT on trimmed v0; original recipe'}
