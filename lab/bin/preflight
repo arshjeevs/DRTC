@@ -1,4 +1,6 @@
 #!/bin/bash
 # Old name kept for compatibility: lab check --rig (devices, calibration; also --data)
+# lab/bin/session passes its mode (run|record): the checks are the same for both, so it is dropped.
 source "$(dirname "$0")/_env"
+case "${1:-}" in run|record) shift ;; esac
 exec "$LAB" check --rig "$@"
