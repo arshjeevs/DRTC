@@ -1,7 +1,7 @@
 """Serve check for one trained checkpoint: does LeRobot 0.7's policy server admit it, with RTC where the policy has
 it, and how long does a chunk take compared with DRTC's margin?
 
-    .venv/bin/python tests/smoke/serve_check.py <model> <checkpoint folder> [--calls 20] [--device cuda]
+    .venv/bin/python tests/smoke/serve_check.py <model> [<checkpoint folder>] [--calls 20] [--device cuda]
 
 It builds the same deployment `lab serve <model> --path <folder>` would, adds the `rtc_guided` mode for RTC
 policies (lab registry RTC_POLICIES), and loads it with upstream's `load_deployment`. That runs the server's own
@@ -62,7 +62,9 @@ def with_config(checkpoint: Path, overrides: dict, dst: Path) -> Path:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("model")
-    ap.add_argument("checkpoint", type=Path)
+    ap.add_argument("checkpoint", type=Path, nargs="?",
+                    help="local checkpoint folder; omitted: the model's Hub repo, old-format (minor) checkpoints "
+                         "converted as `lab serve` does")
     ap.add_argument("--calls", type=int, default=20)
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--s-min", type=int, help="DRTC s_min (default: the recipe's serve.s_min, else 20)")
@@ -92,9 +94,20 @@ def main(argv: list[str] | None = None) -> int:
     reg = Registry()
     r = reg.resolve(a.model)
     overrides = parse_sets(a.set)
-    checkpoint = a.checkpoint.resolve()
-    if overrides:
-        checkpoint = with_config(checkpoint, overrides, Path(tempfile.mkdtemp(prefix="serve_check_")))
+    if a.checkpoint is None:
+        from drtc.compat.serve import install_loader, needs_compat, prepare_checkpoint
+
+        checkpoint = r.hub
+        if needs_compat(r.hub):
+            checkpoint = prepare_checkpoint(r.hub)
+            install_loader()
+            print(f"old-format checkpoint {r.hub}: checking the converted copy {checkpoint}", flush=True)
+        if overrides:
+            raise SystemExit("--set needs a local checkpoint folder")
+    else:
+        checkpoint = a.checkpoint.resolve()
+        if overrides:
+            checkpoint = with_config(checkpoint, overrides, Path(tempfile.mkdtemp(prefix="serve_check_")))
     rtc = r.policy in RTC_POLICIES
     modes = ["chunk", "rtc_guided"] if rtc else ["chunk"]
     cfg = server_config(reg, a.model, str(checkpoint), a.device, modes=modes)
@@ -102,7 +115,7 @@ def main(argv: list[str] | None = None) -> int:
         cfg["execution"]["rtc"] = {"enabled": True, "mode": "guided", "execution_horizon": a.rtc_horizon}
     s_min = a.s_min or int(r.serve.get("s_min") or 20)
     fps = cfg["execution"]["action_fps"]
-    result = {"model": a.model, "policy": r.policy, "checkpoint": str(a.checkpoint), "modes": modes, "s_min": s_min,
+    result = {"model": a.model, "policy": r.policy, "checkpoint": str(a.checkpoint or r.hub), "modes": modes, "s_min": s_min,
               "fps": fps, "config_overrides": overrides, "admitted": False}
     out_name = f"serve_{a.model}{'_' + a.tag if a.tag else ''}.json"
     a.out.mkdir(parents=True, exist_ok=True)
