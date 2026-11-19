@@ -23,7 +23,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-LINE = re.compile(r"^INFO (\d{4}-\d\d-\d\d \d\d:\d\d:\d\d) .*?\bstep:(\d+(?:\.\d+)?[KM]?) .*\bstep_s:")
+# Not anchored: tqdm's progress bar shares stderr and leaves its text (ending in \r, no newline) in front of a log line.
+LINE = re.compile(r"INFO (\d{4}-\d\d-\d\d \d\d:\d\d:\d\d) +\S+ step:(\d+(?:\.\d+)?[KM]?) .*\bstep_s:")
 FIELD = re.compile(r"\b(data_s|prep_s|updt_s|step_s|smp/s|mem_gb):([0-9.]+)")
 
 
@@ -36,7 +37,7 @@ def parse_log(text: str) -> list[dict]:
     """One record per logged training window: step, time, and the timing fields."""
     out = []
     for line in text.splitlines():
-        m = LINE.match(line)
+        m = LINE.search(line)
         if not m:
             continue
         rec = {"step": big(m.group(2)), "time": datetime.strptime(m.group(1), "%Y-%m-%d %H:%M:%S")}
@@ -100,10 +101,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", type=Path, default=Path("logs/bench"))
     a = ap.parse_args(argv)
     gpu = parse_gpu(a.gpu_csv.read_text()) if a.gpu_csv and a.gpu_csv.is_file() else None
+    text = a.log.read_text(errors="replace")
     try:
-        res = summarize(parse_log(a.log.read_text(errors="replace")), a.warmup, gpu)
+        res = summarize(parse_log(text), a.warmup, gpu)
     except ValueError as e:
-        print(f"{a.model}: no measurement ({e})", flush=True)
+        sample = next((ln for ln in text.splitlines() if "step_s" in ln), None)
+        print(f"{a.model}: no measurement ({e}); first line with step_s: "
+              f"{repr(sample[-300:]) if sample else 'none'}", flush=True)
         return 1
     res = {"model": a.model, **res, **projection(a.model)}
     res["projected_hours"] = round(res["recipe_steps"] * res["step_s"] / 3600, 1)

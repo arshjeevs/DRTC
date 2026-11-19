@@ -11,8 +11,8 @@ spec.loader.exec_module(speed_report)
 
 LOG = """\
 INFO 2026-11-19 02:20:00 ot_train.py:850 Start offline training on a fixed dataset, with effective batch size: 64
-INFO 2026-11-19 02:20:30 ot_train.py:905 step:10 smpl:640 ep:2 epch:0.03 loss:1.2 grdn:3.1 lr:1.0e-05 data_s:0.500 prep_s:0.050 updt_s:2.000 step_s:2.550 smp/s:25 mem_gb:70.10
-INFO 2026-11-19 02:20:40 ot_train.py:905 step:60 smpl:4K ep:10 epch:0.17 loss:0.9 grdn:2.0 lr:2.0e-05 data_s:0.010 prep_s:0.040 updt_s:0.900 step_s:0.950 smp/s:67 mem_gb:76.40
+Training:   5%|▌         | 10/200 [00:30<09:30,  3.00s/step]INFO 2026-11-19 02:20:30 ot_train.py:905 step:10 smpl:640 ep:2 epch:0.03 loss:1.2 grdn:3.1 lr:1.0e-05 data_s:0.500 prep_s:0.050 updt_s:2.000 step_s:2.550 smp/s:25 mem_gb:70.10
+Training:  30%|███       | 60/200 [00:40<01:30,  1.00step/s]INFO 2026-11-19 02:20:40 ot_train.py:905 step:60 smpl:4K ep:10 epch:0.17 loss:0.9 grdn:2.0 lr:2.0e-05 data_s:0.010 prep_s:0.040 updt_s:0.900 step_s:0.950 smp/s:67 mem_gb:76.40
 INFO 2026-11-19 02:20:50 ot_train.py:905 step:1K smpl:64K ep:200 epch:2.80 loss:0.5 grdn:1.0 lr:2.5e-05 data_s:0.030 prep_s:0.040 updt_s:0.900 step_s:0.970 smp/s:66 mem_gb:76.49
 """
 
