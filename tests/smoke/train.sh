@@ -16,7 +16,7 @@ here="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$here"
 [ -f pyproject.toml ] && grep -q '^name = "drtc-lab"' pyproject.toml || { echo "not in the drtc-lab repo: $here"; exit 1; }
 MODELS=${*:-act_cubebox_v1_full diffusion_cubebox_v1_full smolvla_cubebox_v1_full pi05_cubebox_v1_full \
-        groot_cubebox_v1_full grootn17_cubebox_v1_full molmoact2_cubebox_v1_full}
+        groot_cubebox_v1_full grootn17_cubebox_v1_full molmoact2_cubebox_v1_lora}
 KEEP=${KEEP:-0}
 SERVE_ONLY=${SERVE_ONLY:-0}
 mkdir -p logs/smoke

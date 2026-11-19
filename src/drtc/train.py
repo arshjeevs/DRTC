@@ -6,6 +6,10 @@ adds only what 0.7 lacks:
   episode list is passed training-first, held-out-last, and eval_split selects exactly the held-out tail;
 - epochs -> steps over the training frames;
 - refusing a stale local dataset copy (a different version cached under the same name);
+- checkpoints: the weights of every one are kept, the training state only for the latest (see
+  prune_training_state);
+- recipes that need more than the recorded dataset (relative-action stats) train on a prepared variant
+  (drtc.data.prepare);
 - a clean stop: Ctrl-C, SIGTERM or `lab stop <model>` saves a checkpoint at the next step, pushes it with its
   training state (resumable anywhere: `lab train <model> --resume`) and exits;
 - logging to Trackio (lab/lab.yaml: project and the shared Hugging Face Space);
@@ -115,6 +119,8 @@ def training_frames(r: Resolved, episodes: list[int] | None) -> int:
 
 
 def flag_value(v: Any) -> str:
+    if v is None:
+        return "null"  # draccus reads "null" as None; "None" would arrive as the string "None"
     if isinstance(v, bool):
         return "true" if v else "false"
     if isinstance(v, (dict, list)):
@@ -188,9 +194,10 @@ def build(reg: Registry, model_id: str, steps: int | None = None, download: bool
         raise RegistryError(f"{model_id!r} has no recipe/dataset: it cannot be trained here")
     if r.status == "not_trainable":
         raise RegistryError(f"{model_id!r} is marked not_trainable ({reg.models[model_id].notes or 'see the registry'})")
-    if r.finetune == "lora":
-        raise RegistryError(f"{model_id!r}: LoRA recipes are not mapped to LeRobot 0.7's --peft.* yet "
-                            f"(the planned models are all full fine-tunes)")
+    if r.finetune == "lora" and r.lora is not None:
+        # Adapter-style LoRA (a `lora:` block, our old format). Policy-native LoRA (e.g. MolmoAct 2's
+        # policy.train_mode_vlm: lora) is a recipe flag and trains as is.
+        raise RegistryError(f"{model_id!r}: adapter LoRA recipes are not mapped to LeRobot 0.7's --peft.* yet")
     t = dict(r.train)
     if "epochs" in t and "steps" in t:
         raise RegistryError(f"{model_id!r}: set train.epochs or train.steps, not both")
@@ -223,6 +230,15 @@ def build(reg: Registry, model_id: str, steps: int | None = None, download: bool
         n = len(episodes) + len(held_out)
         flags["dataset.eval_split"] = (len(held_out) - 0.5) / n  # ceil(n * x) == len(held_out), robust to rounding
     flags.update({k: v for k, v in r.flags.items()})
+    # What the recipe needs beyond the recorded dataset (relative-action stats): a prepared variant folder.
+    from drtc.data import prepare
+
+    variants = []
+    for need in prepare.needs(r.flags, r.policy):
+        root = prepare.ensure(r.dataset.repo, r.dataset.revision, need) if download else \
+            prepare.variant_root(r.dataset.repo, r.dataset.revision, need)
+        flags["dataset.root"] = str(root)
+        variants.append(need.tag)
     frames = None
     if steps is not None:
         flags["steps"] = steps
@@ -236,6 +252,7 @@ def build(reg: Registry, model_id: str, steps: int | None = None, download: bool
     info = {"model": model_id, "recipe": r.recipe.id, "dataset": f"{r.dataset.id}@{r.dataset.revision[:10]}",
             "episodes": len(episodes) if episodes is not None else "all", "held_out": held_out,
             "frames": frames, "epochs": t.get("epochs"), "unknown_flags": unknown_policy_flags(r.policy, flags),
+            "variants": variants,
             "resolved": r}
     return flags, info
 
@@ -257,6 +274,26 @@ def push(checkpoint_dir: Path, repo_id: str) -> None:
     HfApi().upload_folder(folder_path=str(checkpoint_dir / "pretrained_model"), repo_id=repo_id, repo_type="model",
                           commit_message=f"model from checkpoint {checkpoint_dir.name}")
     print(f"pushed checkpoint {checkpoint_dir.name} to https://huggingface.co/{repo_id}", flush=True)
+
+
+def prune_training_state(latest: Path) -> list[Path]:
+    """Keep every checkpoint's weights (to choose the best by held-out action error), but the training state
+    (optimizer, scheduler, RNG: the bulk of a large model's checkpoint) only for the latest one, which resumes.
+    LeRobot 0.7 keeps everything; for π0.5 that is tens of GB per checkpoint."""
+    import shutil
+
+    from lerobot.utils.constants import TRAINING_STATE_DIR
+
+    removed = []
+    latest = latest.resolve()
+    for ckpt in latest.parent.iterdir():
+        if ckpt.is_symlink() or not ckpt.is_dir() or ckpt.resolve() == latest:
+            continue
+        ts = ckpt / TRAINING_STATE_DIR
+        if ts.is_dir():
+            shutil.rmtree(ts)
+            removed.append(ts)
+    return removed
 
 
 def install_clean_stop(lerobot_train, model: str) -> dict:
@@ -287,6 +324,7 @@ def install_clean_stop(lerobot_train, model: str) -> dict:
 
     def update_last_checkpoint(checkpoint_dir):
         update_last(checkpoint_dir)
+        prune_training_state(Path(checkpoint_dir))
         if state["requested"]:
             state["saved"] = Path(checkpoint_dir)
             raise StopTraining
@@ -304,6 +342,8 @@ def print_summary(flags: dict, info: dict) -> None:
     r: Resolved = info["resolved"]
     print(f"\nmodel {info['model']}: recipe {info['recipe']}, dataset {info['dataset']}, policy {r.policy} "
           f"({r.finetune}), push to {r.hub}")
+    if info["variants"]:
+        print(f"dataset prepared for this recipe: {', '.join(info['variants'])} (--dataset.root)")
     if info["held_out"]:
         print(f"episodes: {info['episodes']} for training, held out: {info['held_out']}")
     if info["frames"]:

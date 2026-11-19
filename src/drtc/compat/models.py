@@ -53,7 +53,7 @@ def load_kept_model(model_id: str, device: str = "cuda", registry: Registry | No
     cls = policy_class_for(r.policy)
     config = load_config(cls, r.hub)
     config.device = device
-    if r.finetune == "lora" or is_adapter(r.hub):
+    if (r.finetune == "lora" and r.lora is not None) or is_adapter(r.hub):
         policy = load_lora_policy(cls, r.hub, config=config, device=device)
     else:
         policy = cls.from_pretrained(r.hub, config=config)

@@ -511,6 +511,44 @@ epoch at batch 32). **User's leaning (2026-11-19):** SmolVLA full fine-tune, π0
 - `diffusion_full`: ImageNet backbone without GroupNorm; the original trains from scratch with GroupNorm and EMA.
   `n_obs_steps: 1` stays (the server refuses history; the original uses 2).
 
+### Recipes (confirmed 2026-11-19)
+**Rule (the user's, 2026-11-19): each model trains with its original recipe, the same way every time.** π0.5 and
+GR00T N1.7 in particular always use their original relative actions. A newly recorded and finalised dataset must be
+ready for all models with no manual step (see "Dataset preparation" below).
+
+| Model | Recipe | Trained | Steps × batch | Chunk (executed) | Actions | Notes |
+|---|---|---|---|---|---|---|
+| SmolVLA | `smolvla_authors` | action expert, VLM frozen | 20k × 64 | 50 (50) | absolute | LR 1e-4, cosine to 2.5e-6; the user's full fine-tune idea is not the authors' recipe (a second run can be added) |
+| π0.5 | `pi05_openpi` | everything | 20k × 64 | 50 (50) | **relative arm, absolute gripper** | openpi `pi05_aloha_pen_uncap`: LR 2.5e-5, wd 1e-10, EMA 0.99, quantile |
+| GR00T N1.5 | `groot_n15_nvidia` | projector + DiT | 10k × 32 | 16 (16) | absolute | LR 1e-4, wd 1e-5, 5% warmup |
+| GR00T N1.7 | `groot_n17_nvidia` | projector + DiT + VLLN | 20k × 64 | 16 (16) | **relative arm, absolute gripper** | LR 1e-4; **native RTC is off with relative actions** (modeling_groot.py), so chunk mode only |
+| MolmoAct 2 | `molmoact2_lora` (model renamed `molmoact2_cubebox_v1_lora`) | LoRA r 64 on the VLM; connector + expert full | 50k × 16 | 30 (30) | absolute | LR 5e-5 all groups, augmentation on, compile on |
+| ACT | `act_original` | everything | 100k × 8 | 100 (100) | absolute | LR 1e-5, KL 10 |
+| Diffusion | `diffusion_original` | everything, ResNet-18 from scratch + GroupNorm | 600 epochs × 64 (214k steps) | 48 (24) | absolute | the paper's 16/8 at 10 Hz kept in seconds; DDIM 100 / 10; EMA warmup |
+
+Every recipe pins its key values explicitly (not LeRobot's defaults, which can change), and each has a `source`.
+
+**Checkpoints:** every 1k steps (ACT 5k, Diffusion 10k). `lab train` keeps every checkpoint's weights and the
+training state only for the latest (`prune_training_state`; LeRobot 0.7 keeps everything, tens of GB each for π0.5).
+The best checkpoint is chosen by held-out action error, as decided earlier.
+
+**Found while checking the flags against LeRobot 0.7:**
+- With `resize_shape` set, Diffusion ignores `crop_shape` and derives the crop from `crop_ratio`. The old
+  `diffusion_full` therefore trained without its crop; `diffusion_original` uses `crop_ratio: 0.9` (216×288).
+- `null` in a recipe reached lerobot-train as the string "None"; `flag_value` now writes `null`.
+
+### Dataset preparation (2026-11-19)
+`drtc.data.prepare` makes what a recipe needs beyond the recorded dataset. Today that is relative-action stats:
+LeRobot needs action stats computed in relative space over chunks of the policy's `chunk_size`, with the same joints
+excluded, so π0.5 (chunk 50) and GR00T N1.7 (chunk 16) need different stats.
+- Each need is a variant folder `$HF_LEROBOT_HOME/.drtc_variants/<repo>/<revision>_rel_c<chunk>_x<joints>/`:
+  symlinks to the pinned dataset plus its own `meta/stats.json`. The dataset itself is never written.
+- `lab train` makes the variant on first use on any host and passes it as `--dataset.root`; `lab prepare <dataset>`
+  makes all of them ahead of time for every recipe in use; `lab record` runs it after pushing.
+- A recipe with `use_relative_actions` must set `chunk_size` and `relative_exclude_joints` explicitly (checked).
+- Made and checked on the laptop for `so101_cubebox_v1`: only the action stats differ; the dataset's stats.json is
+  unchanged (checksum).
+
 ### Shortlist (decided 2026-11-18)
 **Models:**
 - SmolVLA
@@ -577,10 +615,7 @@ ACT and Diffusion get DRTC scheduling with the Butterworth filter and the Phase 
 RTC. The other five can be compared with and without RTC.
 
 **Next:**
-- [ ] Recipes after the user's research. The choices to make:
-  - the chunk length at 30 fps;
-  - steps vs epochs, and the stopping rule;
-  - relative vs absolute actions.
+- [x] Recipes: each model's original, confirmed 2026-11-19 (see "Recipes (confirmed 2026-11-19)" below).
 - [x] Test runs of all 7 on the H200: `bash tests/smoke/train.sh` (the user runs it). All 7 train and serve; 6 fit the timing margin.
   - **First run (2026-11-18, commit c4d24663).** Serve times are the H200's; 30 fps, s_min 20:
 
@@ -661,13 +696,12 @@ RTC. The other five can be compared with and without RTC.
 - `act_100ep`: batch 64, ~39k steps, no augmentation, chunk 100 (default).
 - `diffusion_full`: horizon 32 / 16 executed, 240×320 with crop, DDIM 10.
 
-- [ ] For each candidate, who made it work on an SO100/SO101-class arm: ArmnetBench read (reference only). The
-      recipe source is being researched by the user.
+- [x] For each candidate, its recipe source: the model's own docs (2026-11-19, "Official recipes" above).
   - [x] Inference speed against DRTC's timing: the H200 test runs above (MolmoAct 2 does not fit yet).
 - [x] Selection criteria: the user's choice (2026-11-18).
 - [x] Candidates reviewed; shortlist of 7 (2026-11-18).
 - [x] `lab/models/cubebox_v1.yaml`: the shortlist `planned`, the rest `retired`.
-  - [ ] Recipes confirmed after the research.
+  - [x] Recipes confirmed (2026-11-19).
 
 ## Phase 3: Faster training
 - [ ] **[open]** Hardware available (H200 only, or the A100 too; one GPU or several)

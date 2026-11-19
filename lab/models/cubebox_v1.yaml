@@ -1,24 +1,24 @@
 # Full fine-tunes on the trimmed v1 (were the *_full_trim entries). Phase 2 shortlists these; Phase 4 trains them.
 # Shortlist decided 2026-11-18 (lab/PLAN.md, Phase 2): SmolVLA, GR00T N1.5, GR00T N1.7, π0.5, MolmoAct 2, ACT
-# (also the edge fallback), Diffusion. The recipes are placeholders until the user confirms the training configs.
+# (also the edge fallback), Diffusion. Recipes: each model's original (confirmed 2026-11-19, lab/PLAN.md Phase 2).
 
 # --- Shortlisted ---
-smolvla_cubebox_v1_full: {recipe: smolvla_full_45ep, dataset: so101_cubebox_v1, status: planned,
-  notes: Shortlisted 2026-11-18; recipe to be confirmed}
+smolvla_cubebox_v1_full: {recipe: smolvla_authors, dataset: so101_cubebox_v1, status: planned,
+  notes: Shortlisted 2026-11-18; original recipe (2026-11-19)}
 groot_cubebox_v1_full: {recipe: groot_n15_nvidia, dataset: so101_cubebox_v1, status: planned,
-  notes: 'Shortlisted 2026-11-18; recipe to be confirmed. H200 test run ok; guided RTC via the groot_n15 plugin'}
+  notes: 'Shortlisted 2026-11-18; original recipe (2026-11-19). H200 test run ok; guided RTC via the groot_n15 plugin'}
 grootn17_cubebox_v1_full: {recipe: groot_n17_nvidia, dataset: so101_cubebox_v1, status: planned,
-  notes: 'Shortlisted 2026-11-18; recipe to be confirmed. GR00T N1.7 is upstream `groot` in LeRobot 0.7; H200 test
-    run ok (chunk + RTC)'}
-pi05_cubebox_v1_full: {recipe: pi05_full_openpi, dataset: so101_cubebox_v1, status: planned,
-  notes: Shortlisted 2026-11-18; recipe to be confirmed}
-molmoact2_cubebox_v1_full: {recipe: molmoact2_full, dataset: so101_cubebox_v1, status: planned,
-  notes: 'Shortlisted 2026-11-18; recipe to be confirmed. H200 test run ok, but serving (475 ms, RTC 604 ms) misses
+  notes: 'Shortlisted 2026-11-18; original recipe (2026-11-19). GR00T N1.7 is upstream `groot` in LeRobot 0.7. Relative
+    actions (the original) turn off its native RTC prefix: serve in chunk mode'}
+pi05_cubebox_v1_full: {recipe: pi05_openpi, dataset: so101_cubebox_v1, status: planned,
+  notes: Shortlisted 2026-11-18; original recipe (2026-11-19)}
+molmoact2_cubebox_v1_lora: {recipe: molmoact2_lora, dataset: so101_cubebox_v1, status: planned,
+  notes: 'Shortlisted 2026-11-18; original recipe (2026-11-19). H200 test run ok, but serving (475 ms, RTC 604 ms) misses
     the margin at s_min 20; open (lab/PLAN.md)'}
-act_cubebox_v1_full: {recipe: act_100ep, dataset: so101_cubebox_v1, status: planned,
-  notes: 'Shortlisted 2026-11-18, also the edge fallback; recipe to be confirmed'}
-diffusion_cubebox_v1_full: {recipe: diffusion_full, dataset: so101_cubebox_v1, status: planned,
-  notes: 'Shortlisted 2026-11-18; recipe to be confirmed. Must train with n_obs_steps=1 to be servable (the 0.7
+act_cubebox_v1_full: {recipe: act_original, dataset: so101_cubebox_v1, status: planned,
+  notes: 'Shortlisted 2026-11-18, also the edge fallback; original recipe (2026-11-19)'}
+diffusion_cubebox_v1_full: {recipe: diffusion_original, dataset: so101_cubebox_v1, status: planned,
+  notes: 'Shortlisted 2026-11-18; original recipe (2026-11-19). Must train with n_obs_steps=1 to be servable (the 0.7
     server refuses observation history)'}
 
 # --- Not shortlisted (2026-11-18) ---

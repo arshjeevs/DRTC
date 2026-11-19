@@ -182,6 +182,10 @@ def main(argv: list[str] | None = None) -> None:
         from drtc.data.record import main as record_main
 
         sys.exit(record_main(argv[1:]))
+    if argv and argv[0] == "prepare":
+        from drtc.data.prepare import main as prepare_main
+
+        sys.exit(prepare_main(argv[1:]))
     if argv and argv[0] == "trim":
         from drtc.data.trim import main as trim_main
 
@@ -204,6 +208,8 @@ def main(argv: list[str] | None = None) -> None:
     sub.add_parser("train", help="train a registry model (lab train <model> -h)")
     sub.add_parser("submit", help="queue a training job here or on a host (lab submit <model> --host h200)")
     sub.add_parser("worker", help="run queued jobs on this machine")
+    sub.add_parser("prepare", help="make what the recipes need from a dataset, e.g. relative-action stats "
+                                   "(lab prepare <dataset>; lab train does it on first use)")
     sub.add_parser("trim", help="trim the idle start/end of every episode into a new dataset (lab trim -h)")
     sub.add_parser("rig", help="a value of the current rig for shell scripts (lab rig phonecam.device)")
     sub.add_parser("calibrate", help="calibrate follower|leader with the rig's port and calibration file")

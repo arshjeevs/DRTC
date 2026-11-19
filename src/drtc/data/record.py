@@ -189,6 +189,11 @@ def main(argv: list[str] | None = None) -> int:
     existing.update(entries)
     path.write_text("# Written by lab record; review and commit.\n\n" + yaml.safe_dump(existing, sort_keys=False))
     print(f"registry: added {', '.join(entries)} to {path} (review and commit)")
+    # Ready for every recipe in use: relative-action stats etc. (lab train would also make them on first use).
+    from drtc.data.prepare import prepare, recipes_in_use
+
+    reg = Registry()
+    prepare(reg, a.name, recipes_in_use(reg))
     return 0
 
 

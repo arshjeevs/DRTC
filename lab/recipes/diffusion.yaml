@@ -1,19 +1,36 @@
 # Training recipes. `source`: who made this work and where it comes from.
 
-diffusion_full:
+diffusion_original:
+  source: 'Diffusion Policy real-robot config (Chi et al. 2023, arXiv 2303.04137; real-stanford/diffusion_policy
+    train_diffusion_unet_real_image_workspace.yaml): ResNet-18 from scratch with GroupNorm, 240x320 -> random crop
+    216x288, UNet 512/1024/2048, DDIM with 100 train steps (squaredcos), 10 at inference, AdamW 1e-4 (0.95, 0.999)
+    wd 1e-6, cosine, 500 warmup, EMA (power 0.75, max 0.9999), batch 64, 600 epochs. Horizons 16/8 at 10 Hz kept
+    in seconds: 48/24 at 30 fps. One observation frame (theirs: 2), as the policy server needs'
   policy: diffusion
   finetune: full
-  train: {epochs: 100, batch_size: 64, save_freq: 10000}
+  train: {epochs: 600, batch_size: 64, save_freq: 10000}
   flags:
-    policy.resize_shape: [240, 320]
-    policy.crop_shape: [216, 288]
-    policy.pretrained_backbone_weights: ResNet18_Weights.IMAGENET1K_V1
-    policy.use_group_norm: false
-    # One observation frame: LeRobot 0.7's policy server refuses observation history (n_obs_steps > 1).
     policy.n_obs_steps: 1
-    policy.horizon: 32
-    policy.n_action_steps: 16
-    policy.drop_n_last_frames: 16   # horizon - n_action_steps - n_obs_steps + 1
+    policy.horizon: 48
+    policy.n_action_steps: 24
+    policy.drop_n_last_frames: 24   # horizon - n_action_steps - n_obs_steps + 1
+    policy.resize_shape: [240, 320]
+    policy.crop_ratio: 0.9   # 216x288 from 240x320; with resize_shape set, LeRobot 0.7 ignores crop_shape
+    policy.crop_is_random: true
+    policy.pretrained_backbone_weights: null
+    policy.use_group_norm: true
+    policy.use_separate_rgb_encoder_per_camera: true
+    policy.down_dims: [512, 1024, 2048]
     policy.noise_scheduler_type: DDIM
+    policy.num_train_timesteps: 100
+    policy.beta_schedule: squaredcos_cap_v2
+    policy.prediction_type: epsilon
+    policy.clip_sample: true
     policy.num_inference_steps: 10
-  serve: {rtc_enabled: false, num_flow_matching_steps: null, actions_per_chunk: 16, s_min: 8}
+    policy.optimizer_lr: 1.0e-4
+    policy.optimizer_betas: [0.95, 0.999]
+    policy.optimizer_weight_decay: 1.0e-6
+    policy.scheduler_name: cosine
+    policy.scheduler_warmup_steps: 500
+    ema.type: warmup
+  serve: {rtc_enabled: false, num_flow_matching_steps: null, actions_per_chunk: 24, s_min: 8}
