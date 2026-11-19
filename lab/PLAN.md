@@ -16,6 +16,57 @@ nothing has to be redone. Items marked **[open]** are decisions still to make.*
 
 **[open]** Major presentation date. It decides how much of Phase 6 fits in.
 
+## Working plan (2026-11-19, to finalise with the user)
+Time is short, so work runs in parallel: the user records new datasets while three models train on the A100;
+training gets intensive once data collection is done; then evaluation. This section is the order of work; the
+phase sections below keep the details.
+
+**Decisions (2026-11-19):**
+- **Recipes are fixed** for every training from now on: the confirmed originals in `lab/recipes/` (Phase 2
+  "Recipes"). Speed settings (frame caches, workers, compile) are not recipe changes.
+- **Models now: SmolVLA, ACT, GR00T N1.5** (the ones that worked in the minor, plus ACT). π0.5, GR00T N1.7,
+  MolmoAct 2 and Diffusion are **deferred**: recipes, plugins and caches stay, no training for now.
+- **Datasets now:** SmolVLA and ACT on trimmed v0 (`so101_cubebox_v0`, on the Hub 2026-11-19); GR00T N1.5 on trimmed
+  v1 (`so101_cubebox_v1`). New datasets: the user records them and decides what trains on them, in what order.
+- **Machines:** A100 (192.168.5.13, cleaned 2026-11-19, 223 GB free) trains now; the H200 finishes the Phase 3
+  checks, then trains too; the laptop records (and can train ACT).
+
+**A. Now, in parallel**
+- [ ] A1. A100 setup (`lab/bin/a100-setup`): running. **Blocker:** Hugging Face downloads from the A100 run at
+  ~2 KB/s (PyTorch 15.6 MB/s, GitHub 0.4 MB/s). Copy the base models and datasets from the laptop over the LAN (or
+  find out why), and push checkpoints from where the Hub is reachable.
+- [ ] A2. A100 trainings, all three at once (~42 GB of 80): `smolvla_cubebox_v0_full`, `act_cubebox_v0_full`,
+  `groot_cubebox_v1_full`. Estimated 5-6 h (ACT is the longest).
+- [ ] A3. H200: FFmpeg, the two frame-cache checks, round 1 cut to SmolVLA, GR00T N1.5 and ACT (frames, compile,
+  two jobs side by side); then one speed setup per model in the recipes' `data`/flags (Phase 3 "done").
+- [ ] A4. User: robot-side checks from Phase 1 (`lab check --rig`, `lab calibrate`), one short `lab record` test
+  (2 episodes: record -> trim -> push -> registry), then data collection.
+- [ ] A5. Evaluation framework (section C), built while data is collected.
+
+**B. When the A2 trainings finish**
+- [ ] B1. Offline: held-out action error per checkpoint; the best one is already at each Hub repo's root.
+- [ ] B2. Robot trials with the C protocol: the three new models, with the two kept minor models
+  (`groot_cubebox_v1_lora_raw`, `smolvla_cubebox_v0_lora_raw`) as the reference to beat.
+
+**C. Evaluation framework (A5)**
+- [ ] C1. Offline: one command for a model -> held-out action error per checkpoint and the chosen one; one table
+  per dataset x model.
+- [ ] C2. Robot protocol: fixed cube positions (a marked grid), N trials per model in a fixed order, result
+  pick / place / fail and time per trial; the numbers N and the grid decided with the user.
+- [ ] C3. Logged per trial by DRTC: stalls, jerk, jumps between chunks, latency (the same metrics Phase 5 needs).
+- [ ] C4. Results: trials recorded by one command (or a form), one report that updates as trials come in.
+
+**D. When data collection is done**
+- [ ] D1. The user's training order; jobs queued with `lab submit` on the A100 and H200 (laptop: ACT).
+- [ ] D2. Each run: train -> best checkpoint pushed -> offline evaluation -> robot trials (C).
+
+**E. Afterwards, as time allows:** Phase 5 (smoothing) and Phase 6 (DRTC experiments) as below; the deferred models
+only if time is left. **[open]** the presentation date decides how much.
+
+**Left from the earlier phases (folded into A-E):** Phase 1: Zenoh across machines (D7), the Pi install, the
+robot-side checks and `lab run` trials (A4, B2). Phase 3: the H200 round and the per-model setup (A3). Phase 2's
+open MolmoAct 2 flow-step decision waits with MolmoAct 2.
+
 ---
 
 ## Status at the end of the 2026-11-18 session (handover)
