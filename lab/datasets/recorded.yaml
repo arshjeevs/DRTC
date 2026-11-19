@@ -2,21 +2,21 @@
 
 so101_sort_one_v1_raw:
   repo: orangemoon599/so101_sort_one_v1_raw
-  revision: f660ab7861f3a31a13685dafda35cf808aaef854
+  revision: a1442ab9428a68da243271e12c139ecb27f2cce0
   rig: so101_v2
   task: Put the cube in the square of the same color.
   fps: 30
-  episodes: 80
-  frames: 23328
+  episodes: 88
+  frames: 25364
   use_degrees: true
 so101_sort_one_v1:
   repo: orangemoon599/so101_sort_one_v1
-  revision: 1133e339f0e170965d8756b05e21c7ea6146de77
+  revision: bb483488b10b6845ec7708a30b89e3e77f2d61b1
   rig: so101_v2
   task: Put the cube in the square of the same color.
   fps: 30
-  episodes: 80
-  frames: 19204
+  episodes: 88
+  frames: 20935
   use_degrees: true
   parents:
   - so101_sort_one_v1_raw
