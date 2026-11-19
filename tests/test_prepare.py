@@ -4,7 +4,7 @@ import pytest
 
 from drtc.data import prepare
 from drtc.registry import Registry, RegistryError
-from drtc.train import build, flag_value, prune_training_state
+from drtc.train import EvalLosses, best_checkpoint, build, flag_value, prune_checkpoints
 
 
 def test_relative_actions_need_stats_per_chunk_and_exclusion():
@@ -50,17 +50,40 @@ def test_every_recipe_in_use_is_preparable():
         prepare.needs(recipe.flags, recipe.policy)  # raises if a relative recipe is incomplete
 
 
-def test_prune_keeps_weights_everywhere_and_state_only_in_the_latest(tmp_path):
+def test_prune_keeps_the_last_two_and_the_best(tmp_path):
+    ckpts = tmp_path / "checkpoints"
+    steps = ("001000", "002000", "003000", "004000", "005000")
+    for step in steps:
+        (ckpts / step / "pretrained_model").mkdir(parents=True)
+        (ckpts / step / "training_state").mkdir()
+    (ckpts / "last").symlink_to(ckpts / "005000")
+    losses = {1000: 0.9, 2000: 0.3, 3000: 0.5, 4000: 0.6, 5000: 0.7}
+    prune_checkpoints(ckpts / "005000", losses)
+    assert sorted(c.name for c in ckpts.iterdir() if not c.is_symlink()) == ["002000", "004000", "005000"]
+    assert best_checkpoint(ckpts, losses).name == "002000"
+    assert (ckpts / "005000" / "training_state").is_dir()  # the latest resumes
+    assert not (ckpts / "002000" / "training_state").exists() and not (ckpts / "004000" / "training_state").exists()
+    assert (ckpts / "last").resolve() == (ckpts / "005000").resolve()
+
+
+def test_prune_without_eval_keeps_the_last_two(tmp_path):
     ckpts = tmp_path / "checkpoints"
     for step in ("001000", "002000", "003000"):
         (ckpts / step / "pretrained_model").mkdir(parents=True)
-        (ckpts / step / "training_state").mkdir()
-    (ckpts / "last").symlink_to(ckpts / "003000")
-    removed = prune_training_state(ckpts / "003000")
-    assert sorted(p.parent.name for p in removed) == ["001000", "002000"]
-    for step in ("001000", "002000", "003000"):
-        assert (ckpts / step / "pretrained_model").is_dir()
-    assert (ckpts / "003000" / "training_state").is_dir()
+    prune_checkpoints(ckpts / "003000", {})
+    assert sorted(c.name for c in ckpts.iterdir()) == ["002000", "003000"]
+
+
+def test_eval_losses_are_read_from_lerobot_train_logs():
+    import logging
+
+    h = EvalLosses()
+    log = logging.getLogger("test_eval_losses")
+    log.addHandler(h)
+    log.setLevel(logging.INFO)
+    log.info("step 1000: eval_loss=0.2190")
+    log.info("step:1K smpl:64K loss:0.5")
+    assert h.losses == {1000: 0.219}
 
 
 def test_none_flags_reach_draccus_as_none():

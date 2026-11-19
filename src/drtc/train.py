@@ -6,8 +6,8 @@ adds only what 0.7 lacks:
   episode list is passed training-first, held-out-last, and eval_split selects exactly the held-out tail;
 - epochs -> steps over the training frames;
 - refusing a stale local dataset copy (a different version cached under the same name);
-- checkpoints: the weights of every one are kept, the training state only for the latest (see
-  prune_training_state);
+- checkpoints: the latest two and the best by held-out eval loss are kept, the others deleted, the training state
+  only in the latest (prune_checkpoints); the push puts the best one's model files at the repo root;
 - one video decoder everywhere (torchcodec, drtc.data.video): checked before training, no silent PyAV fallback;
 - recipes that need more than the recorded dataset (relative-action stats, a frame cache) train on a prepared
   variant (drtc.data.prepare; drtc.compat.frame_cache reads the cached frames);
@@ -25,8 +25,10 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import json
+import logging
 import math
 import random
+import re
 import shlex
 import signal
 import sys
@@ -268,41 +270,82 @@ def command(flags: dict) -> list[str]:
 # --- clean stop and pushing ----------------------------------------------------------------------------------------
 
 
-def push(checkpoint_dir: Path, repo_id: str) -> None:
-    """Checkpoint (with training state, for resuming) under checkpoints/<step>/, model files at the repo root."""
+def push(checkpoint_dir: Path, repo_id: str, model_from: Path | None = None) -> None:
+    """Checkpoint (with training state, for resuming) under checkpoints/<step>/, and model files at the repo root:
+    from `model_from` (the best checkpoint, also pushed under checkpoints/<step>/) or else from this one."""
     from huggingface_hub import HfApi
     from lerobot.common.train_utils import push_checkpoint_to_hub
 
     checkpoint_dir = checkpoint_dir.resolve()
     push_checkpoint_to_hub(checkpoint_dir, repo_id)
-    HfApi().upload_folder(folder_path=str(checkpoint_dir / "pretrained_model"), repo_id=repo_id, repo_type="model",
-                          commit_message=f"model from checkpoint {checkpoint_dir.name}")
-    print(f"pushed checkpoint {checkpoint_dir.name} to https://huggingface.co/{repo_id}", flush=True)
+    model_from = (model_from or checkpoint_dir).resolve()
+    if model_from != checkpoint_dir:
+        push_checkpoint_to_hub(model_from, repo_id)
+    HfApi().upload_folder(folder_path=str(model_from / "pretrained_model"), repo_id=repo_id, repo_type="model",
+                          commit_message=f"model from checkpoint {model_from.name}"
+                          + (" (best held-out eval loss)" if model_from != checkpoint_dir else ""))
+    print(f"pushed checkpoint {checkpoint_dir.name} to https://huggingface.co/{repo_id}"
+          + (f"; model files from the best checkpoint {model_from.name}" if model_from != checkpoint_dir else ""),
+          flush=True)
 
 
-def prune_training_state(latest: Path) -> list[Path]:
-    """Keep every checkpoint's weights (to choose the best by held-out action error), but the training state
-    (optimizer, scheduler, RNG: the bulk of a large model's checkpoint) only for the latest one, which resumes.
-    LeRobot 0.7 keeps everything; for π0.5 that is tens of GB per checkpoint."""
+KEEP_LAST = 2  # checkpoints kept besides the best one
+
+
+class EvalLosses(logging.Handler):
+    """Collects lerobot-train's held-out losses ("step N: eval_loss=X") as {step: loss}."""
+
+    PATTERN = re.compile(r"step (\d+): eval_loss=([0-9.eE+-]+|nan|inf)")
+
+    def __init__(self):
+        super().__init__(logging.INFO)
+        self.losses: dict[int, float] = {}
+
+    def emit(self, record):
+        m = self.PATTERN.search(record.getMessage())
+        if m:
+            self.losses[int(m.group(1))] = float(m.group(2))
+
+
+def best_checkpoint(ckpts_dir: Path, losses: dict[int, float]) -> Path | None:
+    """The saved checkpoint with the lowest held-out eval loss (None before any evaluated checkpoint)."""
+    scored = [(losses[int(c.name)], c) for c in ckpts_dir.iterdir()
+              if c.is_dir() and not c.is_symlink() and c.name.isdigit() and int(c.name) in losses]
+    scored = [(l, c) for l, c in scored if l == l]  # drop nan
+    return min(scored)[1] if scored else None
+
+
+def prune_checkpoints(latest: Path, losses: dict[int, float], keep_last: int = KEEP_LAST) -> list[Path]:
+    """Bounded disk use: keep the latest `keep_last` checkpoints and the best one by held-out eval loss (the one to
+    serve); delete the others. The training state (optimizer, scheduler, RNG: the bulk of a large model's
+    checkpoint) stays only in the latest, which resumes. LeRobot 0.7 keeps everything (tens of GB per π0.5
+    checkpoint; the A100 and H200 home disks are shared and nearly full)."""
     import shutil
 
     from lerobot.utils.constants import TRAINING_STATE_DIR
 
-    removed = []
     latest = latest.resolve()
-    for ckpt in latest.parent.iterdir():
-        if ckpt.is_symlink() or not ckpt.is_dir() or ckpt.resolve() == latest:
-            continue
-        ts = ckpt / TRAINING_STATE_DIR
-        if ts.is_dir():
-            shutil.rmtree(ts)
-            removed.append(ts)
+    ckpts = sorted((c for c in latest.parent.iterdir() if c.is_dir() and not c.is_symlink() and c.name.isdigit()),
+                   key=lambda c: int(c.name))
+    keep = {c.resolve() for c in ckpts[-keep_last:]} | {latest}
+    best = best_checkpoint(latest.parent, losses)
+    if best is not None:
+        keep.add(best.resolve())
+    removed = []
+    for ckpt in ckpts:
+        if ckpt.resolve() not in keep:
+            shutil.rmtree(ckpt)
+            removed.append(ckpt)
+        elif ckpt.resolve() != latest and (ckpt / TRAINING_STATE_DIR).is_dir():
+            shutil.rmtree(ckpt / TRAINING_STATE_DIR)
+            removed.append(ckpt / TRAINING_STATE_DIR)
     return removed
 
 
 def install_clean_stop(lerobot_train, model: str) -> dict:
     """At the next step after a stop request: save a checkpoint, then stop (the caller pushes it)."""
-    state = {"requested": False, "saved": None}
+    state = {"requested": False, "saved": None, "eval": EvalLosses()}
+    logging.getLogger().addHandler(state["eval"])
     stop = stop_file(model)
     stop.parent.mkdir(parents=True, exist_ok=True)
     stop.unlink(missing_ok=True)  # an old request must not stop this run
@@ -328,7 +371,8 @@ def install_clean_stop(lerobot_train, model: str) -> dict:
 
     def update_last_checkpoint(checkpoint_dir):
         update_last(checkpoint_dir)
-        prune_training_state(Path(checkpoint_dir))
+        for gone in prune_checkpoints(Path(checkpoint_dir), state["eval"].losses):
+            print(f"checkpoints: removed {gone.relative_to(Path(checkpoint_dir).parent)}", flush=True)
         if state["requested"]:
             state["saved"] = Path(checkpoint_dir)
             raise StopTraining
@@ -417,8 +461,12 @@ def main(argv: list[str] | None = None) -> int:
     except StopTraining:
         print(f"\nstopped at checkpoint {state['saved'].name}", flush=True)
     last = out / "checkpoints" / "last"
+    best = best_checkpoint(out / "checkpoints", state["eval"].losses) if last.exists() else None
+    if best is not None:
+        loss = state["eval"].losses[int(best.name)]
+        print(f"best checkpoint by held-out eval loss: {best.name} ({loss:.4f})", flush=True)
     if not args.no_push and last.exists():
-        push(last.resolve(), r.hub)
+        push(last.resolve(), r.hub, model_from=best)
     if state["requested"]:
         print(f"continue (here or on another machine): lab train {args.model} --resume", flush=True)
     return 0
