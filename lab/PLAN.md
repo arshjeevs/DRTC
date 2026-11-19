@@ -11,7 +11,7 @@ nothing has to be redone. Items marked **[open]** are decisions still to make.*
 | 3 | Faster training, and the setup on every machine | One measured speed setup per active model | **Done** (2026-11-19) |
 | 4 | Data collection (the user) | New datasets finalised and on the Hub | Sorting A done (2026-11-19); B, stacking later |
 | 5 | Evaluation framework | One command for offline results; robot trials recorded with a fixed protocol | Built during 3-4 |
-| 6 | Train and choose | We know which models work | Round 1 running on the A100; round 2 after 4 |
+| 6 | Train and choose | We know which models work | Round 1 on the A100, round 2 (sorting A) on the H200: running |
 | 7 | Smoothing test bench, then smoothing methods | Any method compared on any model with one command | After 6 |
 | 8 | DRTC experiments | — | After 6, 7 |
 | Later | Edge fallback (ACT); the deferred models | — | Only if time is left |
@@ -77,11 +77,11 @@ nothing has to be redone. Items marked **[open]** are decisions still to make.*
   robot trials use the same marks). Each layout combination is recorded equally often, in a fixed rotation, so no
   shortcut ("always go right") fits the data. Fixed order of moves within an episode (no mixed strategies).
 
-  | Dataset | Setup | Instruction | Episodes (held out) | Episode / reset |
+  | Dataset | Setup | Instruction | Training + held out | Episode / reset |
   |---|---|---|---|---|
-  | `so101_sort_one_v1` (A) | One cube (red or blue) on one fixed spot; the red and blue squares swap between two fixed spots | "Put the cube in the square of the same color." | 80 (8) | 30 / 10 s |
-  | `so101_sort_two_v1` (B) | Both cubes on two fixed spots, swapping; the squares swap as in A; red first, then blue | "Put the red cube in the red square and the blue cube in the blue square." | 100 (10) | 45 / 15 s |
-  | `so101_stack_v1` | Red cube onto the blue cube (layout decided at its session) | "Put the red cube on top of the blue cube." | 100 (10) | 30 / 10 s |
+  | `so101_sort_one_v1` (A) | One cube (red or blue) on one fixed spot; the red and blue squares swap between two fixed spots | "Put the cube in the square of the same color." | 80 + 8 (done) | 30 / 10 s |
+  | `so101_sort_two_v1` (B) | Both cubes on two fixed spots, swapping; the squares swap as in A; red first, then blue | "Put the red cube in the red square and the blue cube in the blue square." | 100 + 10 | 45 / 15 s |
+  | `so101_stack_v1` | Red cube onto the blue cube (layout decided at its session) | "Put the red cube on top of the blue cube." | 100 + 10 | 30 / 10 s |
 
   - A's rotation (x20): red cube / blue square left; blue cube / blue left; red / blue right; blue / blue right.
   - B's rotation (x25): red cube left / blue square left; red left / blue right; red right / blue left; red right /
@@ -107,9 +107,9 @@ by one command, one report; Zenoh between the laptop and the GPU servers (from P
 up to N + K. `so101_sort_one_v1` was recorded before this (80 = 72 + 8); it becomes 80 + 8 with 8 more episodes
 (`--episodes 80 --held-out 8 --resume`).
 
-**Phase 6 round 2, sorting A (2026-11-19):** `so101_sort_one_v1` finished (80 episodes, 8 held out; trimmed 19,204
-frames). The user chose ACT, SmolVLA and GR00T N1.5 with the fixed recipes (`lab/models/sort_one_v1.yaml`), trained
-on the H200 at once (`lab prepare` first, so the three runs do not prepare the same copy together; H200 `cpu_budget`
+**Phase 6 round 2, sorting A (2026-11-19):** `so101_sort_one_v1` finished (88 episodes: 80 training + 8 held out;
+trimmed 20,935 frames). The user chose ACT, SmolVLA and GR00T N1.5 with the fixed recipes (`lab/models/sort_one_v1.yaml`), trained
+on the H200 at once (started by the user 2026-11-19) (`lab prepare` first, so the three runs do not prepare the same copy together; H200 `cpu_budget`
 scaled from the A100's, not yet measured). Deferred models stay for later.
 
 **Phase 6:** round 1 (A100): SmolVLA and ACT on trimmed v0, GR00T N1.5 on trimmed v1, then offline ranking and
