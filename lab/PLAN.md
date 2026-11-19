@@ -27,7 +27,8 @@ nothing has to be redone. Items marked **[open]** are decisions still to make.*
   robot trials; the H200 tests everything during data collection, afterwards it trains the active models; the
   laptop records and runs the robot.
 - **A100 and Hugging Face:** a first test showed ~2 KB/s, a second one 23.5 MB/s for a large file and 0.4-0.6 s for API
-  calls: the Hub works from the A100. The base models and datasets were copied from the laptop anyway (faster).
+  calls: the Hub works from the A100, faster than copying from the laptop (1.8 MB/s over the LAN); only the SmolVLA
+  base was copied, the rest downloads there.
 - **New datasets (Phase 4):** a new task, the same scene positions and rig as v1 (`so101_v2`: camera1 wrist,
   camera2 scene, 800x600 at 30 fps), names `so101_cubebox_v2`, `v3`, ...; size (episodes, lengths, held-out)
   decided per task. Joints in **degrees** (LeRobot 0.7's default): old and new datasets are not merged, and units are
