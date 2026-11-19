@@ -486,6 +486,31 @@ Ours: 110 episodes, 30 fps, 25,067 frames.
 **The user's view (2026-11-18):** these are not the recipes to follow; they are reference only. The user is
 looking for the right source. The training configs are confirmed after that research.
 
+### Official recipes (read 2026-11-19)
+Each model's own docs: paper, official repo, LeRobot page. Our data: 110 episodes, 30 fps, ~25k frames (≈780 steps per
+epoch at batch 32). **User's leaning (2026-11-19):** SmolVLA full fine-tune, π0.5 full fine-tune, MolmoAct 2 LoRA.
+
+| | What is trained | Steps × batch | LR, schedule | Chunk (executed) | Actions, norm | Other |
+|---|---|---|---|---|---|---|
+| **SmolVLA** (paper 2506.01844, LeRobot docs) | Action expert only, VLM frozen (paper). No full fine-tune documented; LeRobot has the flags (`freeze_vision_encoder`, `train_expert_only`, both `true` by default) | 20k × 64 (docs, "~4 h on one A100"); paper: 200k for real tasks, "much fewer works" | Fine-tune LR not stated; LeRobot default 1e-4, warmup 1k, cosine to 2.5e-6 over 30k | 50 (paper's sync eval runs all 50; LIBERO: 10–50 best) | Not stated | 512×512 images, ~50 episodes recommended (25 was "not enough"). Paper SO-100: 78% multi-task |
+| **π0.5** (openpi `config.py`, LeRobot docs) | Full fine-tune in every openpi π0.5 config; LoRA only exists for π0/π0-FAST. LeRobot's main example is full too (expert-only "costs some success") | openpi: 20k × 32 (DROID), 20k × 64 (ALOHA), 30k × 256 (LIBERO). LeRobot LIBERO: 30k × 64 on one 80 GB GPU | AdamW b2 0.95, clip 1.0; 2.5e-5 peak, 1k warmup, cosine to 2.5e-6 over 30k (default) or flat 5e-5 (LIBERO); EMA 0.99 (0.999 LIBERO) | 50 (ALOHA default); 16 (DROID); 10 (LIBERO) | **Delta joints, absolute gripper** for joint-space robots (ALOHA, DROID joint pos); **quantile** norm (LeRobot example uses mean/std) | 224×224; full FT > 70 GB |
+| **GR00T N1.5** (Isaac-GR00T n1.5-release) | Projector + DiT; LLM and vision frozen. LoRA possible (r 64, α 128) but full head recommended | 10k (script, blog) to 20k ("batch to the max") × 32 per GPU | 1e-4, AdamW (0.95, 0.999), wd 1e-5, warmup 5%, cosine | 16 | Absolute, **min-max** | crop 0.95 → 224×224, colour jitter (0.3/0.4/0.5/0.08); ~25 GB. LeRobot dropped N1.5 (our plugin) |
+| **GR00T N1.7** (Isaac-GR00T main, LeRobot docs) | Projector + DiT + VLLN; LLM and vision frozen; no LoRA | NVIDIA: 10k × 64 global; LeRobot SO-101: **20k × 64** | 1e-4, warmup 5%, wd 1e-5 | **16 of the 40-step head** for SO-100 (LeRobot rollout executes 8, RTC horizon 8) | **Relative arm, absolute gripper**; percentile (q01/q99) | state dropout 0.2, colour jitter; ≥ 40 GB |
+| **MolmoAct 2** (paper 2605.02881, allenai repo, LeRobot docs) | LeRobot docs: **LoRA (default) for < 200 demos**, "similar or even better than fft"; LoRA r 64 on the LLM + ViT, connector and action expert fully trained | Paper's real-robot eval fine-tunes: 50k × 16 (8 H100); SO-100 base itself: 100k × 64; LeRobot LIBERO 10k × 32 × 8 GPUs | LoRA: all groups 5e-5 (fft: VLM 1e-5, ViT/connector 5e-6, expert 5e-5); warmup 200, cosine, decay horizon 24k | 30 at 30 Hz | **Absolute joints**, quantile, gripper not normalized | Continuous flow matching, 8 flow times in training, 10 inference steps. Augmentation **on**: 95% crop, ±5° rotation, colour jitter, blur p 0.2 (LeRobot disables it by default) |
+| **ACT** (paper 2304.13705, tonyzhaozh/act, LeRobot) | Everything | Original: batch 8, 2000 epochs sim, "≥ 5000 epochs real, or 3–4× after the loss plateaus"; LeRobot: 100k steps, batch 8 | 1e-5 (Adam) | 100; temporal ensembling at eval (our server refuses it) | Absolute joints | KL 10, 4/7 layers, dim 512/3200; best validation checkpoint; "train longer if jerky" |
+| **Diffusion** (paper 2303.04137, real-stanford repo) | Everything; ResNet-18 from scratch, GroupNorm, spatial softmax | batch 64; ~600–3000 epochs | AdamW 1e-4 (0.95, 0.999), wd 1e-6, cosine, 500 warmup; EMA (power 0.75, max 0.9999) | To 2, Tp 16, Ta 8 **at 10 Hz** (1.6 s / 0.8 s; ≈ 48 / 24 at 30 fps) | Absolute position, min-max to [−1, 1] | 240×320 → crop 216×288 (random), 100 DDPM train steps, DDIM 10–16 at inference; robust to ≤ 4 steps latency |
+
+**Where our recipes differ:**
+- `smolvla_full_45ep` is named full but trains the action expert only (LeRobot's defaults). A full fine-tune needs
+  `policy.freeze_vision_encoder: false` and `policy.train_expert_only: false`; that is not what the authors do.
+- `pi05_full_openpi`: absolute actions, ~7.8k steps, no EMA. openpi: delta joints + absolute gripper, 20–30k steps,
+  EMA, quantile norm.
+- `groot_n17_nvidia`: chunk 40 and absolute actions. NVIDIA/LeRobot SO-100: chunk 16, relative arm, 20k × 64.
+- `molmoact2_full`: `train_mode_vlm: fft`. The docs recommend LoRA for our 110 episodes; augmentation is off.
+- `act_100ep`: batch 64, ~39k steps, LR default. Original: batch 8, LR 1e-5, much longer.
+- `diffusion_full`: ImageNet backbone without GroupNorm; the original trains from scratch with GroupNorm and EMA.
+  `n_obs_steps: 1` stays (the server refuses history; the original uses 2).
+
 ### Shortlist (decided 2026-11-18)
 **Models:**
 - SmolVLA
