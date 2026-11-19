@@ -141,6 +141,7 @@ def main(argv: list[str] | None = None) -> int:
     flags = {**rig_flags(reg), "dataset.repo_id": raw_repo, "dataset.single_task": a.task, "dataset.fps": fps,
              "dataset.num_episodes": a.episodes, "dataset.episode_time_s": a.episode_time,
              "dataset.reset_time_s": a.reset_time, "dataset.push_to_hub": False, "resume": a.resume,
+             "dataset.no_stamp": True,  # lab manages the names (0.7 otherwise appends the date and time)
              **video.encoder_flags(),  # the same AV1 settings for every recording (drtc.data.video)
              "display_data": display, "play_sounds": False}
     cmd = ["lerobot-record", *(f"--{k}={flag_value(v)}" for k, v in flags.items()), *extra]
