@@ -123,7 +123,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--episode-time", type=float, default=30)
     ap.add_argument("--reset-time", type=float, default=10)
     ap.add_argument("--held-out", type=int, default=10, help="held-out episodes in the trimmed dataset's split")
-    ap.add_argument("--resume", action="store_true", help="add episodes to an existing <name>_raw recording")
+    ap.add_argument("--resume", action="store_true",
+                    help="add --episodes more episodes to an existing <name>_raw recording; the trimmed copy is rebuilt")
     ap.add_argument("--no-push", action="store_true", help="keep both datasets local")
     ap.add_argument("--display", action=argparse.BooleanOptionalAction, default=None)
     ap.add_argument("--dry-run", action="store_true")
@@ -150,8 +151,12 @@ def main(argv: list[str] | None = None) -> int:
     from drtc.cli import check_rig
 
     problems = check_rig(reg)
-    if trimmed_root.exists():
-        problems.append(f"{trimmed_root} exists: the trimmed copy is made after recording (choose a new name)")
+    if trimmed_root.exists() and not a.resume:
+        problems.append(f"{trimmed_root} exists: the trimmed copy is made after recording (choose a new name, "
+                        f"or --resume to add episodes)")
+    rebuild = trimmed_root.with_name(trimmed_root.name + ".rebuild")
+    if a.resume and rebuild.exists():
+        problems.append(f"{rebuild} exists (an interrupted earlier rebuild?); look at it, then remove it")
     if a.dry_run:
         for p in problems:
             print(f"  PROBLEM {p}")
@@ -177,7 +182,17 @@ def main(argv: list[str] | None = None) -> int:
     ds = trim.RawDataset(raw_root)
     results, noise, floor = trim.detect(ds, trim.Params())
     trim.report(ds, results, noise, floor, trim.Params())
-    trim.apply(ds, results, trimmed_root)
+    if trimmed_root.exists():
+        # --resume: the trimmed copy is rebuilt from the whole recording; the old one (also on the Hub, in the
+        # repo's history) is replaced only after the rebuild succeeded. Its videos are hardlinks into the raw copy.
+        import shutil
+
+        trim.apply(ds, results, rebuild)
+        shutil.rmtree(trimmed_root)
+        rebuild.rename(trimmed_root)
+        print(f"rebuilt the trimmed copy from all {len(results)} episodes: {trimmed_root}")
+    else:
+        trim.apply(ds, results, trimmed_root)
     if a.no_push:
         print(f"kept local: {raw_root}, {trimmed_root}")
         return 0
