@@ -565,10 +565,24 @@ Fixes:
   MolmoAct 2 serves 40% faster than the full fine-tune (475 / 604 ms). The likely reason: the checkpoint's config
   now has `compile_model: true`, so the server compiles the same blocks training does. LoRA itself only adds work
   (the adapters are not merged).
-- [ ] MolmoAct 2 latency, option A (serve settings, no retraining): `serve_check.py --set` times a copy of the
-  checkpoint with config keys changed. Sweep `num_inference_steps` 10 (the default) / 8 / 6 / 5 / 4, plus
-  `compile_model=false` to confirm the compile explanation. RTC fits margin 10 at ≤ 10 steps (≤ 333 ms).
-  Fewer flow steps can cost accuracy, so a setting that fits also needs a held-out action-error check.
+- [x] MolmoAct 2 latency, option A (serve settings, no retraining): `serve_check.py --set` times a copy of the
+  checkpoint with config keys changed. Sweep (H200, 2026-11-19, commit 6d487db2), margin 10 (H 30, s_min 20):
+
+  | Setting | chunk ms (steps) | RTC ms (p90) (steps) | RTC fits |
+  |---|---|---|---|
+  | 10 flow steps (default) | 292 (9) | 433 (448) (13) | no |
+  | 8 | 257 (8) | 372 (377) (12) | no |
+  | 6 | 212 (7) | 304 (322) (10) | no (needs < 10) |
+  | 5 | 207 (7) | 279 (290) (9) | yes, 1 step spare |
+  | 4 | 188 (6) | 247 (255) (8) | yes, 2 spare |
+  | 10, `compile_model=false` | 507 (16) | 646 (657) (20) | no |
+
+  - Compiling is what made the LoRA model faster (507 → 292 ms). Serving must keep `compile_model: true`.
+  - Each flow step costs about 17 ms in chunk mode and about 31 ms in RTC mode (guided RTC runs a backward pass per
+    step). About 120 ms per call is fixed: the VLM and preprocessing.
+  - The check times only the server. Network time between robot and server comes on top, so 1 spare step is thin.
+- [ ] MolmoAct 2 flow steps for serving: decide after the real training, from held-out action error at 10 / 6 / 5 / 4
+  steps. `lab serve` also needs the same config override as the check.
 
 ### Dataset preparation (2026-11-19)
 `drtc.data.prepare` makes what a recipe needs beyond the recorded dataset. Today that is relative-action stats:
