@@ -52,8 +52,9 @@ nothing has to be redone. Items marked **[open]** are decisions still to make.*
   - Then: GR00T N1.5 2.3 s per step (preprocessing 1.14 s), ~6.3 h; ACT 6.5 steps/s, ~4.1 h; load ~6.
   - SmolVLA (compile, max-autotune) retunes its kernels once at the first epoch's smaller last batch (step ~170
     on v0); a one-time cost.
-- [ ] Per-machine CPU budget as a setting (hosts.yaml: threads and workers per job when jobs share a machine),
-  instead of the environment variables used by hand on the A100.
+- [x] Per-machine CPU budget (hosts.yaml `cpu_budget`, threads and workers per policy): `lab train` applies it when
+  another `lab train` already runs on that machine; a job alone gets the whole machine. A100 values as measured.
+- [x] GR00T N1.5 on the A100 restarted with the cache fix (2026-11-19 18:20; the first run decoded full-size videos).
 - [x] Old models on LeRobot 0.7 (A100, 2026-11-19, measured with three trainings on the GPU, so the times are high):
   both admitted in chunk and rtc_guided mode. GR00T 379 ms chunk / 466 ms RTC, SmolVLA 571 / 928 ms. [ ] Retime on
   a free GPU before the robot trials.
@@ -937,9 +938,16 @@ RTC. The other five can be compared with and without RTC.
 
   - Three jobs on the one GPU (ACT + Diffusion + SmolVLA) reach 97% GPU use; each is slower than alone, together
     faster than one after another.
-  - GR00T N1.5: the cache makes the model input identical and removes most of the Eagle image work, yet training's
-    preprocessing stays at 0.69 s per step: another part of its CPU preprocessing dominates. [ ] Profile it
-    (later, while models train).
+  - **Correction (2026-11-19, later): the frame caches were not used in these training runs.** lerobot-train
+    starts its DataLoader workers with `spawn`, and the cache was a patch of LeRobot's class in the training
+    process, which spawned workers do not inherit: they decoded the full-size videos (the checks used forked
+    workers, which do). So the "frames" rows above measure decoding, and Diffusion's gain at 16 workers came from
+    the workers. Fixed: the dataset's reader is a `CachedDatasetReader`, whose class travels with the pickled
+    dataset (checked: a spawned worker returns 224x224 frames). The model input was the same either way.
+  - [x] GR00T N1.5 preprocessing profiled (laptop, real batches, `tests/bench/profile_preprocessing.py`): with the
+    cache 118 ms per batch of 32 (Eagle encode 36 ms, collate 70 ms: tokenizer and Eagle's image processor), against
+    0.69 s inside H200 training without it.
+  - [ ] Remeasure on the H200 with the fix: `round.py frames frames_w16`.
 - [x] One setup per active model (2026-11-19), in the recipes' `speed:` section (lerobot-train flags that change only
   the speed; `lab train` refuses one that is also a recipe flag, and prints them separately):
   - SmolVLA: `policy.compile_model: true`.
