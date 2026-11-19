@@ -36,6 +36,12 @@ nothing has to be redone. Items marked **[open]** are decisions still to make.*
   units and refuses a mismatched robot), so the old -100..100 models keep working. **The arm is not recalibrated**
   (both unit systems come from the same calibration files).
 
+- **[open] Training logs (found 2026-11-19):** the shared Trackio Space `orangemoon599/drtc-lab` was never created:
+  Hugging Face hosts Gradio Spaces on free hardware only with a PRO subscription (Trackio's message), and no bucket
+  exists either. Trackio falls back to local logging on each machine (and every run's log file has the numbers).
+  Options: a PRO subscription; Trackio local only (view per machine, `trackio show` through an SSH tunnel); our own
+  sync of each run's metrics to a Hub dataset; or wandb through our wrapper.
+
 ## Plan by phase (2026-11-19)
 **Phase 3 (with 4):**
 - [ ] A100 setup (`lab/bin/a100-setup`); base models and datasets copied from the laptop.
