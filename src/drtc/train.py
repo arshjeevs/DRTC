@@ -13,7 +13,7 @@ adds only what 0.7 lacks:
   variant (drtc.data.prepare; drtc.compat.frame_cache reads the cached frames);
 - a clean stop: Ctrl-C, SIGTERM or `lab stop <model>` saves a checkpoint at the next step, pushes it with its
   training state (resumable anywhere: `lab train <model> --resume`) and exits;
-- logging to Trackio (lab/lab.yaml: project and the shared Hugging Face Space);
+- logging to Trackio (local database per machine) and to wandb (drtc.compat.wandb_mirror; lab/lab.yaml);
 - pushing the final (or a chosen) checkpoint: model files at the repo root, the checkpoint for resuming under
   checkpoints/<step>/ (tagged).
 
@@ -458,10 +458,13 @@ def main(argv: list[str] | None = None) -> int:
             print(f"lab train: {out} exists; continue it with --resume", file=sys.stderr)
             return 1
     cmd = command(flags) + extra
-    from drtc.compat import frame_cache, molmoact2
+    from drtc.compat import frame_cache, molmoact2, wandb_mirror
 
     molmoact2.install()  # LoRA fine-tuning from a full-weight MolmoAct 2 checkpoint
     frame_cache.install()  # cached frames for variants that have them (recipe data.frames)
+    if reg.settings.wandb_project and flags.get("trackio.enable", True) and \
+            "--trackio.enable=false" not in extra:
+        wandb_mirror.install(reg.settings.wandb_project, reg.settings.wandb_entity)  # wandb next to Trackio
     state = install_clean_stop(lerobot_train, args.model)
     sys.argv = cmd
     try:

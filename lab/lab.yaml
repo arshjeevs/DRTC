@@ -1,10 +1,11 @@
 # Lab-wide settings.
 hub_account: orangemoon599
-# Training and robot runs log to Trackio (LeRobot 0.7 has no wandb), project drtc-lab, on a private Hugging Face
-# Space shared by every machine (created on the first logged run; data kept in its Hugging Face bucket).
+# Training runs log to wandb (online, shared by every machine) and to Trackio (LeRobot 0.7's logger; a local database
+# on each machine: its shared Space needs a Hugging Face PRO subscription). Decided 2026-11-19.
 # The minor's runs stay in wandb, project "drtc".
 trackio_project: drtc-lab
-trackio_space: orangemoon599/drtc-lab
+trackio_space: null
 trackio_private: true
+wandb_project: drtc-lab
 # From 2026-11-18 every dataset is trimmed (idle start/end removed) before it is saved; the untrimmed
 # recording is kept as <dataset>_raw. A name without _raw is always trimmed.

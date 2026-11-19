@@ -145,6 +145,8 @@ class Settings(BaseModel):
     trackio_project: str
     trackio_space: str | None = None  # Hugging Face Space all machines log to; None = local database only
     trackio_private: bool = True
+    wandb_project: str | None = None  # every training run also logs here (drtc.compat.wandb_mirror); None = off
+    wandb_entity: str | None = None
 
 
 # --- recipes and models -------------------------------------------------------------------------------------------

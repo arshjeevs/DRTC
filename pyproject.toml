@@ -24,6 +24,7 @@ dependencies = [
 gpu = [
     "lerobot[training,peft,smolvla,pi,xvla,groot]==0.7.0",
     "lerobot_policy_groot_n15",
+    "wandb>=0.21",
 ]
 # Runs the robot-side control loop without hardware (lerobot_robot_replay: --robot.type=replay).
 sim = ["lerobot_robot_replay"]
