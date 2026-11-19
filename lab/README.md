@@ -1,7 +1,7 @@
 # Lab
 
 Our layer on top of LeRobot 0.7 (pinned in `pyproject.toml`). Plan, decisions and progress: [PLAN.md](PLAN.md).
-H200 server: [H200.md](H200.md). The minor's setup is tag `minor-final` (branch `drtc`, `~/Projects/drtc`).
+Guides: [DATA.md](DATA.md) (recording and editing datasets), [TRAIN.md](TRAIN.md) (training). H200 server: [H200.md](H200.md). The minor's setup is tag `minor-final` (branch `drtc`, `~/Projects/drtc`).
 
 ```
 lab/
