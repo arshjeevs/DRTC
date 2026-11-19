@@ -46,8 +46,10 @@ CU13=$(grep -oE '^name = "(nvidia-[a-z0-9-]+|triton)"' uv.lock | cut -d'"' -f2 |
 # shellcheck disable=SC2086
 uv sync --frozen --extra gpu --python 3.12 --no-install-package torch --no-install-package torchvision \
     --no-install-package torchcodec $CU13
+# PyTorch's index has the +cu126 builds and their CUDA 12 libraries; uv must look at both indexes (it searches an
+# extra index first and stops at the first one that has the package name).
 uv pip install --python .venv/bin/python --index-url https://download.pytorch.org/whl/cu126 \
-    --extra-index-url https://pypi.org/simple \
+    --extra-index-url https://pypi.org/simple --index-strategy unsafe-best-match \
     torch==2.14.1+cu126 torchvision==0.29.1+cu126 torchcodec==0.17.0+cu126
 uv cache prune -q || true
 
