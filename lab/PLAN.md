@@ -44,10 +44,19 @@ nothing has to be redone. Items marked **[open]** are decisions still to make.*
 
 ## Plan by phase (2026-11-19)
 **Phase 3 (with 4):**
-- [ ] A100 setup (`lab/bin/a100-setup`); base models and datasets copied from the laptop.
-- [ ] A100 round 1 trainings (Phase 6) as soon as it is set up.
-- [ ] Old models on LeRobot 0.7: a serve check (load, warm up, chunk time) of `groot_cubebox_v1_lora_raw` and
-  `smolvla_cubebox_v0_lora_raw` on the A100 (they were trained with 0.4.3).
+- [x] A100 setup (`lab/bin/a100-setup`, 2026-11-19): torch 2.14.1+cu126, FFmpeg from conda-forge, uv's Python.
+- [x] A100 round 1 trainings started (2026-11-19 17:50, wandb project `drtc-lab`), all three at once:
+  - First start: the 24 CPUs were oversubscribed (load 28: each job's PyTorch uses all threads, plus 8 data
+    workers each); GR00T N1.5 spent 3.8 s of a 4.9 s step in its CPU preprocessing. Restarted with a CPU budget:
+    ACT 2 threads / 2 workers, SmolVLA 4 / 4, GR00T N1.5 12 / 2 (`OMP_NUM_THREADS`, `--num_workers`).
+  - Then: GR00T N1.5 2.3 s per step (preprocessing 1.14 s), ~6.3 h; ACT 6.5 steps/s, ~4.1 h; load ~6.
+  - SmolVLA (compile, max-autotune) retunes its kernels once at the first epoch's smaller last batch (step ~170
+    on v0); a one-time cost.
+- [ ] Per-machine CPU budget as a setting (hosts.yaml: threads and workers per job when jobs share a machine),
+  instead of the environment variables used by hand on the A100.
+- [x] Old models on LeRobot 0.7 (A100, 2026-11-19, measured with three trainings on the GPU, so the times are high):
+  both admitted in chunk and rtc_guided mode. GR00T 379 ms chunk / 466 ms RTC, SmolVLA 571 / 928 ms. [ ] Retime on
+  a free GPU before the robot trials.
 - [x] H200: FFmpeg, the frame-cache checks, the full comparison round, one speed setup per active model (Phase 3
   section, 2026-11-19).
 - [ ] Later, while models train (not now): **easy serving on either GPU server.** Today serving on the A100 or the
@@ -57,8 +66,8 @@ nothing has to be redone. Items marked **[open]** are decisions still to make.*
   machine.
 
 **Phase 4 (the user, with 3):**
-- [ ] Robot-side checks (rig, calibration files present; no recalibration) and a 2-episode `lab record` test
-  (`--no-push`, a throwaway name) before the first real session.
+- [x] Robot-side checks (rig, calibration files present; no recalibration) and a 2-episode `lab record` test
+  (2026-11-19: 29.9 Hz, no late ticks, degrees, AV1; fixes: Rerun viewer on PATH, `dataset.no_stamp`).
 - [ ] Recording sessions; each finished dataset is trimmed, pushed, registered and prepared automatically.
 
 **Phase 5:** offline evaluation (held-out action error per checkpoint, best checkpoint, one table per dataset x
