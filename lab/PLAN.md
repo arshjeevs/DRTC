@@ -4,68 +4,64 @@
 (the proposal stays as the research framing). Each phase starts only when the previous one is done, so
 nothing has to be redone. Items marked **[open]** are decisions still to make.*
 
-| Phase | What | Done when | Needs |
+| Phase | What | Done when | Status (2026-11-19) |
 |---|---|---|---|
-| 1 | Move to the latest LeRobot, with our code as a separate layer on top | The robot runs through DRTC on the new version; every `lab/bin` tool works; a short test training passes for each kept policy | — |
-| 2 | Shortlist the models, each with the recipe others used to make it work | Short list in `models.yaml`, each entry with recipe and source | 1 (research can start during 1) |
-| 3 | Faster training for the shortlisted models | Measured time per run, before and after, per model | 1, 2 |
-| 4 | Train the shortlist once on trimmed data, then robot trials | We know which models work | 3 |
-| 5 | Smoothing test bench, then smoothing methods | Any method can be compared on any model with one command | 4 (bench can be built during 3–4) |
-| 6 | DRTC experiments | — | 4, 5 |
-| Later | Edge fallback | Only if ACT gives good results | 4 |
+| 1 | Move to LeRobot 0.7, our code as a separate layer on top | The new setup runs everywhere | Done; its robot-side items moved to 3 and 5 |
+| 2 | Shortlist the models, each with its original recipe | Recipes fixed and sourced | Done; **recipes fixed for all training** |
+| 3 | Faster training, and the setup on every machine | One measured speed setup per active model | In progress, **in parallel with 4** |
+| 4 | Data collection (the user) | New datasets finalised and on the Hub | Starting, **in parallel with 3** |
+| 5 | Evaluation framework | One command for offline results; robot trials recorded with a fixed protocol | Built during 3-4 |
+| 6 | Train and choose | We know which models work | Round 1 on the A100 now; round 2 after 4 |
+| 7 | Smoothing test bench, then smoothing methods | Any method compared on any model with one command | After 6 |
+| 8 | DRTC experiments | — | After 6, 7 |
+| Later | Edge fallback (ACT); the deferred models | — | Only if time is left |
 
-**[open]** Major presentation date. It decides how much of Phase 6 fits in.
+**[open]** Major presentation date. It decides how much of Phases 7-8 fits in.
 
-## Working plan (2026-11-19, to finalise with the user)
-Time is short, so work runs in parallel: the user records new datasets while three models train on the A100;
-training gets intensive once data collection is done; then evaluation. This section is the order of work; the
-phase sections below keep the details.
-
-**Decisions (2026-11-19):**
+## Decisions (2026-11-19)
 - **Recipes are fixed** for every training from now on: the confirmed originals in `lab/recipes/` (Phase 2
   "Recipes"). Speed settings (frame caches, workers, compile) are not recipe changes.
-- **Models now: SmolVLA, ACT, GR00T N1.5** (the ones that worked in the minor, plus ACT). π0.5, GR00T N1.7,
-  MolmoAct 2 and Diffusion are **deferred**: recipes, plugins and caches stay, no training for now.
-- **Datasets now:** SmolVLA and ACT on trimmed v0 (`so101_cubebox_v0`, on the Hub 2026-11-19); GR00T N1.5 on trimmed
-  v1 (`so101_cubebox_v1`). New datasets: the user records them and decides what trains on them, in what order.
-- **Machines:** A100 (192.168.5.13, cleaned 2026-11-19, 223 GB free) trains now; the H200 finishes the Phase 3
-  checks, then trains too; the laptop records (and can train ACT).
+- **Active models: SmolVLA, ACT, GR00T N1.5.** Deferred: π0.5, GR00T N1.7, MolmoAct 2, Diffusion (recipes, plugins,
+  caches kept; MolmoAct 2's flow-step decision waits with it).
+- **Machines:** the A100 (192.168.5.13; cleaned 2026-11-19; Claude has SSH access) trains now and serves for the
+  robot trials; the H200 tests everything during data collection, afterwards it trains the active models; the
+  laptop records and runs the robot.
+- **A100 and Hugging Face:** downloads from the A100 run at ~2 KB/s, so base models and datasets are copied from the
+  laptop over the LAN, and checkpoints are pushed from where the Hub is reachable.
+- **New datasets (Phase 4):** a new task, the same scene positions and rig as v1 (`so101_v2`: camera1 wrist,
+  camera2 scene, 800x600 at 30 fps), names `so101_cubebox_v2`, `v3`, ...; size (episodes, lengths, held-out)
+  decided per task. Joints in **degrees** (LeRobot 0.7's default): old and new datasets are not merged, and units are
+  set per model at run time (`lab run` sets `robot.use_degrees` from the model's dataset; the server declares the
+  units and refuses a mismatched robot), so the old -100..100 models keep working. **The arm is not recalibrated**
+  (both unit systems come from the same calibration files).
 
-**A. Now, in parallel**
-- [ ] A1. A100 setup (`lab/bin/a100-setup`): running. **Blocker:** Hugging Face downloads from the A100 run at
-  ~2 KB/s (PyTorch 15.6 MB/s, GitHub 0.4 MB/s). Copy the base models and datasets from the laptop over the LAN (or
-  find out why), and push checkpoints from where the Hub is reachable.
-- [ ] A2. A100 trainings, all three at once (~42 GB of 80): `smolvla_cubebox_v0_full`, `act_cubebox_v0_full`,
-  `groot_cubebox_v1_full`. Estimated 5-6 h (ACT is the longest).
-- [ ] A3. H200: FFmpeg, the two frame-cache checks, round 1 cut to SmolVLA, GR00T N1.5 and ACT (frames, compile,
-  two jobs side by side); then one speed setup per model in the recipes' `data`/flags (Phase 3 "done").
-- [ ] A4. User: robot-side checks from Phase 1 (`lab check --rig`, `lab calibrate`), one short `lab record` test
-  (2 episodes: record -> trim -> push -> registry), then data collection.
-- [ ] A5. Evaluation framework (section C), built while data is collected.
+## Plan by phase (2026-11-19)
+**Phase 3 (with 4):**
+- [ ] A100 setup (`lab/bin/a100-setup`), then base models and datasets copied from the laptop.
+- [ ] A100 round 1 trainings (Phase 6) as soon as it is set up.
+- [ ] Old models on LeRobot 0.7: a serve check (load, warm up, chunk time) of `groot_cubebox_v1_lora_raw` and
+  `smolvla_cubebox_v0_lora_raw` on the A100 (they were trained with 0.4.3).
+- [ ] H200: FFmpeg, the frame-cache checks, the full comparison round (all models; while data is collected the H200
+  is for testing), then one speed setup per active model in its recipe.
+- [ ] Later, while models train (not now): **easy serving on either GPU server.** Today serving on the A100 or the
+  H200 means logging in, starting the container/environment and `lab serve <model>` by hand, before the robot
+  client connects. Idea to work out: the client asks for a model and the chosen server starts it on demand (a small
+  always-on launcher per server, or the laptop starting it over SSH), so `lab run` works the same against either
+  machine.
 
-**B. When the A2 trainings finish**
-- [ ] B1. Offline: held-out action error per checkpoint; the best one is already at each Hub repo's root.
-- [ ] B2. Robot trials with the C protocol: the three new models, with the two kept minor models
-  (`groot_cubebox_v1_lora_raw`, `smolvla_cubebox_v0_lora_raw`) as the reference to beat.
+**Phase 4 (the user, with 3):**
+- [ ] Robot-side checks (rig, calibration files present; no recalibration) and a 2-episode `lab record` test
+  (`--no-push`, a throwaway name) before the first real session.
+- [ ] Recording sessions; each finished dataset is trimmed, pushed, registered and prepared automatically.
 
-**C. Evaluation framework (A5)**
-- [ ] C1. Offline: one command for a model -> held-out action error per checkpoint and the chosen one; one table
-  per dataset x model.
-- [ ] C2. Robot protocol: fixed cube positions (a marked grid), N trials per model in a fixed order, result
-  pick / place / fail and time per trial; the numbers N and the grid decided with the user.
-- [ ] C3. Logged per trial by DRTC: stalls, jerk, jumps between chunks, latency (the same metrics Phase 5 needs).
-- [ ] C4. Results: trials recorded by one command (or a form), one report that updates as trials come in.
+**Phase 5:** offline evaluation (held-out action error per checkpoint, best checkpoint, one table per dataset x
+model); robot protocol (marked cube-position grid, N trials per model in a fixed order, pick / place / fail and time;
+N and the grid decided with the user); DRTC metrics per trial (stalls, jerk, chunk jumps, latency); results recorded
+by one command, one report; Zenoh between the laptop and the GPU servers (from Phase 1).
 
-**D. When data collection is done**
-- [ ] D1. The user's training order; jobs queued with `lab submit` on the A100 and H200 (laptop: ACT).
-- [ ] D2. Each run: train -> best checkpoint pushed -> offline evaluation -> robot trials (C).
-
-**E. Afterwards, as time allows:** Phase 5 (smoothing) and Phase 6 (DRTC experiments) as below; the deferred models
-only if time is left. **[open]** the presentation date decides how much.
-
-**Left from the earlier phases (folded into A-E):** Phase 1: Zenoh across machines (D7), the Pi install, the
-robot-side checks and `lab run` trials (A4, B2). Phase 3: the H200 round and the per-model setup (A3). Phase 2's
-open MolmoAct 2 flow-step decision waits with MolmoAct 2.
+**Phase 6:** round 1 (A100): SmolVLA and ACT on trimmed v0, GR00T N1.5 on trimmed v1, then offline ranking and
+robot trials against the kept minor models (GR00T 80%, SmolVLA 90%). Round 2 (after Phase 4): the user's training
+order on the new datasets (A100, H200; laptop for ACT), each run evaluated with Phase 5.
 
 ---
 
