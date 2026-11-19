@@ -119,12 +119,13 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="lab record", description=__doc__.split("\n\n")[0], allow_abbrev=False)
     ap.add_argument("name", help="dataset name, e.g. so101_cubebox_v2 (records <name>_raw, trims into <name>)")
     ap.add_argument("--task", required=True, help="the exact instruction, the same for every episode")
-    ap.add_argument("--episodes", type=int, default=50)
+    ap.add_argument("--episodes", type=int, default=50,
+                    help="total episodes in the recording (with --resume: records the ones still missing)")
     ap.add_argument("--episode-time", type=float, default=30)
     ap.add_argument("--reset-time", type=float, default=10)
     ap.add_argument("--held-out", type=int, default=10, help="held-out episodes in the trimmed dataset's split")
     ap.add_argument("--resume", action="store_true",
-                    help="add --episodes more episodes to an existing <name>_raw recording; the trimmed copy is rebuilt")
+                    help="continue an existing <name>_raw recording up to --episodes; the trimmed copy is rebuilt")
     ap.add_argument("--no-push", action="store_true", help="keep both datasets local")
     ap.add_argument("--display", action=argparse.BooleanOptionalAction, default=None)
     ap.add_argument("--dry-run", action="store_true")
@@ -138,9 +139,21 @@ def main(argv: list[str] | None = None) -> int:
     raw_repo, trimmed_repo = f"{account}/{a.name}_raw", f"{account}/{a.name}"
     raw_root, trimmed_root = HF_LEROBOT_HOME / raw_repo, HF_LEROBOT_HOME / trimmed_repo
     fps = next(iter(reg.current_rig().cameras.values())).fps
+    done = 0
+    if a.resume:
+        info = raw_root / "meta" / "info.json"
+        if not info.is_file():
+            print(f"lab record: --resume, but {raw_root} has no recording", file=sys.stderr)
+            return 1
+        done = json.loads(info.read_text())["total_episodes"]
+        if done >= a.episodes:
+            print(f"lab record: {raw_repo} already has {done} of {a.episodes} episodes; nothing to record",
+                  file=sys.stderr)
+            return 1
+        print(f"{raw_repo}: {done} episodes recorded, {a.episodes - done} to go (total {a.episodes})", flush=True)
     display = a.display if a.display is not None else bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
     flags = {**rig_flags(reg), "dataset.repo_id": raw_repo, "dataset.single_task": a.task, "dataset.fps": fps,
-             "dataset.num_episodes": a.episodes, "dataset.episode_time_s": a.episode_time,
+             "dataset.num_episodes": a.episodes - done, "dataset.episode_time_s": a.episode_time,
              "dataset.reset_time_s": a.reset_time, "dataset.push_to_hub": False, "resume": a.resume,
              "dataset.no_stamp": True,  # lab manages the names (0.7 otherwise appends the date and time)
              **video.encoder_flags(),  # the same AV1 settings for every recording (drtc.data.video)
