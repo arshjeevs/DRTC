@@ -217,6 +217,10 @@ def main(argv: list[str] | None = None) -> None:
         from drtc.control.serve import main as serve_main
 
         sys.exit(serve_main(argv[1:]))
+    if argv and argv[0] == "data":
+        from drtc.data.edit import main as data_main
+
+        sys.exit(data_main(argv[1:]))
     if argv and argv[0] == "record":
         from drtc.data.record import main as record_main
 
@@ -257,6 +261,7 @@ def main(argv: list[str] | None = None) -> None:
     sub.add_parser("results", help="summaries of robot runs: stalls, chunks, turnaround, faults (lab results -h)")
     sub.add_parser("run", help="run an experiment condition against a served model (lab run -h)")
     sub.add_parser("serve", help="serve a registry model with LeRobot 0.7's policy server (lab serve -h)")
+    sub.add_parser("data", help="dataset operations: show, view, delete, trim, label, undo, push, remove (lab data -h)")
     sub.add_parser("record", help="record <name>_raw with the leader arm, trim into <name>, push both (lab record -h)")
     sub.add_parser("jobs", help="list this machine's jobs")
     p = sub.add_parser("stop", help="stop running trainings cleanly (save, push, exit)")

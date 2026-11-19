@@ -8,7 +8,9 @@
   -> / n next, <- / r re-record, Esc / q stop.
 - The untrimmed recording is <name>_raw; the trimmed copy, the one to train on, is <name> (lab trim).
 - Both are pushed (public, like every dataset here), and their entries, pinned to the pushed revision, are written
-  to lab/datasets/recorded.yaml for you to review and commit.
+  to lab/datasets/recorded.yaml for you to review and commit. Later edits: `lab data` (drtc.data.edit).
+- Datasets with layouts in lab/layouts.yaml: before each episode the layout to set up is shown (the least
+  recorded one), and each episode's layout is stored with the dataset.
 """
 
 from __future__ import annotations
@@ -169,9 +171,6 @@ def main(argv: list[str] | None = None) -> int:
     if trimmed_root.exists() and not a.resume:
         problems.append(f"{trimmed_root} exists: the trimmed copy is made after recording (choose a new name, "
                         f"or --resume to add episodes)")
-    rebuild = trimmed_root.with_name(trimmed_root.name + ".rebuild")
-    if a.resume and rebuild.exists():
-        problems.append(f"{rebuild} exists (an interrupted earlier rebuild?); look at it, then remove it")
     if a.dry_run:
         for p in problems:
             print(f"  PROBLEM {p}")
@@ -183,51 +182,80 @@ def main(argv: list[str] | None = None) -> int:
 
     from lerobot.scripts import lerobot_record
 
+    from drtc.data import edit
+
+    p = edit.paths(reg, a.name)
+    edit.clear_state(p)  # a recording session drops the undo snapshot (lerobot-record appends in place)
+    rotation = edit.layouts_for(reg, a.name)
+    if rotation:
+        labels = edit.read_sidecar(raw_root)["layouts"] if raw_root.exists() else {}
+        install_layout_prompts(lerobot_record, rotation, labels)
     sys.argv = cmd
     lerobot_record.main()
 
     issues = check_recording(raw_root, fps)
-    for p in issues:
-        print(f"  CHECK {p}")
+    for i in issues:
+        print(f"  CHECK {i}")
     if issues:
         print("lab record: the recording has problems; not trimming or pushing. Look at them first.", file=sys.stderr)
         return 1
-    from drtc.data import trim
-
-    ds = trim.RawDataset(raw_root)
-    results, noise, floor = trim.detect(ds, trim.Params())
-    trim.report(ds, results, noise, floor, trim.Params())
-    if trimmed_root.exists():
-        # --resume: the trimmed copy is rebuilt from the whole recording; the old one (also on the Hub, in the
-        # repo's history) is replaced only after the rebuild succeeded. Its videos are hardlinks into the raw copy.
-        import shutil
-
-        trim.apply(ds, results, rebuild)
-        shutil.rmtree(trimmed_root)
-        rebuild.rename(trimmed_root)
-        print(f"rebuilt the trimmed copy from all {len(results)} episodes: {trimmed_root}")
-    else:
-        trim.apply(ds, results, trimmed_root)
+    edit.rebuild(p)  # the trimmed copy, from the whole recording (also after --resume)
     if a.no_push:
-        print(f"kept local: {raw_root}, {trimmed_root}")
+        edit.add_pending(p, "recorded episodes")
+        print(f"kept local: {raw_root}, {trimmed_root} (upload later: lab data push {a.name})")
         return 0
+    edit.publish(reg, p, a.held_out)
+    return 0
+
+
+def install_layout_prompts(lerobot_record, rotation: list[str], labels: dict[int, str]) -> None:
+    """Before each episode, say which layout to set up (the least recorded one; lab/layouts.yaml), and
+    store the layout of every saved episode in meta/drtc.json. A re-recorded episode keeps its layout."""
     from lerobot.datasets import LeRobotDataset
 
-    for repo, root in ((raw_repo, raw_root), (trimmed_repo, trimmed_root)):
-        LeRobotDataset(repo, root=root).push_to_hub(allow_patterns=["data/*", "meta/*", "videos/*"])
-        print(f"pushed https://huggingface.co/datasets/{repo}")
-    entries = registry_entries(reg, a.name, raw_repo, trimmed_repo, a.task, fps, a.held_out)
-    path = reg.lab / "datasets" / REGISTRY_FILE
-    existing = yaml.safe_load(path.read_text()) if path.is_file() else {}
-    existing.update(entries)
-    path.write_text("# Written by lab record; review and commit.\n\n" + yaml.safe_dump(existing, sort_keys=False))
-    print(f"registry: added {', '.join(entries)} to {path} (review and commit)")
-    # Ready for every recipe in use: relative-action stats etc. (lab train would also make them on first use).
-    from drtc.data.prepare import prepare, recipes_in_use
+    from drtc.data import edit
 
-    reg = Registry()
-    prepare(reg, a.name, recipes_in_use(reg))
-    return 0
+    state = {"planned": None, "episode": None, "events": None}
+    say, listen, save = lerobot_record.log_say, lerobot_record.init_keyboard_listener, LeRobotDataset.save_episode
+
+    def banner(text: str) -> None:
+        print(f"\n{'=' * 70}\n  {text}\n{'=' * 70}", flush=True)
+
+    def log_say(text, *args, **kwargs):
+        out = say(text, *args, **kwargs)
+        if text.startswith("Recording episode"):
+            state["episode"] = int(text.split()[-1])
+            state["planned"] = edit.next_layout(rotation, labels)
+            banner(f"episode {state['episode']}: {state['planned']}")
+        elif text == "Reset the environment":
+            if state["events"] is not None and state["events"].get("rerecord_episode"):
+                banner(f"re-record episode {state['episode']}: same layout, {state['planned']}")
+            else:
+                banner(f"reset, then set up episode {state['episode'] + 1}: "
+                       f"{edit.next_layout(rotation, {**labels, state['episode']: state['planned']})}")
+        return out
+
+    def init_keyboard_listener(*args, **kwargs):
+        listener, events = listen(*args, **kwargs)
+        state["events"] = events
+        return listener, events
+
+    def save_episode(self, *args, **kwargs):
+        out = save(self, *args, **kwargs)
+        labels[self.num_episodes - 1] = state["planned"]
+        side = edit.read_sidecar(Path(self.root))
+        side["layouts"].update(labels)
+        edit.write_sidecar(Path(self.root), side)
+        return out
+
+    lerobot_record.log_say = log_say
+    lerobot_record.init_keyboard_listener = init_keyboard_listener
+    LeRobotDataset.save_episode = save_episode
+    missing = [] if not labels else [i for i in range(max(labels) + 1) if i not in labels]
+    if missing:
+        print(f"WARNING: episodes without a layout: {edit.fmt_ranges(missing)}; the balance counts only labelled "
+              f"ones (lab data label)", flush=True)
+    banner(f"set up the first episode of this session: {edit.next_layout(rotation, labels)}")
 
 
 if __name__ == "__main__":

@@ -88,6 +88,11 @@ nothing has to be redone. Items marked **[open]** are decisions still to make.*
     blue right.
   - Later: C (both cubes, the instruction names one; language-conditioned, so not for ACT; needs per-episode tasks
     in `lab record`); A/B with varied cube positions; stacking with three cubes.
+  - **Dataset operations (2026-11-19): `lab data show|view|delete|trim|label|undo|push|remove <name>`.** The raw
+    recording is the only copy that is edited; the trimmed copy is rebuilt from it after every change (autotrim plus
+    manual trims). Layouts and manual trims live in the raw copy's `meta/drtc.json`; rotations in `lab/layouts.yaml`
+    (`lab record` shows the least recorded layout before each episode). Edits are local until `lab data push`; one
+    undo level (hardlink snapshot) until the next push or recording.
   - First session: `lab record so101_sort_one_v1 --task "Put the cube in the square of the same color." --episodes 80 --held-out 8`
     (`--resume` adds episodes in a later session).
 
