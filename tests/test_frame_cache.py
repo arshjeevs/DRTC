@@ -25,6 +25,24 @@ def test_frames_need_matching_resize_and_policy():
         prepare.needs({**DIFF, "dataset.image_transforms.enable": True}, "diffusion", {"frames": [240, 320]})
 
 
+def test_groot_n15_frames_are_the_eagle_tile():
+    need = prepare.needs({}, "groot_n15", {"frames": [224, 224]})
+    assert need == [prepare.FrameCache(224, 224, "eagle")] and need[0].tag == "frames224x224_eagle"
+    with pytest.raises(RegistryError):
+        prepare.needs({}, "groot_n15", {"frames": [256, 256]})
+    with pytest.raises(RegistryError):
+        prepare.needs({}, "groot", {"frames": [224, 224]})  # N1.7's processor is different
+
+
+def test_recipes_with_frames_are_valid():
+    reg = Registry()
+    with_frames = {rid for rid, r in reg.recipes.items() if r.data.get("frames")}
+    assert {"diffusion_original", "groot_n15_nvidia"} <= with_frames
+    for rid in with_frames:
+        r = reg.recipes[rid]
+        assert any(isinstance(n, prepare.FrameCache) for n in prepare.needs(r.flags, r.policy, r.data))
+
+
 def test_variant_names_combine_and_keep_the_relative_stats_name():
     rel = prepare.RelativeStats(50, ("gripper",))
     fc = prepare.FrameCache(240, 320)
@@ -34,6 +52,7 @@ def test_variant_names_combine_and_keep_the_relative_stats_name():
     assert prepare.variant_root("u/ds", "3ef1f445d952ae6b", [rel, fc]).name.endswith("rel_c50_xgripper_frames240x320")
     old_marker = {"repo": "u/ds", "revision": "r", "relative_action": True, "chunk_size": 50, "exclude_joints": ["gripper"]}
     assert prepare._want("u/ds", "r", [rel]) == old_marker
+    assert prepare._want("u/ds", "r", [fc])["extra"] == [{"type": "FrameCache", "height": 240, "width": 320}]
 
 
 def test_cached_frames_are_read_by_episode_and_timestamp(tmp_path):

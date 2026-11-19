@@ -8,10 +8,15 @@ A recipe can need more than the recorded dataset:
   (`compute_relative_action_stats`) runs on the pinned dataset, read-only.
 - a frame cache (recipe `data: {frames: [H, W]}`, a speed setting): every camera frame decoded once and resized to
   H×W with the policy's own first image step, stored as uint8 arrays. Training then reads frames instead of decoding
-  AV1 video and moves H×W instead of full-size frames between processes (see drtc.compat.frame_cache). Only for
-  Diffusion today: its first image step is `torchvision.transforms.Resize(resize_shape)`, which leaves an image of
-  that size unchanged, so the model sees the same input up to the uint8 rounding of the resized frame (at most
-  0.5/255 per pixel). Serving is unchanged: the checkpoint still declares the full-size cameras.
+  AV1 video, moves H×W instead of full-size frames between processes, and the policy's own resize has nothing left
+  to do (see drtc.compat.frame_cache). Per policy (FRAME_CACHE_METHODS):
+  - Diffusion (`resize`): its first image step is `torchvision.transforms.Resize(resize_shape)` on float images,
+    which leaves an image of that size unchanged; the model sees the same input up to the uint8 rounding of the
+    resized frame (at most 0.5/255 per pixel).
+  - GR00T N1.5 (`eagle`): its Eagle processor (one tile, no thumbnail) resizes the uint8 frame to 224×224 with
+    torchvision's bicubic resize; the cache stores exactly that, and the processor leaves a 224×224 frame unchanged,
+    so the model input is bit-identical (tests/bench/check_frame_cache.py checks it).
+  Serving is unchanged: the checkpoint still declares the full-size cameras.
 
 All needs of a recipe become one variant folder next to LeRobot's cache:
     $HF_LEROBOT_HOME/.drtc_variants/<repo>/<revision[:10]>_<tag>[_<tag>...]/
@@ -34,7 +39,9 @@ from drtc.registry import Registry, RegistryError
 
 MARKER = "drtc_variant.json"
 FRAMES_DIR = "drtc_frames"
-FRAME_CACHE_POLICIES = {"diffusion"}  # policies whose first image step is Resize(resize_shape), see the module doc
+# Policy -> how its first image step resizes (see the module doc); only these can use a frame cache.
+FRAME_CACHE_METHODS = {"diffusion": "resize", "groot_n15": "eagle"}
+EAGLE_TILE = (224, 224)  # the N1.5 plugin's Eagle processor: one 224x224 tile per camera
 
 
 @dataclass(frozen=True)
@@ -51,10 +58,11 @@ class RelativeStats:
 class FrameCache:
     height: int
     width: int
+    method: str = "resize"
 
     @property
     def tag(self) -> str:
-        return f"frames{self.height}x{self.width}"
+        return f"frames{self.height}x{self.width}" + ("" if self.method == "resize" else f"_{self.method}")
 
 
 def needs(flags: dict, policy: str | None = None, data: dict | None = None) -> list:
@@ -73,15 +81,18 @@ def needs(flags: dict, policy: str | None = None, data: dict | None = None) -> l
     frames = (data or {}).get("frames")
     if frames is not None:
         h, w = (int(x) for x in frames)
-        if policy not in FRAME_CACHE_POLICIES:
-            raise RegistryError(f"{policy or 'recipe'}: data.frames is only valid for {sorted(FRAME_CACHE_POLICIES)} "
+        method = FRAME_CACHE_METHODS.get(policy or "")
+        if method is None:
+            raise RegistryError(f"{policy or 'recipe'}: data.frames is only valid for {sorted(FRAME_CACHE_METHODS)} "
                                 f"(the cache must match the policy's own first image step)")
-        if [int(x) for x in flags.get("policy.resize_shape") or []] != [h, w]:
+        if method == "resize" and [int(x) for x in flags.get("policy.resize_shape") or []] != [h, w]:
             raise RegistryError(f"{policy}: data.frames {[h, w]} must equal policy.resize_shape "
                                 f"{flags.get('policy.resize_shape')} (the model's resize then leaves the frame unchanged)")
+        if method == "eagle" and (h, w) != EAGLE_TILE:
+            raise RegistryError(f"{policy}: data.frames must be {list(EAGLE_TILE)}, the Eagle processor's tile")
         if flags.get("dataset.image_transforms.enable"):
             raise RegistryError(f"{policy}: data.frames with dataset.image_transforms (they would run on the cached size)")
-        out.append(FrameCache(h, w))
+        out.append(FrameCache(h, w, method))
     return out
 
 
@@ -98,7 +109,10 @@ def _want(repo: str, revision: str | None, need: list) -> dict:
         if isinstance(n, RelativeStats):  # the keys of the first version, so existing variants stay valid
             want.update({"relative_action": True, "chunk_size": n.chunk_size, "exclude_joints": list(n.exclude)})
         else:
-            want.setdefault("extra", []).append({"type": type(n).__name__, **asdict(n)})
+            d = asdict(n)
+            if d.get("method") == "resize":
+                del d["method"]  # the default; caches made before methods existed stay valid
+            want.setdefault("extra", []).append({"type": type(n).__name__, **d})
     return want
 
 
@@ -175,7 +189,20 @@ def build_frames(ds, out: Path, need: FrameCache, batch: int = 64) -> None:
     tmp = out.with_name(out.name + ".tmp")
     shutil.rmtree(tmp, ignore_errors=True)
     tmp.mkdir(parents=True)
-    resize = torchvision.transforms.Resize([need.height, need.width])
+    if need.method == "resize":  # Diffusion: torchvision Resize on float images in [0, 1], rounded back to uint8
+        torch_resize = torchvision.transforms.Resize([need.height, need.width])
+
+        def resize(raw):
+            small = torch_resize(raw.to(torch.float32) / 255.0)
+            return (small * 255.0).round().clamp(0, 255).to(torch.uint8)
+    elif need.method == "eagle":  # GR00T N1.5: the Eagle fast processor's one-tile resize, uint8 in and out
+        from torchvision.transforms.v2 import functional as tvf
+
+        def resize(raw):
+            return tvf.resize(raw, [need.height, need.width], interpolation=tvf.InterpolationMode.BICUBIC,
+                              antialias=True)
+    else:
+        raise RegistryError(f"unknown frame cache method {need.method!r}")
     tolerance = float(getattr(ds, "tolerance_s", 1e-4))
     arrays = {k: np.lib.format.open_memmap(tmp / f"{k}.npy", mode="w+", dtype=np.uint8,
                                            shape=(n, 3, need.height, need.width)) for k in meta.video_keys}
@@ -198,8 +225,7 @@ def build_frames(ds, out: Path, need: FrameCache, batch: int = 64) -> None:
                 part = rows[s:s + batch]
                 ts = shift_timestamps(ts_col[part].tolist(), ep[f"videos/{key}/from_timestamp"])
                 raw = decode_video_frames(path, ts, tolerance, "torchcodec", return_uint8=True)
-                small = resize(raw.to(torch.float32) / 255.0)
-                arrays[key][index[part]] = (small * 255.0).round().clamp(0, 255).to(torch.uint8).numpy()
+                arrays[key][index[part]] = resize(raw).numpy()
         return len(eps)
 
     done = 0
@@ -212,10 +238,15 @@ def build_frames(ds, out: Path, need: FrameCache, batch: int = 64) -> None:
     del arrays
     (tmp / "meta.json").write_text(json.dumps({"height": need.height, "width": need.width, "frames": n,
                                                "fps": fps, "keys": list(meta.video_keys),
-                                               "resize": "torchvision.transforms.Resize (antialias), uint8 rounded"},
+                                               "method": need.method},
                                               indent=1))
     shutil.rmtree(out, ignore_errors=True)
     tmp.rename(out)
+    # Close the decoders opened here: DataLoader workers forked later (lab train builds the cache in its own process)
+    # must not inherit them ("Could not push packet to decoder").
+    from lerobot.datasets import video_utils
+
+    video_utils._default_decoder_cache.clear()
 
 
 def recipes_in_use(reg: Registry) -> list[str]:

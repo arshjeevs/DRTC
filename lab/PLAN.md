@@ -812,8 +812,15 @@ RTC. The other five can be compared with and without RTC.
   - GR00T N1.5 and MolmoAct 2 lose a quarter to three quarters of each step in their CPU preprocessing (HF image
     processors in the main process), not in the model.
   - GR00T N1.5's Eagle preprocessing, laptop, batch 32 × 2 cameras: 406 ms at 800×600 against 71 ms at 224×224
-    (5.7×). Frames cached at the processor's own 224×224 output would cut most of its 0.77 s on the H200 (step
-    ≈ 0.45 s, full run ≈ 1.3 h), if the processor leaves a 224×224 frame unchanged (to check: exact equality).
+    (5.7×, random frames).
+- [x] Frame cache for GR00T N1.5 (2026-11-19), recipe `data: {frames: [224, 224]}`, method `eagle`: frames stored
+  at the Eagle processor's one 224×224 tile, made with its own bicubic resize on uint8. The float round trip in
+  training (÷255, then the plugin back to uint8) changes no value, and the processor leaves a 224×224 frame
+  unchanged, so the model input is **bit-identical**: eagle_pixel_values equal in 2/2 batches of 32 (laptop). Laptop:
+  Eagle preprocessing per batch 954 → 82 ms; DataLoader 618 → 3918 samples/s; 7.1 GB. Expected on the H200: step
+  ≈ 1.08 → ≈ 0.4 s.
+- Building a cache decodes in the training process, so `build_frames` closes LeRobot's decoders afterwards; forked
+  DataLoader workers inheriting them fail with "Could not push packet to decoder".
 - Laptop, ACT (2026-11-19, commit 3de1880e): step 0.500 s, data 4%, GPU 99.8%, peak 6.1 GB, full recipe ≈ 13.9 h
   (H200: 3.0 h at 45% GPU). The laptop GPU is the limit, so ACT fits there only as an overnight run; on the H200 it
   can share the GPU (round `together`).

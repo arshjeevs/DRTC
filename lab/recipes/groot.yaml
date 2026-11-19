@@ -19,3 +19,6 @@ groot_n15_nvidia:
     policy.tune_projector: true, policy.tune_diffusion_model: true, policy.optimizer_lr: 1.0e-4,
     policy.optimizer_betas: [0.95, 0.999], policy.optimizer_weight_decay: 1.0e-5, policy.warmup_ratio: 0.05}
   serve: {rtc_enabled: false, num_flow_matching_steps: null, actions_per_chunk: 16, s_min: 8}
+  # Speed (Phase 3): frames cached at the Eagle processor's 224x224 tile (its own bicubic resize), so the model input
+  # is bit-identical and the CPU preprocessing skips the full-size resize; see drtc.data.prepare.
+  data: {frames: [224, 224]}

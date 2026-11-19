@@ -6,9 +6,10 @@
 # Only settings that do not change what the model learns belong here; anything that does (bf16 for ACT/Diffusion, a
 # different batch) is a recipe change and is asked first.
 
-frames:         # Diffusion with its frame cache (recipe data.frames, on since 2026-11-19); compare with baseline
+frames:         # the frame caches (recipe data.frames, on since 2026-11-19); compare with baseline
   models:
     diffusion_cubebox_v1_full: {}
+    groot_cubebox_v1_full: {}
 
 frames_w16:     # the same with 16 workers (decoding needed 24; more workers also slowed the update)
   models:
