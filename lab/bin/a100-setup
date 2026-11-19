@@ -9,6 +9,7 @@
 # - no FFmpeg and no sudo: torchcodec gets FFmpeg's shared libraries from conda-forge (micromamba, in .ffmpeg/);
 #   .server.env puts them on LD_LIBRARY_PATH.
 # - everything lives in ~/drtc_major (caches included); /home is shared and nearly full.
+# - uv's managed Python 3.12 (the system one has no headers for packages that compile).
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 REPO="$PWD"
@@ -35,6 +36,11 @@ if [ ! -e .ffmpeg/lib/libavutil.so ]; then
 fi
 
 # 2. The environment: the lock without its CUDA 13 torch stack, then the CUDA 12.6 builds of the same versions.
+# uv's own Python: the system python3.12 has no headers, and evdev (pynput, LeRobot's key listener) compiles.
+export UV_PYTHON_PREFERENCE=only-managed
+if [ -x .venv/bin/python ] && ! .venv/bin/python -c "import sys; sys.exit('/usr/' in sys.base_prefix)"; then
+    rm -rf .venv   # made with the system Python by an earlier run
+fi
 CU13=$(grep -oE '^name = "(nvidia-[a-z0-9-]+|triton)"' uv.lock | cut -d'"' -f2 | grep -v '^nvidia-ml-py$' | sort -u |
     sed 's/^/--no-install-package /')
 # shellcheck disable=SC2086
