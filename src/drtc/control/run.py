@@ -126,7 +126,8 @@ def build(reg: Registry, experiment: str, model: str | None, robot: str, episode
         "inference.deployment": deployment or deployment_name(model_id),
         "inference.semantics": sem["joints"],
         "inference.mode": "rtc_guided" if rtc_requested(reg, experiment) else "chunk",
-        "inference.chunk_merge": "aligned",
+        # aligned for plain chunks; upstream allows RTC only with append (`auto` picks it)
+        "inference.chunk_merge": "auto" if rtc_requested(reg, experiment) else "aligned",
         # upstream's blending at the chunk switch (a bench baseline): the first blend_steps queued actions are mixed
         # with the new chunk's, (1 - w) * old + w * new; 0 = off (the default)
         "inference.blend_steps": int(composed.get("blend_steps", 0)),

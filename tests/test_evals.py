@@ -215,3 +215,23 @@ def test_adaptive_playback_is_fixed_with_a_full_queue_and_slows_when_short():
     moved = [x for x in out if x is not None]
     assert moved == sorted(moved) and any(x != int(x) for x in moved)  # slower, interpolated, never backwards
     assert len(moved) > 6  # the 6 actions last longer than 6 ticks
+
+
+def test_every_bench_and_robot_experiment_parses():
+    """Each condition's inference settings must be accepted by LeRobot's config parser (blend components, RTC needs
+    the append merge, ...): a setting that does not parse only shows up as failed trials otherwise (2026-11-20)."""
+    from pathlib import Path
+
+    import draccus
+
+    from drtc.control.engine import DRTCInferenceConfig
+    from drtc.control.run import build
+
+    reg = Registry()
+    exps = [str(p.relative_to(reg.lab / "experiments").with_suffix("")) for g in ("bench", "robot")
+            for p in (reg.lab / "experiments" / g).glob("*.yaml")] + ["replication/baseline"]
+    for exp in exps:
+        for robot in ("replay", "rig"):
+            cmd, _, _ = build(reg, exp, "groot_sort_one_v1_full", robot, 49, "tcp/127.0.0.1:1", 10, Path("/tmp/x"), "d")
+            args = [x.replace("--inference.", "--") for x in cmd if x.startswith("--inference.") and "type=" not in x]
+            draccus.parse(DRTCInferenceConfig, args=args)
