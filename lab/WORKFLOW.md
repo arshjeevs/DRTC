@@ -498,6 +498,35 @@ lab eval report sort_one_baseline --pull    # rebuild the report from every sess
 
 The report is rebuilt every time, so never edit it. Tell Claude when an eval is done: the next step reads the report.
 
+## The bench: replay robot on the H200 (Phases 7-8)
+
+A bench eval (`robot: replay`) needs no robot and no laptop. The model server and the replay robot run in the same
+H200 container, and the WiFi link to the A100 is simulated on every reply (0.4 s + up to 0.2 s jitter; see
+`lab/experiments/bench/`). The replay robot plays each of the 8 held-out episodes once per model and condition (10 s
+each) and records M2-M8 (no success: the cube doesn't move). Results go to `results/bench/<eval>/`, pushed to the
+results store like robot sessions.
+
+| Bench eval | Compares | Trials |
+|---|---|---|
+| `bench_sort_one_smoothing` | `baseline` (Butterworth, the robot baseline's settings), `none`, `blend` (upstream), `playback` (method A) | 4 models x 4 x 8 = 128 |
+| `bench_sort_one_rtc` | `baseline`, `rtc` (upstream guided RTC), `rtc_playback` (RTC + A); SmolVLA and GR00T only | 2 x 3 x 8 = 48 |
+| `bench_sort_one_faults` | `baseline` + spikes, drops, dups, reorder, disconnect, mixture | 4 x 7 x 8 = 224 |
+
+In the `drtc_lab` container, one bench at a time:
+
+```bash
+cd /workspace/drtc_major && . ./.server.env && git pull && uv sync --frozen --extra gpu --python /usr/bin/python3
+tmux new -s bench                                                  # window 1: the servers
+.venv/bin/lab eval serve bench_sort_one_smoothing                  # wait for "all 4 ready"
+# Ctrl-b c (a second window):
+.venv/bin/lab eval run bench_sort_one_smoothing --server local     # runs every trial by itself (~45 min)
+.venv/bin/lab eval report bench_sort_one_smoothing                 # → results/bench/bench_sort_one_smoothing/report.md
+# back in window 1 (Ctrl-b p): Ctrl-C stops the servers; then the next bench
+```
+
+`--server local` means the servers on this same machine. Detach with Ctrl-b d; the bench keeps running. On the laptop,
+`lab eval report bench_sort_one_smoothing --pull` fetches the results from the store.
+
 ## Mistakes and fixes
 
 | Situation | Do |
