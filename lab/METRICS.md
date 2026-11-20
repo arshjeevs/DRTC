@@ -1,7 +1,7 @@
-# Metrics v1
+# Metrics v2
 
-**Fixed on 2026-11-20 with the user.** Every official result in Phases 6-8 and in the final presentation uses these
-definitions. A change makes a new version (v2): the definitions here stay as they are, the change and its date are
+**Fixed on 2026-11-20 with the user (v1), revised the same day for the locked scope (v2, see Changes).** Every
+official result and the final presentation use these definitions. A change makes a new version (v2): the definitions here stay as they are, the change and its date are
 added below, and `lab eval report` recomputes every trial from its raw files, so old and new results stay comparable.
 
 Where the data comes from: [EVALUATION.md](EVALUATION.md) (one folder per trial; raw files never edited).
@@ -24,7 +24,8 @@ Where the data comes from: [EVALUATION.md](EVALUATION.md) (one folder per trial;
 
 | # | Metric | Definition | Per trial | Across trials |
 |---|---|---|---|---|
-| M1 | **Success rate** | The operator presses the success key before the time limit, and the result meets the task's written success rule (in the eval file, fixed before the first trial). A failure key, or the time limit, is a failure. | 1 or 0 | successes / valid trials, with a Wilson 95% interval |
+| M1 | **Success rate** | The operator presses the success key before the time limit, and the result meets the task's written success rule (in the eval file, fixed before the first trial). A failure key, the time limit, or a **terminal fault after the first action** (the system stopped the arm; label `fault`) is a failure. A fault before the first action is a setup problem: the trial is not counted and is run again. | 1 or 0 | successes / valid trials, with a Wilson 95% interval |
+| M1f | **Ended by a fault** | Trials that a terminal fault ended after the first action (they count as failures in M1). | 1 or 0 | fraction of valid trials |
 | M1t | **Time to success** | Seconds from the first action to the success key press. | seconds (successful trials only) | median and interquartile range |
 
 ## Network and timing (headline for Phase 8)
@@ -54,7 +55,7 @@ Where the data comes from: [EVALUATION.md](EVALUATION.md) (one folder per trial;
 
 ## Rules for reporting
 
-1. **Trials:** 20 valid trials per model per condition (`trials: 20` in the eval file). The operator chooses the
+1. **Trials:** 10 valid trials per condition, per model, per task (`trials: 10` in the eval file; v1: 20). The operator chooses the
    layouts; all trials of one round use the same layout.
 2. **Order:** in rounds. Each round runs every model x condition once, in a seeded random order, so drift (light,
    motor temperature, battery) affects all of them alike.
@@ -72,7 +73,15 @@ Where the data comes from: [EVALUATION.md](EVALUATION.md) (one folder per trial;
 
 ## Changes
 
-None yet (v1).
+**v2 (2026-11-20, the locked scope, lab/PLAN.md):**
+- M1: a terminal fault after the first action is a failure (v1: such trials were not counted and run again). Under
+  network faults the fault *is* the outcome: a system that gives up must score lower, not be retried until it gets
+  lucky. New M1f, the fraction of trials ended this way.
+- Rule 1: 10 trials per condition, per model, per task (v1: 20).
+- Every report is rebuilt with v2 from the raw files (`lab eval report`), including the evals made under v1.
+
+**v1** (2026-11-20, morning): as above, except: a trial ended by a terminal fault was not counted and was run again
+in a later round; 20 trials per model per condition.
 
 Clarification (2026-11-20, still v1, before any official trial): while the arm holds through a stall, the control
 loop does not ask for actions, so those ticks have no row in `ticks.csv`. M2, M3, M7 and M8b therefore use the tick

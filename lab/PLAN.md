@@ -4,6 +4,56 @@
 (the proposal stays as the research framing). Each phase starts only when the previous one is done, so
 nothing has to be redone. Items marked **[open]** are decisions still to make.*
 
+## LOCKED SCOPE (2026-11-20, with the user): this is the project from here on
+
+Decided one item at a time; it replaces the evaluation plans further down wherever they differ. Today's earlier robot
+evals and benches (sort_one_baseline_v2, sort_one_faults, the bench_* evals) are side results: valid, shown in the
+report, not the main experiment.
+
+**Claim.** In client-server robot inference, network faults lower the task scores; **DRTC recovers them**; **smoothing**
+then improves the motion.
+
+**Datasets** (as they are, no new recording or edits): `so101_cubebox_v0` (50 = 45 + 5 held out),
+`so101_cubebox_v1` (110 = 100 + 10), `so101_sort_one_v1` (88 = 80 + 8).
+
+**Models.** The 7 shortlisted (SmolVLA, GR00T N1.5, GR00T N1.7, π0.5, MolmoAct 2, ACT, Diffusion), each with its fixed
+original recipe, are trained on the 3 datasets and tested **on the baseline only** (condition 1). **SmolVLA and GR00T
+N1.5** go on to the experiments (conditions 2-4).
+
+**Conditions** (per model, per task; the same order and rules everywhere):
+
+| # | Condition | Network | Robot side |
+|---|---|---|---|
+| 1 | baseline | normal | upstream LeRobot remote inference, as it ships: no DRTC, no filter, and it ends the run after 1 s without actions (starvation grace 1.0 s) |
+| 2 | baseline + faults | the fault mix | as 1 |
+| 3 | DRTC + faults | the fault mix | DRTC, our version (the 2026-11-20 fixes: cooldown never shorter than the measured latency incl. the slowest of the last 10 replies, cold-start wait, request delay capped at the chunk); **no** Butterworth filter; holds the arm through stalls and carries on |
+| 4 | DRTC + smoothing + faults | the fault mix | as 3 + the Butterworth filter + adaptive playback (method A) |
+
+Claim 1 = 2 against 1 (faults hurt) and 3 against 2 (DRTC recovers); claim 2 = 4 against 3 (smoothing).
+
+**Fault mix** (conditions 2-4, every task, times from the trial start): latency spike +1 s at 2 s; every reply dropped
+4-5 s; full outage (both directions) 6-7.5 s. Each fault type is measured separately on the bench only.
+
+**Rules.** 10 trials per condition, per model, per task (rounds, as before). A terminal fault after the arm has started
+moving counts as a failure (M1 = 0, label `fault`); a fault before the first action is a setup problem and is
+repeated. The report shows the fraction of trials ended by a fault. Metrics v2 ([METRICS.md](METRICS.md)).
+
+**Robot computer:** the laptop for every experiment; the Raspberry Pi is set up only after everything is complete. The
+presentation and report say the laptop was the robot computer.
+
+**Order of work** (approved):
+
+| # | What | Who |
+|---|---|---|
+| 1 | This scope into PLAN.md, the rule changes into METRICS.md (v2) | Claude |
+| 2 | Build the 4 conditions, the fault mix, the new rules and the eval files; test on the bench (H200) | Claude |
+| 3 | Train the 2 missing for the experiments (SmolVLA on cubebox v1, GR00T N1.5 on cubebox v0), then the other 12 (π0.5 last) | Claude, A100 + H200 |
+| 4 | Main experiment: per task SmolVLA + GR00T N1.5 x 4 conditions x 10 trials (80 per task, 240 in all, ~3 h) | the user |
+| 5 | 7-model baseline: per task, condition 1 x 10 trials, as the models finish training | the user |
+| 6 | Bench (each fault type separately) and offline M9/M10 for everything | Claude, H200 |
+| 7 | One report with all results | Claude |
+| 8 | The Raspberry Pi setup | later |
+
 | Phase | What | Done when | Status (2026-11-20) |
 |---|---|---|---|
 | 1 | Move to LeRobot 0.7, our code as a separate layer on top | The new setup runs everywhere | Done; its robot-side items moved to 3 and 5 |
