@@ -30,7 +30,7 @@ RESULTS = Path("results") / "scratch"  # test runs only (lab/EVALUATION.md rule 
 INDEX_FIELDS = ["run_id", "experiment", "model", "trial", "success", "started_at", "duration_s", "git_commit",
                 "git_dirty", "note", "run_dir", "robot", "host", "outcome"]
 # Composed experiment keys this run applies; anything else that is set is reported as not applied yet.
-APPLIED = {"scheduler", "blend_steps", "blend_weight", "cooldown", "cooldown_cap", "epsilon", "playback_mode", "playback_min_rate", "playback_margin_steps",
+APPLIED = {"starvation_grace_s", "scheduler", "blend_steps", "blend_weight", "cooldown", "cooldown_cap", "epsilon", "playback_mode", "playback_min_rate", "playback_margin_steps",
            "playback_rate_slew", "action_filter_mode", "action_filter_butterworth_cutoff", "action_filter_gain", *("drop_obs", "drop_action", "dup_obs", "dup_action", "reorder_obs", "reorder_action", "disconnect",
               "spikes", "latency"), "estimator", "s_min", "latency_k", "latency_alpha", "latency_beta", "duration_s", "fps", "task",
            "policy_type", "pretrained_name_or_path", "finetune", "model", "name", "description", "train",
@@ -150,10 +150,12 @@ def build(reg: Registry, experiment: str, model: str | None, robot: str, episode
         "inference.playback_margin_steps": float(composed.get("playback_margin_steps", 4.0)),
         "inference.playback_rate_slew": float(composed.get("playback_rate_slew", 0.05)),
         "inference.cooldown_cap": str(composed.get("cooldown_cap", "none")),
-        # DRTC holds the arm while starved and goes on when actions arrive (stalls are measured: M2, M3); upstream
-        # ends the run with a fault after 1 s without actions, which would turn every stall into an aborted trial.
-        "inference.action_starvation_grace_s": float(duration if duration is not None else composed.get("duration_s",
-                                                                                                         25.0)),
+        # How long the arm may wait without actions before the run ends with a fault. DRTC holds and goes on when
+        # actions arrive (default: the whole trial; stalls are measured, M2, M3). Upstream as it ships gives up after
+        # 1 s (`starvation_grace_s: 1.0` in its conditions, the locked scope 2026-11-20).
+        "inference.action_starvation_grace_s": float(composed.get("starvation_grace_s") or
+                                                     (duration if duration is not None else composed.get("duration_s",
+                                                                                                         25.0))),
         **({"inference.faults_json": json.dumps({k: composed[k] for k in FAULT_KEYS if composed.get(k)})}
            if any(composed.get(k) for k in FAULT_KEYS) else {}),
         "fps": float(composed.get("fps", 30)),

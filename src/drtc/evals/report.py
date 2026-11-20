@@ -47,7 +47,7 @@ def build(reg: Registry, name: str) -> Path:
         w = csv.DictWriter(f, fieldnames=TRIAL_COLS)
         w.writeheader()
         w.writerows(rows)
-    mcols = ["condition", "model", "trial", "session", "machine", "server", "M1_success"] + [c for c, _, _ in
+    mcols = ["condition", "model", "trial", "session", "machine", "server", "M1_success", "M1f_fault"] + [c for c, _, _ in
                                                                                            M.CONTINUOUS]
     with open(out_dir / "metrics.csv", "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=mcols, extrasaction="ignore")
@@ -76,8 +76,8 @@ def render(reg, name, sp, trials, mrows) -> str:
         groups.setdefault((r["condition"], r["model"]), []).append(r)
     # success
     if rig:
-        L += ["## Success (M1)", "", "| Condition | Model | Valid | Successes | Rate | 95% interval | Time to success "
-              "(s), median [IQR] |", "|---|---|---|---|---|---|---|"]
+        L += ["## Success (M1, M1f)", "", "| Condition | Model | Valid | Successes | Rate | 95% interval | Ended by a fault "
+              "(M1f) | Time to success (s), median [IQR] |", "|---|---|---|---|---|---|---|---|"]
         for c in sp.conditions:
             for m in sp.models:
                 g = groups.get((c, m), [])
@@ -85,8 +85,9 @@ def render(reg, name, sp, trials, mrows) -> str:
                 lo, hi = M.wilson(k, n)
                 t = M.median_iqr(r["M1t_time_to_success_s"] for r in g)
                 tt = "-" if t is None else f"{t[0]:.1f} [{t[1]:.1f}-{t[2]:.1f}]"
+                nf = sum(1 for r in g if r.get("M1f_fault") == 1)
                 L.append(f"| {c} | {m} | {n}/{sp.trials} | {k} | {_pct(k / n) if n else '-'} | "
-                         f"{_pct(lo) if n else '-'} - {_pct(hi) if n else '-'} | {tt} |")
+                         f"{_pct(lo) if n else '-'} - {_pct(hi) if n else '-'} | {nf}/{n} | {tt} |")
         L.append("")
     # continuous
     cols = [x for x in M.CONTINUOUS if rig or not x[0].startswith("M1")]
@@ -94,8 +95,8 @@ def render(reg, name, sp, trials, mrows) -> str:
         title = "## Timing and smoothness (M2-M8), median [IQR] over trials"
         if split:
             title += f": {split[0]} / {split[1]}"
-        L += [title, "", "| Condition | Model | n | " + " | ".join(lbl for _, lbl, _ in cols) + " |",
-              "|---|---|---|" + "---|" * len(cols)]
+        L += [title, "", "| Condition | Model | n | Ended by a fault | " + " | ".join(lbl for _, lbl, _ in cols) + " |",
+              "|---|---|---|---|" + "---|" * len(cols)]
         for c in sp.conditions:
             for m in sp.models:
                 g = [r for r in groups.get((c, m), []) if split is None or (r["machine"], r["server"]) == split]
@@ -105,7 +106,8 @@ def render(reg, name, sp, trials, mrows) -> str:
                 for col, _, d in cols:
                     v = M.median_iqr(r.get(col) for r in g)
                     cells.append("-" if v is None else f"{v[0]:.{d}f} [{v[1]:.{d}f}-{v[2]:.{d}f}]")
-                L.append(f"| {c} | {m} | {len(g)} | " + " | ".join(cells) + " |")
+                nf = sum(1 for r in g if r.get("M1f_fault") == 1)
+                L.append(f"| {c} | {m} | {len(g)} | {nf}/{len(g)} | " + " | ".join(cells) + " |")
         L.append("")
     # comparisons against the baseline condition
     conds = list(sp.conditions)

@@ -1,0 +1,25 @@
+# THE DRTC experiment (lab/PLAN.md, "LOCKED SCOPE", 2026-11-20): sort_one, SmolVLA + GR00T N1.5, the four conditions.
+# The report compares each condition with the first and with the one before it, which are the claims:
+#   baseline_faults vs baseline   (network faults lower the score)
+#   drtc_faults vs baseline_faults (DRTC recovers it)
+#   drtc_smooth_faults vs drtc_faults (smoothing improves the motion)
+# 10 trials per condition per model (metrics v2), rounds; the real network (laptop -> server over WiFi).
+description: DRTC experiment, sort_one - baseline, baseline + faults, DRTC + faults, DRTC + smoothing + faults
+success: The cube is fully inside the square of its colour and the gripper has let go of it, before the time limit.
+time_limit_s: 30
+trials: 10
+seed: 0
+models:
+  - smolvla_sort_one_v1_full
+  - groot_sort_one_v1_full
+conditions:
+  baseline: main/baseline
+  baseline_faults: main/baseline_faults
+  drtc_faults: main/drtc_faults
+  drtc_smooth_faults: main/drtc_smooth_faults
+video: true
+
+# Written by `lab eval freeze`: the Hub commit each model is served at. Do not edit by hand.
+frozen:
+  smolvla_sort_one_v1_full: '246f7e54c3fe33c0f3ef66ded8c4da916995a399'
+  groot_sort_one_v1_full: '6b862e61ce462f063ffa5fda9af803e4143038f2'

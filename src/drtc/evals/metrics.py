@@ -10,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 
-VERSION = "v1"
+VERSION = "v2"
 ARM_JOINTS = 5  # the first five commanded joints are the arm (degrees); the sixth is the gripper (%)
 
 
@@ -48,7 +48,8 @@ def trial_metrics(tdir: Path, fps: float = 30.0) -> dict:
     """One value per metric for one trial (METRICS.md rule 4)."""
     tdir = Path(tdir)
     info = json.loads((tdir / "trial.json").read_text())
-    out: dict = {"M1_success": info.get("success"), "M1t_time_to_success_s": info.get("time_to_success_s")}
+    out: dict = {"M1_success": info.get("success"), "M1t_time_to_success_s": info.get("time_to_success_s"),
+                 "M1f_fault": 1 if info.get("label") == "fault" else 0}
     ticks_path = tdir / "ticks.csv"
     if ticks_path.is_file():
         rows = list(csv.DictReader(open(ticks_path)))

@@ -1,0 +1,13 @@
+# Baseline (condition 1) on cubebox v0 (lab/PLAN.md, "LOCKED SCOPE": v0 is the initial, temporary dataset: SmolVLA and
+# GR00T N1.5 only, baseline only). Frozen once groot_cubebox_v0_full has finished training.
+description: Baseline, cubebox v0 - SmolVLA and GR00T N1.5, upstream LeRobot as it ships, normal network
+success: The green cube ends inside the box and the gripper is open, before the time limit.
+time_limit_s: 30
+trials: 10
+seed: 0
+models:
+  - smolvla_cubebox_v0_full
+  - groot_cubebox_v0_full
+conditions:
+  baseline: main/baseline
+video: true

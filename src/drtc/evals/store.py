@@ -50,10 +50,10 @@ class Trial:
         labels, M2-M8 only) every completed run."""
         if self.void:
             return False
-        if self.info.get("robot") == "replay":  # completed, the model drove the arm, and the loop ran at ~30 Hz
-            hz = self.info.get("cadence_hz")
-            return (self.info.get("outcome") == "completed" and self.info.get("first_action_s") is not None
-                    and (hz is None or hz >= MIN_REPLAY_HZ))
+        if self.info.get("robot") == "replay":  # the model drove the arm (to the end, or until a fault: metrics v2),
+            hz = self.info.get("cadence_hz")      # and the loop ran at ~30 Hz
+            ended = self.info.get("outcome") == "completed" or self.info.get("label") == "fault"
+            return ended and self.info.get("first_action_s") is not None and (hz is None or hz >= MIN_REPLAY_HZ)
         return self.info.get("success") in (0, 1)
 
 

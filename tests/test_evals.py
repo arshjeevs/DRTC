@@ -230,8 +230,20 @@ def test_every_bench_and_robot_experiment_parses():
     reg = Registry()
     exps = [str(p.relative_to(reg.lab / "experiments").with_suffix("")) for g in ("bench", "robot")
             for p in (reg.lab / "experiments" / g).glob("*.yaml")] + ["replication/baseline"]
+    exps += [str(p.relative_to(reg.lab / "experiments").with_suffix("")) for p in (reg.lab / "experiments" / "main").glob("*.yaml")]
     for exp in exps:
         for robot in ("replay", "rig"):
             cmd, _, _ = build(reg, exp, "groot_sort_one_v1_full", robot, 49, "tcp/127.0.0.1:1", 10, Path("/tmp/x"), "d")
             args = [x.replace("--inference.", "--") for x in cmd if x.startswith("--inference.") and "type=" not in x]
             draccus.parse(DRTCInferenceConfig, args=args)
+
+
+def test_a_fault_after_the_first_action_counts_and_before_it_does_not():
+    """Metrics v2: a terminal fault once the arm moves is a failure (replay: a valid run); before it, a setup problem."""
+    rig_fault = store.Trial(None, "s", "c", "m", 1, {"robot": "rig", "success": 0, "label": "fault"})
+    rig_setup = store.Trial(None, "s", "c", "m", 2, {"robot": "rig", "success": None, "label": "aborted"})
+    rep_fault = store.Trial(None, "s", "c", "m", 3, {"robot": "replay", "outcome": "exit 1", "label": "fault",
+                                                      "first_action_s": 0.3, "cadence_hz": 29.8})
+    rep_setup = store.Trial(None, "s", "c", "m", 4, {"robot": "replay", "outcome": "exit 1", "label": "replay",
+                                                      "first_action_s": None})
+    assert rig_fault.valid and not rig_setup.valid and rep_fault.valid and not rep_setup.valid

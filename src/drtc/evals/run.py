@@ -35,7 +35,7 @@ from drtc.evals import serving, store, sync
 from drtc.evals import spec as S
 from drtc.registry import Registry, RegistryError
 
-METRICS_VERSION = "v1"
+METRICS_VERSION = "v2"
 
 
 # --- keys during a trial ----------------------------------------------------------------------------------------------
@@ -168,16 +168,21 @@ def run_trial(reg: Registry, sp: S.EvalSpec, condition: str, model: str, number:
     if eng is not None:
         first = next((row[0] for row in eng._ticks if row[1]), None)
     key_t = None if (keys.at is None or eng is None) else round(keys.at - eng._t0, 3)
+    # Metrics v2 (lab/METRICS.md): a terminal fault after the first action is the system stopping the arm, so a failure
+    # (label `fault`); before the first action it is a setup problem (`aborted`: not counted, run again).
+    faulted = outcome != "completed"
     if robot == "replay":
-        success, label = None, "replay"
+        success, label = None, ("fault" if faulted and first is not None else "replay")
     elif keys.key == "s":
         success, label = 1, "s"
     elif keys.key == "f":
         success, label = 0, "f"
+    elif faulted and first is not None:
+        success, label = 0, "fault"
     elif outcome == "completed" and took >= sp.time_limit_s - 1.0:
         success, label = 0, "time_limit"
     else:
-        success, label = None, "aborted"  # a fault, an error or Ctrl-C: not a valid trial, run again later
+        success, label = None, "aborted"  # before the first action, or stopped by the operator: run again later
     info = {
         "eval": ctx["eval"], "session": session.name, "condition": condition, "model": model, "trial": number,
         "round": rnd, "success": success, "label": label, "key_time_s": key_t,
@@ -341,11 +346,14 @@ def session_run(reg: Registry, name: str, server: str, models: list[str] | None,
                 counted = store.Trial(tdir, session.name, cond, m, number, info).valid
                 failures[(cond, m)] = 0 if counted else failures.get((cond, m), 0) + 1
                 if sp.robot == "replay":
-                    verdict = "done" if counted else "not counted (run again later)"
+                    verdict = ("done (ended by a fault)" if info["label"] == "fault" else "done") if counted \
+                        else "not counted (run again later)"
                     if info.get("cadence_hz") is not None and info["cadence_hz"] < store.MIN_REPLAY_HZ:
                         verdict += f" - control loop at {info['cadence_hz']:.1f} Hz"
                 else:
                     verdict = {1: "SUCCESS", 0: "FAILURE"}.get(info["success"], "not counted (run again later)")
+                    if info["label"] == "fault":
+                        verdict += " (ended by a fault)"
                 extra = f" in {info['time_to_success_s']} s" if info.get("time_to_success_s") is not None else ""
                 print(f"  t{number:02d}: {verdict}{extra} ({info['label']}; {info['outcome']}"
                       + (f": {info['error']}" if info.get("error") else "") + ")")
