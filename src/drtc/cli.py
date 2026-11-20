@@ -187,8 +187,32 @@ def use_own_bin() -> None:
         os.environ["PATH"] = own + os.pathsep + os.environ.get("PATH", "")
 
 
+def load_server_env() -> None:
+    """Apply the repo's .server.env (H200 only: caches, LAB_HOST, PATH) when the shell did not source it.
+
+    A tmux window inherits the tmux server's environment, not the shell's, so `.venv/bin/lab` could run without it:
+    LeRobot then looked for datasets in the wrong cache and lab did not know it was on the H200 (no HF token), seen
+    2026-11-20. Lines are `export KEY=VALUE`; variables already set are kept.
+    """
+    import os
+    from pathlib import Path
+
+    env = Path(__file__).resolve().parents[2] / ".server.env"
+    if not env.is_file():
+        return
+    for line in env.read_text().splitlines():
+        line = line.strip()
+        if not line.startswith("export ") or "=" not in line:
+            continue
+        key, _, value = line[len("export "):].partition("=")
+        key, value = key.strip(), os.path.expandvars(value.strip().strip('"').strip("'"))
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
 def main(argv: list[str] | None = None) -> None:
     argv = sys.argv[1:] if argv is None else argv
+    load_server_env()
     use_own_bin()
     from drtc import secrets
 
