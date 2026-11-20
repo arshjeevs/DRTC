@@ -159,6 +159,13 @@ def build(reg: Registry, experiment: str, model: str | None, robot: str, episode
         "duration": float(duration if duration is not None else composed.get("duration_s", 25.0)),
         "play_sounds": False,
     }
+    if flags["inference.blend_steps"]:
+        # upstream needs the components to blend named explicitly: every action joint of the model's dataset
+        from lerobot.datasets import LeRobotDatasetMetadata
+
+        r = reg.resolve(model_id)
+        names = list(LeRobotDatasetMetadata(r.dataset.repo, revision=r.dataset.revision).features["action"]["names"])
+        flags["inference.blend_components"] = json.dumps(names)
     renames = camera_renames(reg, model_id)
     if renames:  # robot camera keys -> the checkpoint's names, which the server declares (drtc.control.serve)
         flags["rename_map"] = json.dumps(renames)
