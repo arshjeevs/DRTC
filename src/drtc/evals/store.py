@@ -49,8 +49,8 @@ class Trial:
         labels, M2-M8 only) every completed run."""
         if self.void:
             return False
-        if self.info.get("robot") == "replay":
-            return self.info.get("outcome") == "completed"
+        if self.info.get("robot") == "replay":  # completed, and the model actually drove the arm
+            return self.info.get("outcome") == "completed" and self.info.get("first_action_s") is not None
         return self.info.get("success") in (0, 1)
 
 

@@ -131,6 +131,10 @@ def build(reg: Registry, experiment: str, model: str | None, robot: str, episode
         "inference.filter_cutoff_hz": float(composed.get("action_filter_butterworth_cutoff", 3.0)),
         "inference.filter_gain": float(composed.get("action_filter_gain", 1.4)),
         "inference.epsilon": int(composed.get("epsilon", 1)),
+        # DRTC holds the arm while starved and goes on when actions arrive (stalls are measured: M2, M3); upstream
+        # ends the run with a fault after 1 s without actions, which would turn every stall into an aborted trial.
+        "inference.action_starvation_grace_s": float(duration if duration is not None else composed.get("duration_s",
+                                                                                                         25.0)),
         **({"inference.faults_json": json.dumps({k: composed[k] for k in FAULT_KEYS if composed.get(k)})}
            if any(composed.get(k) for k in FAULT_KEYS) else {}),
         "fps": float(composed.get("fps", 30)),
@@ -161,6 +165,7 @@ def rollout_once(cmd: list[str], run_dir: Path, on_context=None) -> tuple[str, s
     register_third_party_plugins()
     install()
     handler = logging.FileHandler(run_dir / "rollout.log")
+    handler.setLevel(logging.INFO)  # not the libraries' DEBUG chatter
     handler.setFormatter(logging.Formatter("%(levelname)s %(asctime)s %(name)s %(message)s"))
     # lerobot-rollout reconfigures logging when it starts (init_logging), which drops handlers added before;
     # attach ours right after it.

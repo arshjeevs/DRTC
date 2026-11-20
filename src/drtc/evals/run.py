@@ -9,6 +9,7 @@
 4. Writes results/evals/<eval>/sessions/<YYYYMMDD-HHMM>-<machine>/, and pushes the session at the end.
 
 `--test` makes the same session in results/scratch/<date>/ (not official: no checks on git, never pulled or pushed).
+`--replay` (a setup check, no robot needed): one round on the replay robot against the eval's own servers, as a test.
 On the replay robot (`robot: replay` in the eval, the Phase 7-8 bench) there are no keys: every completed run is a
 valid trial (M2-M8 only), stored under results/bench/.
 """
@@ -207,16 +208,20 @@ def void_trial(tdir: Path, reason: str) -> None:
 
 
 def session_run(reg: Registry, name: str, server: str, models: list[str] | None, test: bool, offline: bool,
-                max_trials: int | None) -> int:
+                max_trials: int | None, replay: bool = False) -> int:
     sp = S.load(reg, name)
+    if replay:  # a setup check without the robot: one round on the replay robot, against this eval's own servers
+        test = True
+        sp = sp.model_copy(update={"robot": "replay", "trials": 1, "time_limit_s": min(sp.time_limit_s, 10.0)})
     problems = S.check(reg, sp)
     if problems:
         raise RegistryError(f"{name}: " + "; ".join(problems))
     if not S.is_frozen(sp):
         raise RegistryError(f"{name} is not frozen: lab eval freeze {name}, then commit and push")
     kind = "bench" if sp.robot == "replay" else "evals"
-    root = (Path("results") / "scratch" / f"{datetime.now():%Y%m%d}" / f"{kind}-test") if test else \
-        (Path("results") / kind)
+    # A test session starts fresh (its own folder), so earlier tests never count towards it.
+    root = (Path("results") / "scratch" / f"{datetime.now():%Y%m%d}" / f"{kind}-test-{datetime.now():%H%M%S}") \
+        if test else (Path("results") / kind)
     commit, clean = git_clean()
     if not test and not clean:
         raise RegistryError("the git tree has uncommitted changes: commit them first (official trials record the "
@@ -275,15 +280,17 @@ def session_run(reg: Registry, name: str, server: str, models: list[str] | None,
               f"{server} ({gpu})")
         done_here = 0
         quit_ = False
+        failures: dict[tuple[str, str], int] = {}  # consecutive not-counted trials per pair in this session
+        skipped: set[tuple[str, str]] = set()
         while not quit_:
             counts = store.valid_counts(name, root)
             rnd, pairs = S.next_round(sp, counts)
-            pairs = [p for p in pairs if p[1] in chosen]
+            pairs = [p for p in pairs if p[1] in chosen and p not in skipped]
             if not rnd:
                 print("the eval is complete")
                 break
             if not pairs:
-                print(f"round {rnd} needs models not served in this session; serve them, or end here")
+                print(f"round {rnd} needs models that are not served or were skipped in this session; end here")
                 break
             print(f"\n=== Round {rnd}: {len(pairs)} trials ===")
             if sp.robot == "rig":
@@ -302,6 +309,9 @@ def session_run(reg: Registry, name: str, server: str, models: list[str] | None,
                 info = run_trial(reg, sp, cond, m, number, rnd, session, conn.endpoints[m], ctx)
                 done_here += 1
                 tdir = store.trial_dir(session, cond, m, number)
+                counted = (info["outcome"] == "completed" and info.get("first_action_s") is not None) \
+                    if sp.robot == "replay" else info["success"] in (0, 1)
+                failures[(cond, m)] = 0 if counted else failures.get((cond, m), 0) + 1
                 if sp.robot == "replay":
                     verdict = "done" if info["outcome"] == "completed" else "not counted (run again later)"
                 else:
@@ -320,6 +330,10 @@ def session_run(reg: Registry, name: str, server: str, models: list[str] | None,
                     if ans == "q":
                         quit_ = True
                         break
+                if failures.get((cond, m), 0) >= 2:
+                    skipped.add((cond, m))
+                    print(f"  {label}: 2 trials in a row not counted ({info['outcome']}): skipped for the rest of this "
+                          f"session. Check its server log (logs/serve/{name}/{m}.log) and the trial's rollout.log")
                 if max_trials and done_here >= max_trials:
                     quit_ = True
                     break

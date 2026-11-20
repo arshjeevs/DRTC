@@ -237,31 +237,210 @@ Paste the last lines of the window (or the dry run's output) with the question.
 
 # Part 2: evaluation
 
-**Status (2026-11-20): being built** (lab/PLAN.md, Phase 5 steps 1-8). Each step is added here once it is tested;
-until a step is marked ready, ask Claude. How results are stored and why: [EVALUATION.md](EVALUATION.md). What
-every number means: [METRICS.md](METRICS.md).
-
-The path, once built:
+Official robot trials, from the plan to the report. Why it works this way: [EVALUATION.md](EVALUATION.md). What
+every number means: [METRICS.md](METRICS.md). The example throughout is `sort_one_baseline` (Phase 6: ACT,
+SmolVLA, GR00T N1.5 and Diffusion on sorting A, 20 trials each).
 
 ```
-lab/evals/<eval>.yaml  →  lab eval freeze  →  commit + push
-model server (laptop GPU / A100 / H200): start the eval's servers
-robot computer (laptop, later the Pi): lab eval run <eval> --server <host>   (20 trials per model, rounds)
-lab eval report <eval>   (any machine)
+once per eval    laptop: write lab/evals/<eval>.yaml → lab eval check → lab eval freeze → commit + push
+each session     model server (A100 / H200 / laptop GPU): lab eval serve <eval>        (leave it running)
+                 laptop (robot):  lab eval servers → lab eval run <eval> --server <host>  (s / f per trial)
+any time         lab eval status <eval>   ·   lab eval report <eval> --pull
 ```
 
-| Step | Ready |
+Only `lab eval run` makes official results. Anything else you try (`lab run`, `--test`, `--replay`) goes to
+`results/scratch/` and never into the results.
+
+## Cheat sheet
+
+```bash
+# --- once per eval (laptop) ---
+cd ~/Projects/drtc-major && source .venv/bin/activate && git pull
+lab eval check sort_one_baseline
+lab eval freeze sort_one_baseline
+git add lab/evals/sort_one_baseline.yaml && git commit -m "eval sort_one_baseline: frozen" && git push
+
+# --- each session: 1. the model server (pick one) ---
+# A100:   ssh b230968ee@192.168.5.13, then
+cd ~/drtc_major && git pull && tmux new -s serve '.venv/bin/lab eval serve sort_one_baseline; bash'
+# H200:   in the drtc_lab container
+cd /workspace/drtc_major && . ./.server.env && git pull && uv sync --frozen --extra gpu --python /usr/bin/python3
+tmux new -s serve '.venv/bin/lab eval serve sort_one_baseline; bash'
+# laptop GPU (8 GB: the small models only)
+lab eval serve sort_one_baseline --models act_sort_one_v1_full,diffusion_sort_one_v1_full
+
+# --- each session: 2. the laptop with the robot ---
+cd ~/Projects/drtc-major && source .venv/bin/activate && git pull
+lab/bin/session record                                   # phone camera + rig check (tmux "robot")
+lab eval servers sort_one_baseline --server a100         # every model "ready"?
+lab eval run sort_one_baseline --server a100 --replay    # optional: 1 round on the replay robot, no arm moves
+lab eval run sort_one_baseline --server a100             # the official session
+
+# --- afterwards (any machine) ---
+lab eval status sort_one_baseline
+lab eval report sort_one_baseline --pull                 # → results/evals/sort_one_baseline/report.md
+```
+
+---
+
+## 1. Write the eval (once per study)
+
+One file per study in `lab/evals/`. Copy `lab/evals/sort_one_baseline.yaml` and change it:
+
+```yaml
+description: Phase 6 baseline, sorting A (every trained model, as trained)
+success: The cube is fully inside the square of its colour and the gripper has let go of it, before the time limit.
+time_limit_s: 30          # a trial that runs out is a failure
+trials: 20                # per model per condition (the standard)
+seed: 0                   # the order inside each round
+models: [act_sort_one_v1_full, smolvla_sort_one_v1_full, groot_sort_one_v1_full, diffusion_sort_one_v1_full]
+conditions:
+  baseline: replication/baseline      # settings from lab/experiments
+video: true
+```
+
+- **Decide everything before the first trial.** Once trials exist, the plan can't change. A change means a new eval
+  (e.g. `sort_one_baseline_v2`), and `lab eval run` refuses a plan that differs from earlier sessions.
+- **`success`** is the rule you apply when you press `s`. Write it so that close calls are rare.
+- **`conditions`** are what you compare: just `baseline` in Phase 6. In Phases 7–8, e.g. `baseline`, `smoothing_a` and
+  `spikes`, each pointing at an experiment file in `lab/experiments/`.
+
+Then:
+
+```bash
+lab eval check sort_one_baseline      # names exist, conditions point at real experiments, task found
+lab eval freeze sort_one_baseline     # pins every model to its current Hub commit, written into the file
+git add lab/evals/sort_one_baseline.yaml && git commit -m "eval sort_one_baseline: frozen" && git push
+```
+
+Freezing is what makes "the same model" exact: the laptop, the Pi and every server use that commit, and a server
+serving any other version simply can't be reached by the session.
+
+## 2. Start the model server
+
+Pick whichever server is free that day. **The whole session uses one server**, and each trial records which one it was.
+
+| Server | Where to type | Command |
+|---|---|---|
+| A100 | `ssh b230968ee@192.168.5.13` | `cd ~/drtc_major && git pull && tmux new -s serve '.venv/bin/lab eval serve sort_one_baseline; bash'` |
+| H200 | the `drtc_lab` container ([H200.md](H200.md)) | `cd /workspace/drtc_major && . ./.server.env && git pull && uv sync --frozen --extra gpu --python /usr/bin/python3`, then `tmux new -s serve '.venv/bin/lab eval serve sort_one_baseline; bash'` |
+| laptop GPU | a laptop terminal | `lab eval serve sort_one_baseline --models act_sort_one_v1_full,diffusion_sort_one_v1_full` |
+
+It starts the models one after the other and prints each one's status:
+
+```
+  act_sort_one_v1_full             port 7460  starting (loading the model) ... ready in 30 s
+  smolvla_sort_one_v1_full         port 7461  starting (loading the model) ... ready in 547 s
+  groot_sort_one_v1_full           port 7462  starting (loading the model) ... ready in 159 s
+  diffusion_sort_one_v1_full       port 7463  starting (loading the model) ... ready in 34 s
+all 4 ready. Leave this running during the session; Ctrl-C stops every server.
+```
+
+- Wait for **`all N ready`**. SmolVLA compiles its model when it starts (about 9 minutes the first time on the A100).
+- Detach with Ctrl-b d. At the end of the session, attach (`tmux attach -t serve`) and press Ctrl-C.
+- The laptop's 8 GB fits ACT and Diffusion, not GR00T. Then run the session with the same `--models`.
+- On the H200, the laptop connects through an SSH tunnel into the container: type the server password when
+  `lab eval servers` or `lab eval run` asks for it (once per session). **Not tested on the H200 yet:** if it fails the
+  first time, paste the message to Claude.
+
+## 3. Prepare the robot (laptop)
+
+```bash
+cd ~/Projects/drtc-major && source .venv/bin/activate && git pull
+lab/bin/session record          # phone camera bridge + rig check; every line ok
+lab eval servers sort_one_baseline --server a100
+```
+
+`lab eval servers` connects (A100: by key; H200: asks the password) and asks each model to describe itself:
+
+```
+  act_sort_one_v1_full             ready   commit 449b9c12  checkpoint sha256:5af906278031  tcp/127.0.0.1:17460
+  ...
+```
+
+Every model must say `ready`. Optional setup check without moving the arm: one round on the replay robot against the
+same servers (a test, in scratch):
+
+```bash
+lab eval run sort_one_baseline --server a100 --replay
+```
+
+## 4. Run the session
+
+```bash
+lab eval run sort_one_baseline --server a100
+```
+
+It checks everything first and refuses to start when something is off: uncommitted changes, a changed plan, a
+failed rig check, or a model that isn't served. Then it pulls the sessions other machines pushed, so the counts
+include them.
+
+It works in **rounds**. A round is one trial of every model, in a random order (the same order on every machine).
+
+```
+=== Round 1: 4 trials ===
+Set this round's layout (the same for every trial of the round).
+
+Round 1, trial 1/4: groot_sort_one_v1_full, t01. Put the cube(s) on the marks, press Enter to start ...
+  [success] ending the trial
+  t01: SUCCESS in 9.4 s (s; completed)
+  Enter = next trial, v = void this trial (setup mistake), q = end the session:
+```
+
+| When | Key | Means |
+|---|---|---|
+| before a trial | Enter | start (cube on its mark) |
+| before a trial | `q` | end the session |
+| during a trial | `s` | **success**, right now: the task is done by the success rule. Ends the trial; the time is the time to success |
+| during a trial | `f` | **failure**: it won't succeed. Ends the trial early |
+| during a trial | (nothing) | the time limit ends it: failure |
+| after a trial | Enter | next trial |
+| after a trial | `v` | **void**: a setup mistake (cube not on its mark, wrong layout, cable caught), with a reason. Kept, not counted, run again in a later round. **Never for a model's failure** |
+| after a trial | `q` | end the session |
+
+- **Layouts are yours:** set one layout per round, all trials of the round use it, and rotate the layouts over the
+  rounds as in the recording (sorting A: the 4 combinations, 5 rounds each over 20 rounds).
+- A trial that ends by itself with a fault (the server stopped, the network dropped) is **not counted** and comes back
+  in a later round. It's listed in the report.
+- Stop whenever you like (`q`). The next `lab eval run` continues where the eval stands, on any machine.
+- At the end, the session is **pushed** to the results store automatically. Without internet, use `--offline`, then
+  `lab eval push sort_one_baseline` later.
+
+## 5. Results
+
+```bash
+lab eval status sort_one_baseline           # trials done per model, the next round, unpushed sessions
+lab eval report sort_one_baseline --pull    # rebuild the report from every session (all machines)
+```
+
+`results/evals/sort_one_baseline/`:
+
+| File | What |
 |---|---|
-| Test runs go to `results/scratch/<date>/` (never mixed with official results): `lab run`, `lab results` | ready |
-| Writing an eval file, `lab eval check`, `lab eval freeze`, `lab eval status`, `lab eval list` | ready (explained here with step 5) |
-| Serving an eval on the laptop GPU, the A100 or the H200 | not yet |
-| `lab eval run`: trials, keys `s` / `f`, resume, `lab eval void`, video, push | not yet |
-| `lab eval report` | not yet |
-| `lab eval offline` (held-out action error, M9) | not yet |
+| `report.md` | the tables: success rate with its 95% interval and time to success; stalls, latency, server time, jerk, chunk jumps (median and spread); comparisons with the baseline condition; trials not counted; sessions |
+| `trials.csv` | one row per trial (also voided ones), with its folder |
+| `metrics.csv` | one row per counted trial, every metric |
+| `sessions/<date>-<machine>/trials/<condition>/<model>/tNN/` | the raw files of one trial, including `video/scene.mp4` and `video/wrist.mp4` |
 
-Rules that already hold:
+The report is rebuilt every time, so never edit it. Tell Claude when an eval is done: the next step reads the report.
 
-- Only `lab eval run` makes official results. Anything you try by hand is a test run.
-- The official copy of every result is the private Hub dataset `orangemoon599/drtc-results`. Nothing analysis needs
-  is kept on the GPU servers.
-- Old results (before 2026-11-20) are in `results/archive/`.
+## Mistakes and fixes
+
+| Situation | Do |
+|---|---|
+| Realised after a trial that the cube wasn't on its mark | `lab eval void sort_one_baseline <model> t05 --reason "cube off its mark"`, then `lab eval push sort_one_baseline` |
+| Want to try something without it counting | `--test` (a real session, kept in `results/scratch/`) or `--replay` (no arm movement) |
+| `the git tree has uncommitted changes` | commit and push first (official trials record the exact code), or ask Claude what changed |
+| `... changed since session ...` | the eval file was edited after trials started: undo the edit, or make a new eval |
+| `not served on a100: ...` | the server isn't running or is still loading: check its tmux window |
+| `cannot connect to a100` | the A100 isn't reachable from this network: use the H200 or the laptop GPU |
+| `rig check failed` | arms or cameras not found: `lab check --rig`, check USB and the phone camera |
+| `WARNING: push failed` | the session stays on this machine: `lab eval push sort_one_baseline` when online |
+
+## What to know about latency (2026-11-20)
+
+Measured from the laptop over WiFi to the A100, through the SSH tunnel: about **390-450 ms** turnaround for ACT, of
+which the model takes about 40 ms. Ping is 7 ms and the upload speed 42 Mbit/s, so it isn't simply bandwidth; the
+cause is still being looked into (lab/PLAN.md). On the laptop's own GPU it is about 36 ms. It's recorded in every
+trial (M4, M6), and reports never mix servers. Every model served from the same server gets the same network delay;
+models with short chunks (GR00T 16 actions = 0.5 s) have the least room for it.

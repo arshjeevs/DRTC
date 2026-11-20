@@ -150,7 +150,7 @@ def cmd_servers(reg: Registry, a) -> int:
 def cmd_run(reg: Registry, a) -> int:
     from drtc.evals.run import session_run
 
-    return session_run(reg, a.eval, a.server, _models(a.models), a.test, a.offline, a.max_trials)
+    return session_run(reg, a.eval, a.server, _models(a.models), a.test, a.offline, a.max_trials, a.replay)
 
 
 def cmd_void(reg: Registry, a) -> int:
@@ -232,6 +232,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--test", action="store_true", help="a test session in results/scratch (not official, not pushed)")
     p.add_argument("--offline", action="store_true", help="do not pull/push (push later with lab eval push)")
     p.add_argument("--max-trials", type=int, help="end the session after this many trials")
+    p.add_argument("--replay", action="store_true", help="setup check without the robot: one round on the replay "
+                                                         "robot against this eval's servers (a test session)")
     p.set_defaults(fn=cmd_run)
     p = sub.add_parser("void", help="void a trial for a setup mistake (kept, not counted, run again)")
     p.add_argument("eval")

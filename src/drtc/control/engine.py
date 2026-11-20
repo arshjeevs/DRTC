@@ -289,8 +289,13 @@ class DRTCEngine(RemoteInferenceEngine):
         rt = self.runtime
         est = rt.turnaround if rt._completed else None
         if est is None or not math.isfinite(est):
-            # Before the first measurement (cold start is slow), seed with s_min + epsilon steps, as DRTC does.
-            return (self.config.s_min + self.config.epsilon) * rt.interval
+            # Before the first reply there is no latency to adapt to. DRTC seeds the cooldown with s_min + epsilon
+            # steps, which on a link slower than that (a remote GPU over WiFi: ~0.4 s, 2026-11-20) gives up every
+            # first request before it can be answered, so no reply is ever measured and the robot never starts.
+            # Until the first reply, wait as long as the startup timeout allows (upstream's cold start); from then
+            # on the cooldown follows the measured latency as in DRTC.
+            return max((self.config.s_min + self.config.epsilon) * rt.interval,
+                       float(getattr(self.config, "startup_timeout_s", 10.0)))
         steps = max(1, math.ceil(est / rt.interval))
         if getattr(rt, "horizon", None):
             steps = min(steps, max(1, rt.horizon // 2))
