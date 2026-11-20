@@ -102,6 +102,7 @@ class DRTCRuntime(ChunkRuntime):
         self.last_turnaround: float | None = None
         self.not_before = 0.0  # backoff after a BUSY reply
         self.sent: dict[str, tuple[float, float | None]] = {}  # request_id -> (sent at, latency estimate then)
+        self.max_delay: int | None = None  # the server's prediction steps (set by the engine from the handshake)
         self.chunk_log: list[list] = []  # CHUNK_FIELDS rows, monotonic times
 
     def abandon(self, request_id: str, backoff: float = 0.0) -> bool:
@@ -137,6 +138,15 @@ class DRTCRuntime(ChunkRuntime):
 
     def begin(self, observation):
         request = super().begin(observation)
+        if request is not None and self.max_delay is not None and request.delay > self.max_delay:
+            # Upstream estimates the delay as turnaround / step time, unbounded, and the server rejects a delay longer
+            # than the model's chunk ("Invalid RTC delay"): with GR00T's 16-step chunk any turnaround above 0.53 s
+            # (a remote GPU over WiFi, 2026-11-20) ended the trial. In chunk mode the value is only checked, so it is
+            # capped at the chunk length.
+            from dataclasses import replace
+
+            request = replace(request, delay=self.max_delay)
+            self.pending = request
         if request is not None:
             est = self.turnaround if self._completed else None
             self.sent[request.request_id] = (request.submitted_at,
@@ -283,6 +293,9 @@ class DRTCEngine(RemoteInferenceEngine):
         self.recovery: list[tuple[float, str, str]] = []
         if isinstance(cfg, DRTCInferenceConfig) and cfg.cooldown:
             self.client._exchange = self._cooldown_exchange(self.client._exchange)
+        if isinstance(getattr(self, "runtime", None), DRTCRuntime):
+            caps = getattr(self.client, "capabilities", None)
+            self.runtime.max_delay = getattr(caps, "prediction_steps", None)
         for fn in ON_ENGINE:
             fn(self)
 

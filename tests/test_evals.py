@@ -150,3 +150,26 @@ def test_cooldown_is_never_shorter_than_the_latency():
     assert DRTCEngine.cooldown_s(eng) < 0.7  # DRTC's original cap: shorter than the reply
     rt._completed = 0
     assert DRTCEngine.cooldown_s(eng) == 10.0  # before the first reply: the startup timeout
+
+
+def test_request_delay_never_exceeds_the_chunk(monkeypatch):
+    """'Invalid RTC delay' (2026-11-20): GR00T's 16-step chunk with a 0.56 s (17-step) turnaround."""
+    from dataclasses import dataclass
+
+    import lerobot.inference.execution as ex
+
+    from drtc.control.engine import DRTCRuntime
+
+    @dataclass(frozen=True)
+    class Req:
+        delay: int
+        request_id: str = "r"
+        submitted_at: float = 0.0
+
+    monkeypatch.setattr(ex.ChunkRuntime, "begin", lambda self, obs: Req(17))
+    rt = object.__new__(DRTCRuntime)
+    rt.max_delay, rt.sent, rt._completed, rt.pending = 16, {}, 0, None
+    out = rt.begin(None)
+    assert out.delay == 16 and rt.pending.delay == 16
+    rt.max_delay = 20
+    assert rt.begin(None).delay == 17  # within the chunk: unchanged

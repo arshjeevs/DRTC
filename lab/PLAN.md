@@ -1054,6 +1054,9 @@ step, each step tested and added to [WORKFLOW.md](WORKFLOW.md) part 2 so the use
   - **Stalls hold the arm** (`action_starvation_grace_s` = the trial length) instead of upstream's terminal fault
     after 1 s, as DRTC does; stalls are measured (M2, M3) from the gaps between executed actions, since the control
     loop does not ask for actions while it holds.
+  - **Fixed: "Invalid RTC delay"** (user's first official session, 12:29): upstream estimates the request delay as
+    turnaround / step time, unbounded, and the server rejects a delay longer than the chunk; GR00T (16 steps) ended
+    every trial whose turnaround passed 0.53 s. The delay is now capped at the server's prediction steps.
   - GR00T over this link: 74% of the trial stalled (replay robot); Diffusion 46%. Their short chunks cannot cover
     the round trip: the central DRTC problem, now measured.
 - [ ] 7. `lab eval offline <dataset>` (M9) and the benchmark (M10), on a GPU server, pushed to the results store
