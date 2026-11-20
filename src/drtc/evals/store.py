@@ -16,6 +16,7 @@ from pathlib import Path
 
 ROOT = Path("results") / "evals"
 PUSHED = ".pushed"
+MIN_REPLAY_HZ = 27.0  # a replay trial whose control loop ran slower measures the wrong thing (30 Hz robot)
 
 
 def eval_root(name: str, root: Path | None = None) -> Path:
@@ -49,8 +50,10 @@ class Trial:
         labels, M2-M8 only) every completed run."""
         if self.void:
             return False
-        if self.info.get("robot") == "replay":  # completed, and the model actually drove the arm
-            return self.info.get("outcome") == "completed" and self.info.get("first_action_s") is not None
+        if self.info.get("robot") == "replay":  # completed, the model drove the arm, and the loop ran at ~30 Hz
+            hz = self.info.get("cadence_hz")
+            return (self.info.get("outcome") == "completed" and self.info.get("first_action_s") is not None
+                    and (hz is None or hz >= MIN_REPLAY_HZ))
         return self.info.get("success") in (0, 1)
 
 

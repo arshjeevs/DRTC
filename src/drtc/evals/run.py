@@ -155,6 +155,14 @@ def run_trial(reg: Registry, sp: S.EvalSpec, condition: str, model: str, number:
     finally:
         engine_mod.ON_ENGINE.remove(on_engine)
         video_info = video.stop() if video is not None else None
+    cadence = None  # the control loop's measured rate (the rollout's cadence summary)
+    try:
+        import re as _re
+
+        m_ = _re.search(r"effective cadence: ([0-9.]+) Hz", (tdir / "rollout.log").read_text(errors="replace"))
+        cadence = float(m_.group(1)) if m_ else None
+    except OSError:
+        pass
     eng = holder.get("engine")
     first = None
     if eng is not None:
@@ -175,7 +183,7 @@ def run_trial(reg: Registry, sp: S.EvalSpec, condition: str, model: str, number:
         "round": rnd, "success": success, "label": label, "key_time_s": key_t,
         "first_action_s": first, "time_to_success_s": (round(key_t - first, 3) if success == 1 and key_t is not None
                                                         and first is not None else None),
-        "time_limit_s": sp.time_limit_s, "outcome": outcome, "error": error,
+        "time_limit_s": sp.time_limit_s, "outcome": outcome, "error": error, "cadence_hz": cadence,
         "started_at": started.isoformat(timespec="seconds"), "duration_s": round(took, 2),
         "robot": robot, "episode": episode if robot == "replay" else None, "machine": ctx["machine"],
         "server": ctx["server"], "server_gpu": ctx["server_gpu"], "deployment": serving.deployment(sp, model),
@@ -330,11 +338,12 @@ def session_run(reg: Registry, name: str, server: str, models: list[str] | None,
                 info = run_trial(reg, sp, cond, m, number, rnd, session, conn.endpoints[m], ctx)
                 done_here += 1
                 tdir = store.trial_dir(session, cond, m, number)
-                counted = (info["outcome"] == "completed" and info.get("first_action_s") is not None) \
-                    if sp.robot == "replay" else info["success"] in (0, 1)
+                counted = store.Trial(tdir, session.name, cond, m, number, info).valid
                 failures[(cond, m)] = 0 if counted else failures.get((cond, m), 0) + 1
                 if sp.robot == "replay":
-                    verdict = "done" if info["outcome"] == "completed" else "not counted (run again later)"
+                    verdict = "done" if counted else "not counted (run again later)"
+                    if info.get("cadence_hz") is not None and info["cadence_hz"] < store.MIN_REPLAY_HZ:
+                        verdict += f" - control loop at {info['cadence_hz']:.1f} Hz"
                 else:
                     verdict = {1: "SUCCESS", 0: "FAILURE"}.get(info["success"], "not counted (run again later)")
                 extra = f" in {info['time_to_success_s']} s" if info.get("time_to_success_s") is not None else ""
