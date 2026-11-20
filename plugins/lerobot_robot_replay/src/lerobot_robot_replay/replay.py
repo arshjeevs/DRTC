@@ -29,7 +29,16 @@ def preload(repo_id: str, revision: str | None, episode: int, root=None) -> int:
     key = (repo_id, revision, episode)
     if key in _CACHE:
         return len(_CACHE[key])
-    ds = LeRobotDataset(repo_id, root=root, revision=revision, episodes=[episode])
+    try:
+        ds = LeRobotDataset(repo_id, root=root, revision=revision, episodes=[episode])
+    except ValueError as e:
+        # On a machine's first, partial download of a dataset, loading one episode can fail with the datasets
+        # library's 'Instruction "train" corresponds to no data!' (A100 and H200, 2026-11-20). Download the whole
+        # dataset once, then load the episode again.
+        if "corresponds to no data" not in str(e):
+            raise
+        LeRobotDataset(repo_id, root=root, revision=revision)
+        ds = LeRobotDataset(repo_id, root=root, revision=revision, episodes=[episode])
     cams = [k.removeprefix("observation.images.") for k, f in ds.meta.features.items() if f["dtype"] == "video"]
     frames = []
     for i in range(len(ds)):
