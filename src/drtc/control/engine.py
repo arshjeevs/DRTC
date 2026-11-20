@@ -103,6 +103,7 @@ class DRTCRuntime(ChunkRuntime):
         self.not_before = 0.0  # backoff after a BUSY reply
         self.sent: dict[str, tuple[float, float | None]] = {}  # request_id -> (sent at, latency estimate then)
         self.max_delay: int | None = None  # the server's prediction steps (set by the engine from the handshake)
+        self.recent: deque[float] = deque(maxlen=10)  # the last measured turnarounds (the cooldown covers them)
         self.chunk_log: list[list] = []  # CHUNK_FIELDS rows, monotonic times
 
     def abandon(self, request_id: str, backoff: float = 0.0) -> bool:
@@ -171,6 +172,7 @@ class DRTCRuntime(ChunkRuntime):
         if self._completed > completed:  # super measured this request's turnaround
             rtt = self.clock() - submitted
             self.last_turnaround = rtt
+            self.recent.append(rtt)
             if self.estimator is not None:
                 self.estimator.update(rtt)
         if accepted:
@@ -318,6 +320,13 @@ class DRTCEngine(RemoteInferenceEngine):
             # on the cooldown follows the measured latency as in DRTC.
             return max((self.config.s_min + self.config.epsilon) * rt.interval,
                        float(getattr(self.config, "startup_timeout_s", 10.0)))
+        # Option b, made literal (2026-11-20, a GR00T trial): the smoothed estimate is close to the typical reply,
+        # and with replies at 0.52-0.59 s and a 0.6-0.69 s cooldown, every slow reply was given up; the server, still
+        # computing it, made the next one slower still, until nothing got through. So the cooldown covers the slowest
+        # of the last 10 measured replies as well.
+        recent = getattr(rt, "recent", None)
+        if recent:
+            est = max(est, max(recent))
         steps = max(1, math.ceil(est / rt.interval))
         if getattr(rt, "horizon", None) and getattr(self.config, "cooldown_cap", "none") == "half_chunk":
             steps = min(steps, max(1, rt.horizon // 2))

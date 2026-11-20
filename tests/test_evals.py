@@ -150,6 +150,9 @@ def test_cooldown_is_never_shorter_than_the_latency():
     assert DRTCEngine.cooldown_s(eng) < 0.7  # DRTC's original cap: shorter than the reply
     rt._completed = 0
     assert DRTCEngine.cooldown_s(eng) == 10.0  # before the first reply: the startup timeout
+    rt._completed, eng.config.cooldown_cap = 3, "none"
+    rt.recent = [0.5, 0.9, 0.6]
+    assert DRTCEngine.cooldown_s(eng) >= 0.9  # covers the slowest recent reply, not only the estimate
 
 
 def test_request_delay_never_exceeds_the_chunk(monkeypatch):

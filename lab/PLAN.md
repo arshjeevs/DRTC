@@ -1057,6 +1057,10 @@ step, each step tested and added to [WORKFLOW.md](WORKFLOW.md) part 2 so the use
   - **Fixed: "Invalid RTC delay"** (user's first official session, 12:29): upstream estimates the request delay as
     turnaround / step time, unbounded, and the server rejects a delay longer than the chunk; GR00T (16 steps) ended
     every trial whose turnaround passed 0.53 s. The delay is now capped at the server's prediction steps.
+  - **Fixed: cooldown request storm** (same session, 12:34): with replies at 0.52-0.59 s, the cooldown from the
+    smoothed estimate (0.6-0.69 s) gave up slow replies; the server, still computing them, delayed the next request
+    further, until no reply got through and the start-up deadline ended the trial. The cooldown now also covers the
+    slowest of the last 10 measured replies (option b, literally: never shorter than the measured latency).
   - GR00T over this link: 74% of the trial stalled (replay robot); Diffusion 46%. Their short chunks cannot cover
     the round trip: the central DRTC problem, now measured.
 - [ ] 7. `lab eval offline <dataset>` (M9) and the benchmark (M10), on a GPU server, pushed to the results store
