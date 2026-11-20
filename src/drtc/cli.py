@@ -213,6 +213,10 @@ def main(argv: list[str] | None = None) -> None:
         from drtc.control.run import main as run_main
 
         sys.exit(run_main(argv[1:]))
+    if argv and argv[0] == "eval":
+        from drtc.evals.cli import main as eval_main
+
+        sys.exit(eval_main(argv[1:]))
     if argv and argv[0] == "serve":
         from drtc.control.serve import main as serve_main
 
@@ -260,6 +264,7 @@ def main(argv: list[str] | None = None) -> None:
     sub.add_parser("import-results", help="import the minor's results (old names mapped by lab/renames.yaml)")
     sub.add_parser("results", help="summaries of robot runs: stalls, chunks, turnaround, faults (lab results -h)")
     sub.add_parser("run", help="run an experiment condition against a served model (lab run -h)")
+    sub.add_parser("eval", help="official evaluations: list, check, freeze, status (lab eval -h; lab/EVALUATION.md)")
     sub.add_parser("serve", help="serve a registry model with LeRobot 0.7's policy server (lab serve -h)")
     sub.add_parser("data", help="dataset operations: show, view, delete, trim, label, undo, push, remove (lab data -h)")
     sub.add_parser("record", help="record <name>_raw with the leader arm, trim into <name>, push both (lab record -h)")
