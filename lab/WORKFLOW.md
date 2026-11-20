@@ -1,7 +1,79 @@
 # Workflow
 
-- **Part 1: from a new dataset to trained models** (below): record, review, register, train.
-- **[Part 2: evaluation](#part-2-evaluation)**: official robot trials, results, reports.
+- **[The whole path at a glance](#the-whole-path-at-a-glance)** (below): new dataset → trained models → evaluated
+  against the current baseline, on one page.
+- **[Part 1: from a new dataset to trained models](#part-1-from-a-new-dataset-to-trained-models)**: record, review,
+  register, train, with every command.
+- **[Part 2: evaluation](#part-2-evaluation)**: official robot trials, results, reports, with every command.
+
+# The whole path at a glance
+
+```
+ A. RECORD (laptop)              B. TRAIN (H200)                 C. EVALUATE (server + laptop)
+ ─────────────────────           ─────────────────────           ─────────────────────────────────────
+ plan the dataset                lab/models/<task>_v1.yaml       lab/evals/<eval>.yaml
+ lab record <name> ...           lab check, --dry-run            lab eval check / freeze
+ lab data show / edit            commit + push                   commit + push
+ commit recorded.yaml            H200: pull, prepare, train      server: lab eval serve <eval>
+                                 → models on the Hub             laptop: lab eval run <eval> --server ...
+                                                                 lab eval report <eval> --pull
+```
+
+Each step ends with a **commit and push**. That's how the next machine learns about it: the GPU server learns about
+the new dataset from `recorded.yaml`, and every machine learns about the eval from `lab/evals/<eval>.yaml`.
+
+### A. Record a new dataset (laptop) → Part 1, steps 1-5
+
+1. **Plan:**
+   - the name `so101_<task>_v<N>`;
+   - one fixed instruction;
+   - N training + K held-out episodes, about 10% held out (`--episodes 100 --held-out 10` records 110);
+   - the layout rotation, on paper.
+2. **Record:** `lab/bin/session record`, then `lab record <name> --task "..." --episodes N --held-out K ...`.
+   Continue later with the same command plus `--resume`.
+3. **Review:** `lab data show <name>`; fix with `lab data delete/trim/undo`, then `lab data push`. Edit only
+   **before** training.
+4. **Commit `lab/datasets/recorded.yaml`** and push.
+
+### B. Train (H200) → Part 1, steps 6-9
+
+1. **Laptop:** write `lab/models/<task>_v1.yaml`, one line per model, e.g. `act_<task>_v1_full` with recipe
+   `act_original`. Run `lab check` and `lab train <model> --dry-run`, then commit and push.
+2. **H200 container:** `git pull && uv sync ...`, then `lab prepare <name>`, then one tmux window per model with
+   `lab train <model>`, ACT first.
+3. **Watch** in wandb (`drtc-lab`). At the end each model pushes itself to `orangemoon599/<model>`. Set
+   `status: trained` in the model file, commit and push.
+
+### C. Evaluate against the current baseline → Part 2
+
+**The one rule to remember:** models are only compared **inside one eval**, run alternately in the same sessions
+(METRICS.md rule 5). A frozen eval that has trials is never changed. So a new model gets compared by **making a
+new eval that contains both the new models and the ones to beat.**
+
+| Situation | Make this eval | Models in it |
+|---|---|---|
+| **New task** (e.g. sorting B, `so101_sort_two_v1`) | `sort_two_baseline` | the new models (ACT, SmolVLA, GR00T, Diffusion on sort_two). This *is* the task's baseline |
+| **Same task, new model or more data** (e.g. a better SmolVLA on sorting A) | `sort_one_baseline_v2` | the new model(s) **plus** the current best from `sort_one_baseline`, re-run side by side |
+| **Same models, a new method** (Phases 7-8: smoothing, faults) | `sort_one_smoothing`, `sort_one_faults` | the chosen models; the conditions are `baseline` + the methods. Each method is compared with `baseline` in the same eval |
+
+Steps:
+1. **Laptop:** copy an existing eval, e.g. `cp lab/evals/sort_one_baseline.yaml lab/evals/sort_two_baseline.yaml`.
+   Edit `description`, `success` (the rule you'll apply when pressing `s`), `time_limit_s` and `models`. Then run
+   `lab eval check <eval>` and `lab eval freeze <eval>`, commit and push.
+2. **Model server**, the A100 or H200, whichever is free: `git pull`, then
+   `tmux new -s serve '.venv/bin/lab eval serve <eval>; bash'`. Wait for `all N ready`.
+3. **Laptop with the robot:**
+   - `git pull` and `lab/bin/session record`;
+   - `lab eval servers <eval> --server <a100|h200>`: all `ready`?
+   - one `--test` trial to check the keys;
+   - `lab eval run <eval> --server <a100|h200>`: 20 trials per model, in rounds. Set one layout per round. During a
+     trial press `s` for success or `f` for failure; `q` stops, and the next run continues where it stopped.
+4. **Results:** `lab eval report <eval> --pull` gives `results/evals/<eval>/report.md`. Then stop the servers
+   (Ctrl-C in their tmux window) and tell Claude the eval is done.
+
+What never changes: the recipes (`lab/recipes/`), the metrics (`lab/METRICS.md`), 20 trials per model, and the rule
+that only `lab eval run` makes official results. Anything you try by hand is a test (`results/scratch/`).
+
 
 # Part 1: from a new dataset to trained models
 
