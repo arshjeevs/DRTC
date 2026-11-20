@@ -1038,9 +1038,9 @@ step, each step tested and added to [WORKFLOW.md](WORKFLOW.md) part 2 so the use
        GPU
 - [x] 4. Logging for metrics v1: `chunks.csv` (turnaround, server inference time, estimate at send, chunk-switch
        disagreement), measured joints in `ticks.csv`
-- [ ] 5. `lab eval run`: rounds, seeded order, keys `s`/`f`, time limit, resume, `lab eval void`, video, session
+- [x] 5. `lab eval run`: rounds, seeded order, keys `s`/`f`, time limit, resume, `lab eval void`, video, session
        folders, pull before / push after
-- [ ] 6. `lab eval report`: `trials.csv`, `metrics.csv`, `report.md` (M1-M8, Wilson intervals, Fisher / Mann-Whitney)
+- [x] 6. `lab eval report`: `trials.csv`, `metrics.csv`, `report.md` (M1-M8, Wilson intervals, Fisher / Mann-Whitney)
 - [ ] 7. `lab eval offline <dataset>` (M9) and the benchmark (M10), on a GPU server, pushed to the results store
 - [ ] 8. End-to-end test: replay robot against each server, then one short real trial; WORKFLOW.md part 2 complete
 - [ ] Later: the Raspberry Pi as robot computer (edge eval)

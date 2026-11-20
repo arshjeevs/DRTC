@@ -195,6 +195,14 @@ def cmd_pull(reg: Registry, a) -> int:
     return 0
 
 
+def cmd_report(reg: Registry, a) -> int:
+    from drtc.evals import report
+
+    if a.pull:
+        cmd_pull(reg, a)
+    return report.main(reg, a.eval)
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="lab eval", description="Official evaluations (lab/EVALUATION.md)")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -237,6 +245,10 @@ def main(argv: list[str] | None = None) -> int:
         p = sub.add_parser(name, help=help_)
         p.add_argument("eval")
         p.set_defaults(fn=fn)
+    p = sub.add_parser("report", help="rebuild trials.csv, metrics.csv and report.md from every session here")
+    p.add_argument("eval")
+    p.add_argument("--pull", action="store_true", help="first pull the sessions other machines pushed")
+    p.set_defaults(fn=cmd_report)
     a = ap.parse_args(argv)
     reg = Registry()
     try:

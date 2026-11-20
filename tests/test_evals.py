@@ -60,3 +60,60 @@ def test_repo_evals_are_valid():
     for path in sorted(S.evals_dir(reg).glob("*.yaml")):
         sp = S.load(reg, path.stem)
         assert S.check(reg, sp) == [], path.name
+
+
+def _write_trial(d, ticks, chunks, info=None):
+    import csv as _csv
+
+    d.mkdir(parents=True)
+    (d / "trial.json").write_text(json.dumps(info or {"success": 1, "time_to_success_s": 4.0}))
+    names = ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll", "gripper"]
+    with open(d / "ticks.csv", "w", newline="") as f:
+        w = _csv.writer(f)
+        w.writerow(["t", "action"] + [f"cmd.{n}" for n in names])
+        for i, (a, x) in enumerate(ticks):
+            w.writerow([i / 30, a] + ([x] * 5 + [50] if a else [""] * 6))
+    with open(d / "chunks.csv", "w", newline="") as f:
+        w = _csv.writer(f)
+        w.writerow(["turnaround_s", "estimate_at_send_s", "server_total_s", "overlap_steps", "switch_l2"])
+        w.writerows(chunks)
+
+
+def test_trial_metrics_follow_metrics_v1(tmp_path):
+    from drtc.evals import metrics as M
+
+    # 2 start-up ticks (not counted), then 10 moving ticks with a 3-tick stall in the middle
+    ticks = [(0, None)] * 2 + [(1, float(i)) for i in range(4)] + [(0, None)] * 3 + [(1, float(i)) for i in range(4, 7)]
+    chunks = [(0.10, "", 0.05, 0, ""), (0.12, 0.15, 0.06, 20, 2.0), (0.20, 0.14, 0.07, 18, 4.0)]
+    _write_trial(tmp_path / "t", ticks, chunks)
+    m = M.trial_metrics(tmp_path / "t")
+    assert m["M1_success"] == 1 and m["M1t_time_to_success_s"] == 4.0
+    assert m["M2_stall_pct"] == 30.0 and m["M3_stall_events"] == 1 and abs(m["M3_longest_stall_s"] - 0.1) < 1e-9
+    assert abs(m["M4_turnaround_med_ms"] - 120) < 1e-6
+    assert abs(m["M5_estimate_err_ms"] - (-1.5 * 10)) < 1e-6  # median of +30 and -60 ms
+    assert abs(m["M6_server_ms"] - 60) < 1e-6
+    assert m["M8a_switch_l2_deg"] == 3.0  # switches with an overlap only
+    assert m["M8b_largest_step_deg"] == 1.0  # held through the stall, so no jump
+    assert m["M7_jerk_k"] > 0
+
+
+def test_wilson_and_tests():
+    from drtc.evals import metrics as M
+
+    lo, hi = M.wilson(14, 20)
+    assert abs(lo - 0.481) < 0.002 and abs(hi - 0.855) < 0.002
+    assert M.fisher_p(20, 20, 0, 20) < 1e-6
+    assert M.mannwhitney_p([1], [2, 3]) is None
+
+
+def test_void_marks_the_session_for_a_new_push(tmp_path):
+    from drtc.evals.run import void_trial
+
+    sess = tmp_path / "e" / "sessions" / "s1"
+    d = store.trial_dir(sess, "baseline", "a", 1)
+    d.mkdir(parents=True)
+    (d / "trial.json").write_text(json.dumps({"success": 1}))
+    (sess / store.PUSHED).write_text("abc")
+    void_trial(d, "cube off its mark")
+    assert json.loads((d / "trial.json").read_text())["void"] == "cube off its mark"
+    assert not (sess / store.PUSHED).exists()
