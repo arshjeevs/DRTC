@@ -18,7 +18,10 @@ hosts:
     - {name: RTX 4060 Laptop, memory_gb: 8}
   pi:
     label: raspberrypiv5
+    hostname: raspberrypi
     roles: [client]
+    ssh: rasp@raspberrypi.local   # on the laptop's hotspot (10.42.0.x); the laptop's key is authorized
+    repo: /home/rasp/drtc_major   # lab/bin/pi-setup (Raspberry Pi 5, 8 GB, Debian 13, no GPU)
   h200:
     label: gpuh200
     roles: [serve, train]
