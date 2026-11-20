@@ -232,6 +232,11 @@ def switch_disagreement(previous, future) -> tuple[int, float | None]:
     return n, float(d.mean())
 
 
+# Callables(engine) run when a DRTCEngine is built: lab eval run uses it to reach the trial's engine (its start time,
+# the video observer). Empty for lab run.
+ON_ENGINE: list = []
+
+
 class DRTCEngine(RemoteInferenceEngine):
     """Upstream's remote engine with the DRTC runtime and per-tick metrics (for DRTCInferenceConfig)."""
 
@@ -276,6 +281,8 @@ class DRTCEngine(RemoteInferenceEngine):
         self.recovery: list[tuple[float, str, str]] = []
         if isinstance(cfg, DRTCInferenceConfig) and cfg.cooldown:
             self.client._exchange = self._cooldown_exchange(self.client._exchange)
+        for fn in ON_ENGINE:
+            fn(self)
 
     def cooldown_s(self) -> float:
         """DRTC: latency estimate in steps (capped at H/2) + epsilon steps."""

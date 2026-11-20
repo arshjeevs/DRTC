@@ -145,6 +145,65 @@ def build(reg: Registry, experiment: str, model: str | None, robot: str, episode
     return cmd, composed, notes
 
 
+def rollout_once(cmd: list[str], run_dir: Path, on_context=None) -> tuple[str, str | None, float]:
+    """Run one lerobot-rollout in this process with the drtc engine; its log goes to run_dir/rollout.log.
+
+    on_context(shutdown_event) is called once the rollout has its shutdown event: setting that event ends the
+    rollout early and cleanly (teardown, metrics written), as Ctrl-C does. Returns (outcome, error, seconds).
+    """
+    import logging
+
+    from lerobot.scripts import lerobot_rollout
+    from lerobot.utils.import_utils import register_third_party_plugins
+
+    from drtc.control.engine import install
+
+    register_third_party_plugins()
+    install()
+    handler = logging.FileHandler(run_dir / "rollout.log")
+    handler.setFormatter(logging.Formatter("%(levelname)s %(asctime)s %(name)s %(message)s"))
+    # lerobot-rollout reconfigures logging when it starts (init_logging), which drops handlers added before;
+    # attach ours right after it.
+    _init_logging = lerobot_rollout.init_logging
+    _build = lerobot_rollout.build_rollout_context
+
+    def init_logging(*args, **kwargs):
+        _init_logging(*args, **kwargs)
+        logging.getLogger().addHandler(handler)
+
+    def build_rollout_context(cfg, shutdown_event, *args, **kwargs):
+        if on_context is not None:
+            on_context(shutdown_event)
+        return _build(cfg, shutdown_event, *args, **kwargs)
+
+    lerobot_rollout.init_logging = init_logging
+    lerobot_rollout.build_rollout_context = build_rollout_context
+    t0 = time.monotonic()
+    argv, sys.argv = sys.argv, cmd
+    outcome, error = "completed", None
+    try:
+        code = lerobot_rollout.main()
+        if code not in (None, 0):
+            outcome = f"exit {code}"
+    except SystemExit as e:  # a terminal fault ends the rollout through sys.exit
+        if e.code not in (None, 0):
+            outcome = f"exit {e.code}"
+    except Exception as e:  # noqa: BLE001 - a failed run is still a result
+        outcome, error = "error", f"{type(e).__name__}: {e}"
+    finally:
+        took = time.monotonic() - t0
+        sys.argv = argv
+        logging.getLogger().removeHandler(handler)
+        handler.close()
+        lerobot_rollout.init_logging = _init_logging
+        lerobot_rollout.build_rollout_context = _build
+    if outcome != "completed":
+        fault = [line for line in (run_dir / "rollout.log").read_text(errors="replace").splitlines()
+                 if "terminal fault" in line or line.startswith("ERROR")]
+        error = error or (fault[-1][-300:] if fault else None)
+    return outcome, error, took
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="lab run", description=__doc__.split("\n\n")[0])
     ap.add_argument("experiment", help="group/name under lab/experiments, e.g. replication/baseline")
@@ -188,48 +247,9 @@ def main(argv: list[str] | None = None) -> int:
         (run_dir / "config.yaml").write_text(yaml.safe_dump(composed, sort_keys=False))
         if a.robot == "rig" and trial > 1:
             input("Reset the scene, then press Enter to start the trial...")
-        from lerobot.scripts import lerobot_rollout
-        from lerobot.utils.import_utils import register_third_party_plugins
-
-        from drtc.control.engine import install
-
-        register_third_party_plugins()
-        install()
-        import logging
-
-        handler = logging.FileHandler(run_dir / "rollout.log")
-        handler.setFormatter(logging.Formatter("%(levelname)s %(asctime)s %(name)s %(message)s"))
-        # lerobot-rollout reconfigures logging when it starts (init_logging), which drops handlers added before;
-        # attach ours right after it.
-        _init_logging = lerobot_rollout.init_logging
-
-        def init_logging(*args, **kwargs):
-            _init_logging(*args, **kwargs)
-            logging.getLogger().addHandler(handler)
-
-        lerobot_rollout.init_logging = init_logging
         started = datetime.now()
-        t0 = time.monotonic()
-        sys.argv = cmd
-        outcome, error = "completed", None
-        try:
-            code = lerobot_rollout.main()
-            if code not in (None, 0):
-                outcome = f"exit {code}"
-        except SystemExit as e:  # a terminal fault ends the rollout through sys.exit
-            if e.code not in (None, 0):
-                outcome = f"exit {e.code}"
-        except Exception as e:  # noqa: BLE001 - a failed run is still a result
-            outcome, error = "error", f"{type(e).__name__}: {e}"
-        finally:
-            took = time.monotonic() - t0
-            logging.getLogger().removeHandler(handler)
-            handler.close()
-            lerobot_rollout.init_logging = _init_logging
+        outcome, error, took = rollout_once(cmd, run_dir)
         if outcome != "completed":
-            fault = [line for line in (run_dir / "rollout.log").read_text(errors="replace").splitlines()
-                     if "terminal fault" in line or line.startswith("ERROR")]
-            error = error or (fault[-1][-300:] if fault else None)
             print(f"trial {trial}: {outcome}{f': {error}' if error else ''}", flush=True)
         success = ""
         if label:

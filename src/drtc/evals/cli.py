@@ -22,7 +22,7 @@ def cmd_list(reg: Registry, a) -> int:
         except RegistryError as e:
             print(f"  {n:28s} INVALID: {e}")
             continue
-        done = sum(min(v, sp.trials) for v in store.valid_counts(n).values())
+        done = sum(min(v, sp.trials) for v in store.valid_counts(n, S.results_root(sp)).values())
         total = len(sp.pairs()) * sp.trials
         state = "frozen" if S.is_frozen(sp) else "not frozen"
         print(f"  {n:28s} {done:4d}/{total:<4d} trials  {state:10s}  {sp.description}")
@@ -52,7 +52,7 @@ def cmd_freeze(reg: Registry, a) -> int:
     if sp.frozen == current:
         print(f"{a.eval}: already frozen at the current Hub commits; nothing to do")
         return 0
-    started = store.trials(a.eval)
+    started = store.trials(a.eval, S.results_root(sp))
     if sp.frozen and started:
         changed = [m for m in sp.models if sp.frozen.get(m) != current.get(m)]
         print(f"lab eval freeze: {a.eval} already has {len(started)} trials at its frozen versions, and these models "
@@ -71,8 +71,9 @@ def cmd_freeze(reg: Registry, a) -> int:
 
 def cmd_status(reg: Registry, a) -> int:
     sp = S.load(reg, a.eval)
-    counts = store.valid_counts(a.eval)
-    all_trials = store.trials(a.eval)
+    root = S.results_root(sp)
+    counts = store.valid_counts(a.eval, root)
+    all_trials = store.trials(a.eval, root)
     voids: dict[tuple[str, str], int] = {}
     for t in all_trials:
         if t.void:
@@ -101,8 +102,8 @@ def cmd_status(reg: Registry, a) -> int:
                                                      for c, m in pairs))
     else:
         print("  next:    complete")
-    sess = store.sessions(a.eval)
-    waiting = store.unpushed(a.eval)
+    sess = store.sessions(a.eval, root)
+    waiting = store.unpushed(a.eval, root)
     print(f"  done:    {done}/{total} valid trials in {len(sess)} sessions on this machine"
           + (f"; NOT PUSHED: {', '.join(s.name for s in waiting)}" if waiting else ""))
     return 0
@@ -146,6 +147,54 @@ def cmd_servers(reg: Registry, a) -> int:
     return 1 if bad else 0
 
 
+def cmd_run(reg: Registry, a) -> int:
+    from drtc.evals.run import session_run
+
+    return session_run(reg, a.eval, a.server, _models(a.models), a.test, a.offline, a.max_trials)
+
+
+def cmd_void(reg: Registry, a) -> int:
+    from drtc.evals.run import void_trial
+
+    sp = S.load(reg, a.eval)
+    number = int(a.trial.lstrip("tT"))
+    hits = [t for t in store.trials(a.eval, S.results_root(sp))
+            if t.model == a.model and t.number == number and (a.condition is None or t.condition == a.condition)]
+    if len(hits) != 1:
+        raise RegistryError(f"{len(hits)} trials match {a.model} t{number:02d}"
+                            + ("; add --condition" if len(hits) > 1 else ""))
+    t = hits[0]
+    if t.void:
+        print(f"{t.path} is already void ({t.info['void']})")
+        return 0
+    void_trial(t.path, a.reason)
+    print(f"voided {t.path}: {a.reason}\nit is run again in a later round; push the session: lab eval push {a.eval}")
+    return 0
+
+
+def cmd_push(reg: Registry, a) -> int:
+    from drtc.evals import sync
+
+    sp = S.load(reg, a.eval)
+    kind = "bench" if sp.robot == "replay" else "evals"
+    waiting = store.unpushed(a.eval, S.results_root(sp))
+    if not waiting:
+        print(f"{a.eval}: every session on this machine is pushed")
+    for s in waiting:
+        oid = sync.push(reg, s, kind)
+        print(f"pushed {s.name} ({oid[:10]})")
+    return 0
+
+
+def cmd_pull(reg: Registry, a) -> int:
+    from drtc.evals import sync
+
+    sp = S.load(reg, a.eval)
+    new = sync.pull(reg, a.eval, "bench" if sp.robot == "replay" else "evals")
+    print(f"{a.eval}: {len(new)} new sessions" + (f": {', '.join(new)}" if new else ""))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="lab eval", description="Official evaluations (lab/EVALUATION.md)")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -168,6 +217,26 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--models", help="only these models (comma-separated)")
     p.add_argument("--keep", action="store_true", help="keep the SSH tunnel open afterwards")
     p.set_defaults(fn=cmd_servers)
+    p = sub.add_parser("run", help="on the robot computer: a session of official trials (s/f keys; lab/EVALUATION.md)")
+    p.add_argument("eval")
+    p.add_argument("--server", required=True, choices=["laptop", "a100", "h200"], help="where the models are served")
+    p.add_argument("--models", help="only these models (comma-separated), e.g. the ones a small GPU can serve")
+    p.add_argument("--test", action="store_true", help="a test session in results/scratch (not official, not pushed)")
+    p.add_argument("--offline", action="store_true", help="do not pull/push (push later with lab eval push)")
+    p.add_argument("--max-trials", type=int, help="end the session after this many trials")
+    p.set_defaults(fn=cmd_run)
+    p = sub.add_parser("void", help="void a trial for a setup mistake (kept, not counted, run again)")
+    p.add_argument("eval")
+    p.add_argument("model")
+    p.add_argument("trial", help="its number, e.g. t03")
+    p.add_argument("--reason", required=True)
+    p.add_argument("--condition")
+    p.set_defaults(fn=cmd_void)
+    for name, fn, help_ in (("push", cmd_push, "upload this machine's sessions that are not pushed yet"),
+                            ("pull", cmd_pull, "download the sessions other machines pushed")):
+        p = sub.add_parser(name, help=help_)
+        p.add_argument("eval")
+        p.set_defaults(fn=fn)
     a = ap.parse_args(argv)
     reg = Registry()
     try:

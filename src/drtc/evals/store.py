@@ -45,8 +45,13 @@ class Trial:
 
     @property
     def valid(self) -> bool:
-        """Counts towards the plan: not voided, and labelled by the operator (s/f or the time limit)."""
-        return not self.void and self.info.get("success") in (0, 1)
+        """Counts towards the plan: not voided, and labelled (s, f or the time limit); on the replay robot (no
+        labels, M2-M8 only) every completed run."""
+        if self.void:
+            return False
+        if self.info.get("robot") == "replay":
+            return self.info.get("outcome") == "completed"
+        return self.info.get("success") in (0, 1)
 
 
 def sessions(name: str, root: Path | None = None) -> list[Path]:

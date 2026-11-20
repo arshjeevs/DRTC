@@ -16,6 +16,8 @@ import re
 from pathlib import Path
 
 import yaml
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from drtc.registry import Registry, RegistryError
@@ -36,11 +38,17 @@ class EvalSpec(BaseModel):
     models: list[str]
     conditions: dict[str, str]  # condition name -> experiment (lab/experiments/<group>/<name>)
     video: bool = True
+    robot: Literal["rig", "replay"] = "rig"  # replay: the Phase 7-8 bench (M2-M8 only), stored under results/bench
     frozen: dict[str, str] = Field(default_factory=dict)  # model -> Hub commit (lab eval freeze)
 
     def pairs(self) -> list[tuple[str, str]]:
         """Every (condition, model) of the plan, in file order."""
         return [(c, m) for c in self.conditions for m in self.models]
+
+
+def results_root(spec: EvalSpec) -> Path:
+    """Where this eval's official sessions live: results/evals (robot) or results/bench (replay robot)."""
+    return Path("results") / ("bench" if spec.robot == "replay" else "evals")
 
 
 def evals_dir(reg: Registry) -> Path:
