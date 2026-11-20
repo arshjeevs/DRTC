@@ -1,6 +1,10 @@
+# SUPERSEDED by sort_one_baseline_v2 (2026-11-20): its first 5 rounds ran before the GR00T cooldown/delay fixes.
+
 # Phase 6 baseline, sorting A (lab/PLAN.md Phase 6; lab/EVALUATION.md; metrics: lab/METRICS.md v1).
 # Every trained sorting A model, as trained (no smoothing method, no faults), 20 trials each. The two best go on to
 # Phases 7-8 (decision A, 2026-11-20). The task instruction comes from the models' dataset (so101_sort_one_v1).
+
+
 description: Phase 6 baseline, sorting A (every trained model, as trained)
 success: The cube is fully inside the square of its colour and the gripper has let go of it, before the time limit.
 time_limit_s: 30          # as in the recording (episode time 30 s); a demonstration takes about 10 s

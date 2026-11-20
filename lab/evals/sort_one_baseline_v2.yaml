@@ -1,0 +1,23 @@
+# Phase 6 baseline, sorting A (lab/PLAN.md Phase 6; lab/EVALUATION.md; metrics: lab/METRICS.md v1).
+# Every trained sorting A model, as trained (no smoothing method, no faults), 20 trials each. The two best go on to
+# Phases 7-8 (decision A, 2026-11-20). The task instruction comes from the models' dataset (so101_sort_one_v1).
+description:  Phase 6 baseline, sorting A, restarted after the GR00T fixes (every trained model, as trained)
+success: The cube is fully inside the square of its colour and the gripper has let go of it, before the time limit.
+time_limit_s: 30          # as in the recording (episode time 30 s); a demonstration takes about 10 s
+trials: 20                # valid trials per model per condition (METRICS.md rule 1)
+seed: 0                   # the order inside each round (METRICS.md rule 2)
+models:
+  - act_sort_one_v1_full
+  - smolvla_sort_one_v1_full
+  - groot_sort_one_v1_full
+  - diffusion_sort_one_v1_full
+conditions:
+  baseline: replication/baseline     # DRTC with its defaults (lab/experiments/_defaults.yaml), no faults
+video: true
+
+# Written by `lab eval freeze`: the Hub commit each model is served at. Do not edit by hand.
+frozen:
+  act_sort_one_v1_full: '449b9c1250ae0fe76b579b444360361a0f1f5249'
+  smolvla_sort_one_v1_full: '246f7e54c3fe33c0f3ef66ded8c4da916995a399'
+  groot_sort_one_v1_full: '6b862e61ce462f063ffa5fda9af803e4143038f2'
+  diffusion_sort_one_v1_full: '6e373e1c728c5affc32c505e4d5784f8b37d40e2'
