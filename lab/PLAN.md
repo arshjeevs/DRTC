@@ -71,9 +71,9 @@ presentation and report say the laptop was the robot computer.
 | # | What | Who | Status |
 |---|---|---|---|
 | 1 | This scope into PLAN.md, the rule changes into METRICS.md (v2); earlier results archived | Claude | ✓ done |
-| 2 | Build the 4 conditions, the fault mix, the new rules (fault = failure, M1f) and the eval files; test on the bench (H200) | Claude | · next |
+| 2 | Build the 4 conditions, the fault mix, the new rules (fault = failure, M1f) and the eval files; test on the replay robot | Claude | ✓ done (A100 check 2026-11-20: upstream gave up under the faults, DRTC got through, smoothing cut jerk 3-4x) |
 | 3 | Trainings (table above) | Claude, A100 + H200 | ▶ 4 running; 6 to do |
-| 4 | **DRTC experiment on sort_one:** SmolVLA + GR00T N1.5 x 4 conditions x 10 trials = 80 trials (~1 h) | the user | · after 2 |
+| 4 | **DRTC experiment on sort_one:** SmolVLA + GR00T N1.5 x 4 conditions x 10 trials = 80 trials (~1 h): eval `sort_one_drtc_main`, served on the A100 | the user | ▶ ready |
 | 5 | **Baselines:** condition 1 x 10 trials: cubebox v0 (2 models), cubebox v1 (7), sort_one (7), as the models finish | the user | · after 2, and 3 per model |
 | 6 | Bench (each fault type separately, sort_one, SmolVLA + GR00T) and offline M9/M10 for every model | Claude, H200 | · |
 | 7 | One report with all results | Claude | · |
