@@ -446,7 +446,9 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "lerobot", extra = ["core-scripts", "feetech", "remote"] },
+    { name = "pydantic" },
     { name = "pyyaml" },
+    { name = "scipy" },
     { name = "torch", version = "2.14.1", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine != 'x86_64' or sys_platform != 'linux'" },
     { name = "torch", version = "2.14.1+cu130", source = { registry = "https://download.pytorch.org/whl/cu130" }, marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
     { name = "torchvision", version = "0.29.1", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine != 'x86_64' or sys_platform != 'linux'" },
@@ -474,7 +476,9 @@ requires-dist = [
     { name = "lerobot", extras = ["training", "peft", "smolvla", "pi", "xvla", "groot"], marker = "extra == 'gpu'", specifier = "==0.7.0" },
     { name = "lerobot-policy-groot-n15", marker = "extra == 'gpu'", editable = "plugins/lerobot_policy_groot_n15" },
     { name = "lerobot-robot-replay", marker = "extra == 'sim'", editable = "plugins/lerobot_robot_replay" },
+    { name = "pydantic", specifier = ">=2.14,<3" },
     { name = "pyyaml", specifier = ">=6.0,<7" },
+    { name = "scipy", specifier = ">=1.18,<2" },
     { name = "torch", marker = "platform_machine != 'x86_64' or sys_platform != 'linux'", specifier = "==2.14.1" },
     { name = "torch", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'", specifier = "==2.14.1", index = "https://download.pytorch.org/whl/cu130" },
     { name = "torchvision", marker = "platform_machine != 'x86_64' or sys_platform != 'linux'", specifier = "==0.29.1" },

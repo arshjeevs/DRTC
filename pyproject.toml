@@ -13,8 +13,13 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "lerobot[core_scripts,feetech,remote]==0.7.0",
     "pyyaml>=6.0,<7",
+    # Used directly by drtc (the registry and eval files; the Butterworth filter, the report's tests). The GPU extra
+    # brought them in indirectly, so their absence showed only on the Pi (2026-11-20).
+    "pydantic>=2.14,<3",
+    "scipy>=1.18,<2",
     # torch is pinned to the newest build for CUDA 13.0: the H200's driver (580) cannot be changed and supports
-    # CUDA up to 13.0. Linux x86_64 (laptop, H200) gets it from PyTorch's cu130 index; the Pi gets PyPI's build.
+    # CUDA up to 13.0. Linux x86_64 (laptop, H200) gets it from PyTorch's cu130 index; the A100 its cu126 build
+    # (lab/bin/a100-setup), the Pi the CPU build (lab/bin/pi-setup).
     "torch==2.14.1",
     "torchvision==0.29.1",
 ]

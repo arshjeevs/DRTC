@@ -44,7 +44,8 @@ export UV_PYTHON_PREFERENCE=only-managed
 CUDA=$(grep -oE '^name = "(cuda-[a-z0-9-]+|nvidia-[a-z0-9-]+|triton)"' uv.lock | cut -d'"' -f2 | grep -v '^nvidia-ml-py$' |
     sort -u | sed 's/^/--no-install-package /')
 # shellcheck disable=SC2086
-uv sync --frozen --python 3.12 --no-install-package torch --no-install-package torchvision $CUDA
+# --extra sim: the replay robot, for the no-arm check (`lab eval run <eval> --replay`).
+uv sync --frozen --extra sim --python 3.12 --no-install-package torch --no-install-package torchvision $CUDA
 uv pip install --python .venv/bin/python --index-url https://download.pytorch.org/whl/cpu \
     --extra-index-url https://pypi.org/simple --index-strategy unsafe-best-match \
     torch==2.14.1+cpu torchvision==0.29.1+cpu

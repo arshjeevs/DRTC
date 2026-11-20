@@ -3,5 +3,5 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 [ -f "$REPO_ROOT/.server.env" ] && . "$REPO_ROOT/.server.env"   # H200 only
 LAB="$REPO_ROOT/.venv/bin/lab"
 cd "$REPO_ROOT"
-[ -x "$LAB" ] || { echo "Missing $LAB: run 'uv sync --extra gpu' (laptop/H200) or 'uv sync' (Pi) in $REPO_ROOT"; exit 1; }
+[ -x "$LAB" ] || { echo "Missing $LAB: run 'uv sync --extra gpu' (laptop/H200), lab/bin/a100-setup (A100) or lab/bin/pi-setup (Pi) in $REPO_ROOT"; exit 1; }
 rig() { "$LAB" rig "$1"; }
