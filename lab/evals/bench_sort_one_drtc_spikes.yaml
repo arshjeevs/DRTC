@@ -1,0 +1,22 @@
+# Bench: the headline comparison (upstream vs DRTC vs DRTC + smoothing A) under spikes, on the simulated WiFi link.
+description: Bench, headline under spikes - upstream vs DRTC vs DRTC + smoothing (replay robot, simulated WiFi)
+success: n/a (replay robot)
+time_limit_s: 10
+trials: 8
+seed: 0
+models:
+  - smolvla_sort_one_v1_full
+  - diffusion_sort_one_v1_full
+  - groot_sort_one_v1_full
+conditions:
+  upstream: bench/upstream_spikes
+  drtc: bench/spikes
+  drtc_smooth: bench/playback_spikes
+video: false
+robot: replay
+
+# Written by `lab eval freeze`: the Hub commit each model is served at. Do not edit by hand.
+frozen:
+  smolvla_sort_one_v1_full: '246f7e54c3fe33c0f3ef66ded8c4da916995a399'
+  diffusion_sort_one_v1_full: '6e373e1c728c5affc32c505e4d5784f8b37d40e2'
+  groot_sort_one_v1_full: '6b862e61ce462f063ffa5fda9af803e4143038f2'

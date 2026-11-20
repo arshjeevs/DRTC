@@ -1,0 +1,10 @@
+description: Bench - upstream (no DRTC) under outages, as bench/disconnect
+model: smolvla_sort_one_v1_full
+scheduler: upstream
+estimator: upstream
+cooldown: false
+action_filter_mode: none
+disconnect:
+  - {start_s: 2.0, duration_s: 1.0}
+  - {start_s: 5.0, duration_s: 2.0}
+latency: {base_ms: 400, jitter_ms: 200, seed: 0}   # the measured WiFi link to the A100 (_wifi.md)
