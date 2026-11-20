@@ -260,8 +260,10 @@ def session_run(reg: Registry, name: str, server: str, models: list[str] | None,
         try:
             import lerobot_robot_replay  # noqa: F401
         except ImportError:
-            raise RegistryError("the replay robot is not installed here: uv sync --frozen --extra gpu --extra sim "
-                                "(add --python /usr/bin/python3 on the H200)") from None
+            raise RegistryError("the replay robot is not installed here. H200: uv sync --frozen --extra gpu --extra sim "
+                                "--python /usr/bin/python3. A100: lab/bin/a100-setup (never a plain uv sync there: it "
+                                "installs CUDA 13 builds the A100's driver cannot run). Laptop: uv sync --extra gpu "
+                                "--extra sim") from None
     if sp.robot == "rig":
         from drtc.cli import check_rig
 

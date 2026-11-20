@@ -36,6 +36,8 @@ if [ ! -e .ffmpeg/lib/libavutil.so ]; then
 fi
 
 # 2. The environment: the lock without its CUDA 13 torch stack, then the CUDA 12.6 builds of the same versions.
+# NEVER run a plain `uv sync` here: it installs the lock's CUDA 13 builds, and every new GPU process then fails with
+# "The NVIDIA driver on your system is too old" (happened 2026-11-20). `--extra sim`: the replay robot (the bench).
 # uv's own Python: the system python3.12 has no headers, and evdev (pynput, LeRobot's key listener) compiles.
 export UV_PYTHON_PREFERENCE=only-managed
 if [ -x .venv/bin/python ] && ! .venv/bin/python -c "import sys; sys.exit('/usr/' in sys.base_prefix)"; then
@@ -44,7 +46,7 @@ fi
 CU13=$(grep -oE '^name = "(nvidia-[a-z0-9-]+|triton)"' uv.lock | cut -d'"' -f2 | grep -v '^nvidia-ml-py$' | sort -u |
     sed 's/^/--no-install-package /')
 # shellcheck disable=SC2086
-uv sync --frozen --extra gpu --python 3.12 --no-install-package torch --no-install-package torchvision \
+uv sync --frozen --extra gpu --extra sim --python 3.12 --no-install-package torch --no-install-package torchvision \
     --no-install-package torchcodec $CU13
 # PyTorch's index has the +cu126 builds and their CUDA 12 libraries; uv must look at both indexes (it searches an
 # extra index first and stops at the first one that has the package name).

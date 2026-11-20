@@ -395,6 +395,7 @@ Pick whichever server is free that day. **The whole session uses one server**, a
 | Server | Where to type | Command |
 |---|---|---|
 | A100 | `ssh b230968ee@192.168.5.13` | `cd ~/drtc_major && git pull && tmux new -s serve '.venv/bin/lab eval serve sort_one_baseline; bash'` |
+| (A100 after a lock change) | `ssh b230968ee@192.168.5.13` | `cd ~/drtc_major && git pull && lab/bin/a100-setup` (**never a plain `uv sync` on the A100**: it installs CUDA 13 builds its driver cannot run) |
 | H200 | the `drtc_lab` container ([H200.md](H200.md)) | `cd /workspace/drtc_major && . ./.server.env && git pull && uv sync --frozen --extra gpu --extra sim --python /usr/bin/python3`, then `tmux new -s serve '.venv/bin/lab eval serve sort_one_baseline; bash'` |
 | laptop GPU | a laptop terminal | `lab eval serve sort_one_baseline --models act_sort_one_v1_full,diffusion_sort_one_v1_full` |
 

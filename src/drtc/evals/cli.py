@@ -258,9 +258,10 @@ def main(argv: list[str] | None = None) -> int:
         p = sub.add_parser(name, help=help_)
         p.add_argument("eval")
         p.set_defaults(fn=fn)
-    p = sub.add_parser("offline", help="on a GPU server: held-out action error (M9) and inference time (M10) of the "
-                                       "eval's models, no robot; never during a robot session on that server")
-    p.add_argument("eval")
+    p = sub.add_parser("offline", help="on a GPU server: held-out action error (M9) and inference time (M10), no "
+                                       "robot: an eval's models (frozen commits) or --models (current Hub commits); never "
+                                       "during a robot session on that server")
+    p.add_argument("eval", nargs="?", help="the eval (optional with --models)")
     p.add_argument("--models", help="only these models (comma-separated)")
     p.add_argument("--device", default="cuda")
     p.add_argument("--local", action="store_true", help="also every checkpoint in outputs/train/<model>/ here")

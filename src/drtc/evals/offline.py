@@ -179,12 +179,20 @@ def evaluate(reg: Registry, model: str, revision: str, device: str, local: bool)
     return result
 
 
-def main(reg: Registry, name: str, models: list[str] | None, device: str, local: bool, push: bool) -> int:
-    sp = S.load(reg, name)
-    if not S.is_frozen(sp):
-        raise RegistryError(f"{name} is not frozen (lab eval freeze {name})")
-    for m in models or sp.models:
-        res = evaluate(reg, m, sp.frozen[m], device, local)
+def main(reg: Registry, name: str | None, models: list[str] | None, device: str, local: bool, push: bool) -> int:
+    """With an eval: its models at their frozen commits. Without: `models` at their current Hub commits (for models
+    whose eval cannot be frozen yet, e.g. a baseline that waits for its other models' trainings)."""
+    if name:
+        sp = S.load(reg, name)
+        if not S.is_frozen(sp):
+            raise RegistryError(f"{name} is not frozen (lab eval freeze {name})")
+        todo = {m: sp.frozen[m] for m in (models or sp.models)}
+    else:
+        if not models:
+            raise RegistryError("give an eval, or --models a,b (scored at their current Hub commits)")
+        todo = S.hub_commits(reg, models)
+    for m, revision in todo.items():
+        res = evaluate(reg, m, revision, device, local)
         p = out_path(res["dataset"], m)
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(json.dumps(res, indent=2))

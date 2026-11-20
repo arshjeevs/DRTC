@@ -19,7 +19,7 @@ src/drtc/             the `lab` command, registry, training, jobs, recording/tri
 plugins/              LeRobot plugins: lerobot_policy_groot_n15 (GR00T N1.5), lerobot_robot_replay (replay robot)
 ```
 
-Install: `uv sync --extra gpu --extra sim` (laptop / GPU servers), `uv sync` (Pi). Then `.venv/bin/lab ...`.
+Install: `uv sync --extra gpu --extra sim` (laptop; the H200 container adds `--frozen --python /usr/bin/python3`), **A100: `lab/bin/a100-setup` only** (a plain `uv sync` there installs CUDA 13 builds its driver cannot run), `uv sync` (Pi). Then `.venv/bin/lab ...`.
 
 | Command | Does |
 |---|---|
