@@ -499,6 +499,48 @@ lab eval report sort_one_baseline --pull    # rebuild the report from every sess
 
 The report is rebuilt every time, so never edit it. Tell Claude when an eval is done: the next step reads the report.
 
+## The Raspberry Pi as the robot computer
+
+The Pi (Raspberry Pi 5, 8 GB, no GPU, hostname `raspberrypi`, on the laptop's hotspot) does exactly the laptop's
+robot-side job: the arm, the cameras, `lab eval run`. The models are served on the A100 as always; only the robot
+computer changes, and every session records which one it was (`results/evals/<eval>/sessions/<date>-pi/`).
+
+**Once** (and again after a lock change), from a laptop terminal:
+
+```bash
+ssh rasp@raspberrypi.local                                               # the laptop's SSH key is authorized
+git clone -b major https://github.com/arshjeevs/DRTC.git ~/drtc_major    # first time only
+cd ~/drtc_major && git pull && lab/bin/pi-setup
+```
+
+`pi-setup` installs Python 3.12 and the robot side with the **CPU build** of PyTorch (the Pi has no GPU), and checks
+the system parts (phone camera device `/dev/video10`, the clock synced to the laptop). It asks for the sudo password
+only when one of those is missing.
+
+**The arm's calibration is the laptop's** (one file per arm: with another file the joint angles would not match the
+recordings). Copy it after every new calibration on the laptop:
+
+```bash
+# laptop
+C=.cache/huggingface/lerobot/calibration
+ssh rasp@raspberrypi.local "mkdir -p ~/$C/robots/so101_follower ~/$C/teleoperators/so101_leader"
+scp ~/$C/robots/so101_follower/follower.json rasp@raspberrypi.local:$C/robots/so101_follower/
+scp ~/$C/teleoperators/so101_leader/leader.json rasp@raspberrypi.local:$C/teleoperators/so101_leader/
+```
+
+**Each session:** plug the arm (follower), the wrist camera and the phone into the Pi (the leader arm is not needed),
+then on the Pi the same commands as on the laptop:
+
+```bash
+cd ~/drtc_major && source .venv/bin/activate && git pull
+lab/bin/session record                          # phone camera + rig check (tmux "robot"); every line ok
+lab eval servers <eval> --server a100           # every model "ready"?
+lab eval run <eval> --server a100
+```
+
+Serve on the A100 for Pi sessions: the H200 is reached through an SSH tunnel that needs the H200 password on the
+robot computer, which is set up on the laptop only.
+
 ## The bench: replay robot on the H200 (Phases 7-8)
 
 A bench eval (`robot: replay`) needs no robot and no laptop. The model server and the replay robot run in the same
