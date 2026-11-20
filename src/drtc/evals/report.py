@@ -135,6 +135,27 @@ def render(reg, name, sp, trials, mrows) -> str:
                         cells.append("-" if va is None or vb is None else f"Δ {va[0] - vb[0]:+.2f}, p={_fmt(p, 3)}")
                 L.append(f"| {c} | {m} | " + " | ".join(cells) + " |")
         L.append("")
+    offline_rows = []
+    for m in sp.models:
+        f = Path("results") / "offline" / reg.resolve(m).dataset.id / f"{m}.json"
+        if f.is_file():
+            d = json.loads(f.read_text())
+            if d.get("revision") == sp.frozen.get(m):
+                offline_rows.append((m, d))
+    if offline_rows:
+        L += ["## Without the robot (M9, M10)", "",
+              "M9: mean absolute error of the first 15 predicted actions on the held-out episodes, in the dataset's "
+              "units (`root` is the served checkpoint). M10: inference time and peak GPU memory of the served "
+              "checkpoint.", "",
+              "| Model | Checkpoint | M9 arm | M9 gripper | M10 median (ms) | M10 p95 (ms) | GPU (GB) | Units | Measured on |",
+              "|---|---|---|---|---|---|---|---|---|"]
+        for m, d in offline_rows:
+            for ck, e in d["checkpoints"].items():
+                b = e.get("M10") or {}
+                L.append(f"| {m} | {ck} | {_fmt(e.get('M9_arm_mae'), 2)} | {_fmt(e.get('M9_gripper_mae'), 2)} | "
+                         f"{_fmt(b.get('server_ms_median'), 0)} | {_fmt(b.get('server_ms_p95'), 0)} | "
+                         f"{_fmt(b.get('peak_gpu_gb'), 1)} | {d.get('units')} | {d.get('gpu')} |")
+        L.append("")
     voids = [t for t in trials if t.void]
     bad = [t for t in trials if not t.void and not t.valid]
     if voids or bad:

@@ -56,3 +56,14 @@ def push(reg: Registry, session: Path, kind: str = "evals", name: str | None = N
     oid = getattr(info, "oid", None) or str(info)
     (session / store.PUSHED).write_text(f"{oid}\n")
     return oid
+
+
+def pull_offline(reg: Registry, datasets: set[str], root: Path = Path("results")) -> int:
+    """Download the offline results (M9, M10) of these datasets; returns the number of files."""
+    from huggingface_hub import HfApi, hf_hub_download
+
+    files = [f for f in HfApi().list_repo_files(repo(reg), repo_type="dataset")
+             if f.startswith("offline/") and f.split("/")[1] in datasets]
+    for f in files:
+        hf_hub_download(repo(reg), f, repo_type="dataset", local_dir=root, force_download=True)
+    return len(files)

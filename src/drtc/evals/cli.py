@@ -195,11 +195,22 @@ def cmd_pull(reg: Registry, a) -> int:
     return 0
 
 
+def cmd_offline(reg: Registry, a) -> int:
+    from drtc.evals import offline
+
+    return offline.main(reg, a.eval, _models(a.models), a.device, a.local, not a.no_push)
+
+
 def cmd_report(reg: Registry, a) -> int:
     from drtc.evals import report
 
     if a.pull:
+        from drtc.evals import sync
+
         cmd_pull(reg, a)
+        sp = S.load(reg, a.eval)
+        n = sync.pull_offline(reg, {reg.resolve(m).dataset.id for m in sp.models})
+        print(f"{n} offline result files")
     return report.main(reg, a.eval)
 
 
@@ -247,6 +258,14 @@ def main(argv: list[str] | None = None) -> int:
         p = sub.add_parser(name, help=help_)
         p.add_argument("eval")
         p.set_defaults(fn=fn)
+    p = sub.add_parser("offline", help="on a GPU server: held-out action error (M9) and inference time (M10) of the "
+                                       "eval's models, no robot; never during a robot session on that server")
+    p.add_argument("eval")
+    p.add_argument("--models", help="only these models (comma-separated)")
+    p.add_argument("--device", default="cuda")
+    p.add_argument("--local", action="store_true", help="also every checkpoint in outputs/train/<model>/ here")
+    p.add_argument("--no-push", action="store_true", help="keep the results here (default: push to the store)")
+    p.set_defaults(fn=cmd_offline)
     p = sub.add_parser("report", help="rebuild trials.csv, metrics.csv and report.md from every session here")
     p.add_argument("eval")
     p.add_argument("--pull", action="store_true", help="first pull the sessions other machines pushed")
