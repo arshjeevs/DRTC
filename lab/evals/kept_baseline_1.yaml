@@ -1,0 +1,13 @@
+description: Testing out Kept Baseline
+success: The cube is fully inside the square of its colour and the gripper has let go of it, before the time limit.
+time_limit_s: 30          # a trial that runs out is a failure
+trials: 20                # per model per condition (the standard)
+seed: 0                   # the order inside each round
+models: [groot_cubebox_v1_lora_raw]
+conditions:
+  baseline: replication/baseline      # settings from lab/experiments
+video: true
+
+# Written by `lab eval freeze`: the Hub commit each model is served at. Do not edit by hand.
+frozen:
+  groot_cubebox_v1_lora_raw: '8f9c7913c5ac1a99cd35207ed240363b9bd2c956'
