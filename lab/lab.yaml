@@ -7,5 +7,7 @@ trackio_project: drtc-lab
 trackio_space: null
 trackio_private: true
 wandb_project: drtc-lab
+# Evaluation results: the one official copy (private Hub dataset; lab/EVALUATION.md). Decided 2026-11-20.
+results_repo: orangemoon599/drtc-results
 # From 2026-11-18 every dataset is trimmed (idle start/end removed) before it is saved; the untrimmed
 # recording is kept as <dataset>_raw. A name without _raw is always trimmed.

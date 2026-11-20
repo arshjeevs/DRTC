@@ -4,19 +4,40 @@
 (the proposal stays as the research framing). Each phase starts only when the previous one is done, so
 nothing has to be redone. Items marked **[open]** are decisions still to make.*
 
-| Phase | What | Done when | Status (2026-11-19) |
+| Phase | What | Done when | Status (2026-11-20) |
 |---|---|---|---|
 | 1 | Move to LeRobot 0.7, our code as a separate layer on top | The new setup runs everywhere | Done; its robot-side items moved to 3 and 5 |
 | 2 | Shortlist the models, each with its original recipe | Recipes fixed and sourced | Done; **recipes fixed for all training** |
 | 3 | Faster training, and the setup on every machine | One measured speed setup per active model | **Done** (2026-11-19) |
 | 4 | Data collection (the user) | New datasets finalised and on the Hub | Sorting A done (2026-11-19); B, stacking later |
-| 5 | Evaluation framework | One command for offline results; robot trials recorded with a fixed protocol | Built during 3-4 |
-| 6 | Train and choose | We know which models work | Round 1 on the A100, round 2 (sorting A) on the H200: running |
-| 7 | Smoothing test bench, then smoothing methods | Any method compared on any model with one command | After 6 |
-| 8 | DRTC experiments | — | After 6, 7 |
+| 5 | Evaluation framework | Official trials on any robot computer and server, stored in one place; metrics v1 in one report | **Designed 2026-11-20** ([EVALUATION.md](EVALUATION.md), [METRICS.md](METRICS.md)); building |
+| 6 | Train and choose | Baseline of every trained model; the 2 models for 7-8 chosen | Trained: round 1 (cubebox), round 2 (sorting A; Diffusion running). Baseline eval after 5 |
+| 7 | Smoothing: bench, baselines, methods A/B/C | Methods compared with metrics v1 (M7, M8) on the chosen models | After 6 |
+| 8 | DRTC experiments: faults, estimators, vs upstream | Fault conditions measured (M1-M6) on the chosen models | After 6, 7 |
 | Later | Edge fallback (ACT); the deferred models | — | Only if time is left |
 
 **[open]** Major presentation date. It decides how much of Phases 7-8 fits in.
+
+## Decisions (2026-11-20): evaluation, Phases 5-8
+- **Phases 7 and 8 are the main part of the project**; Phase 6 is the baseline and the choice of models for them.
+- **Metrics are fixed: metrics v1** ([METRICS.md](METRICS.md)). They are the ones the final presentation shows;
+  changes only as a new version, with every trial recomputed from its raw files.
+- **Storage** ([EVALUATION.md](EVALUATION.md)): official trials only through `lab eval run`, into
+  `results/evals/<eval>/sessions/<date>-<machine>/`; everything else into `results/scratch/`. The one official copy
+  is the private Hub dataset `orangemoon599/drtc-results` (pull before a session, push after). Model servers store
+  nothing for analysis (their timings come back in every reply). The old mixed `results/` moved to
+  `results/archive/`.
+- **Robot computer:** the laptop (usual) or the Raspberry Pi (edge proof, its own eval, set up after everything works
+  on the laptop). **Model server:** the laptop GPU, the A100 or the H200, chosen per session by availability; every
+  trial records both, and reports never average across them.
+- **Trials:** 20 per model per condition, for every task. The user sets the layouts (one per round). Per trial: the
+  operator's key (`s` success / `f` failure, which also gives the time to success), and video. No outcome levels,
+  failure codes or blinding.
+- **Choice for 7-8 (A):** the top 2 by success rate on sorting A, ideally one small model (ACT or Diffusion) and one
+  VLA.
+- **Phase 8 robot time (B):** all fault conditions on the replay robot (M2-M8); 4 headline conditions on the real
+  robot for success (spikes, drops, disconnect, mixture).
+- **[open]** The presentation date (decides Phase 8 step 4).
 
 ## Decisions (2026-11-19)
 - **Recipes are fixed** for every training from now on: the confirmed originals in `lab/recipes/` (Phase 2
@@ -97,10 +118,7 @@ nothing has to be redone. Items marked **[open]** are decisions still to make.*
   - First session: `lab record so101_sort_one_v1 --task "Put the cube in the square of the same color." --episodes 80 --held-out 8`
     (`--resume` adds episodes in a later session).
 
-**Phase 5:** offline evaluation (held-out action error per checkpoint, best checkpoint, one table per dataset x
-model); robot protocol (marked cube-position grid, N trials per model in a fixed order, pick / place / fail and time;
-N and the grid decided with the user); DRTC metrics per trial (stalls, jerk, chunk jumps, latency); results recorded
-by one command, one report; Zenoh between the laptop and the GPU servers (from Phase 1).
+**Phase 5:** designed 2026-11-20; see "Phase 5: Evaluation framework" below.
 
 **Recording standard (2026-11-19, the user): held-out episodes come on top.** `lab record <name> --episodes N
 --held-out K` records N + K episodes; N train, K are held out (seeded split, never trained on). `--resume` continues
@@ -1008,21 +1026,46 @@ RTC. The other five can be compared with and without RTC.
   - Deferred, for when they return: Diffusion `num_workers: 16` with its cache (set); MolmoAct 2 checkpointing off
     only on the H200 (124 GB, more than the A100's 80); π0.5 no gain that fits one H200.
 
+## Phase 5: Evaluation framework (designed 2026-11-20)
+Design: [EVALUATION.md](EVALUATION.md) (roles, storage, rules); metrics: [METRICS.md](METRICS.md). Built step by
+step, each step tested and added to [WORKFLOW.md](WORKFLOW.md) part 2 so the user can run it alone.
+- [x] Old `results/` moved to `results/archive/`; private results store `orangemoon599/drtc-results` created
+- [ ] 1. `lab run` and every non-official run write to `results/scratch/<date>/`
+- [ ] 2. Eval files (`lab/evals/`), `lab eval freeze`, `lab eval status`
+- [ ] 3. Serving the same way on the laptop GPU, A100, H200: all models of an eval at once; the robot computer reaches
+       them (A100 directly or tunnelled, H200 through an SSH tunnel to the container); servers report model version and
+       GPU
+- [ ] 4. Logging for metrics v1: `chunks.csv` (turnaround, server inference time, estimate at send, chunk-switch
+       disagreement), measured joints in `ticks.csv`
+- [ ] 5. `lab eval run`: rounds, seeded order, keys `s`/`f`, time limit, resume, `lab eval void`, video, session
+       folders, pull before / push after
+- [ ] 6. `lab eval report`: `trials.csv`, `metrics.csv`, `report.md` (M1-M8, Wilson intervals, Fisher / Mann-Whitney)
+- [ ] 7. `lab eval offline <dataset>` (M9) and the benchmark (M10), on a GPU server, pushed to the results store
+- [ ] 8. End-to-end test: replay robot against each server, then one short real trial; WORKFLOW.md part 2 complete
+- [ ] Later: the Raspberry Pi as robot computer (edge eval)
+
 ## Phase 6: Train and choose
-- [ ] Train each shortlisted model once (`*_full_trim`) with the Phase 3 setup
-- [ ] Rank offline (`eval-offline`), then robot trials with a fixed protocol (trial count, cube positions)
+- [x] Trained (fixed recipes): round 1 `act_cubebox_v0_full`, `smolvla_cubebox_v0_full`, `groot_cubebox_v1_full`;
+      round 2 `act/smolvla/groot_sort_one_v1_full`; `diffusion_sort_one_v1_full` training (2026-11-20)
+- [ ] M9 offline table for every trained model
+- [ ] Eval `sort_one_baseline`: ACT, SmolVLA, GR00T N1.5, Diffusion, 20 trials each (~1 h)
+- [ ] Optional eval `cubebox_baseline`: round 1 models against the kept minor models (GR00T 80%, SmolVLA 90%)
+- [ ] Choose the 2 models for Phases 7-8 (decision A)
 
 ## Phase 7: Smoothing
-- [ ] Test bench:
-  - replay recorded observations and chunks offline, with simulated latency
-  - the same metrics for every run: stalls, jerk, jumps between chunks, action error
-  - a fixed robot procedure, so a method can be compared on any model with one command
-- [ ] Baselines: no smoothing; upstream alignment, blending and RTC
-- [ ] Methods: A (adaptive playback), B (RTC), C (smoothness guidance); new ones later
+- [ ] Bench: the replay robot plays held-out episodes to the served model with simulated latency (normal and
+      spikes); metrics v1 M2-M8 per run, in `results/bench/`; one command per method x model
+- [ ] Baselines: no smoothing; upstream alignment and blending; upstream RTC; the Butterworth filter (current default)
+- [ ] Methods ported from the minor: A adaptive playback, B RTC for GR00T, C smoothness guidance; new ones later
+- [ ] Robot eval `sort_one_smoothing`: the best method(s) against the baseline on the 2 chosen models, normal network
+      and latency spikes, 20 trials each (M1, M1t, M7, M8)
 
 ## Phase 8: DRTC experiments
-- [ ] Fault conditions (spikes, drops, duplicates, reordering, disconnects), on the chosen model(s)
-- [ ] Latency estimators, offline on the logged runs
-- [ ] Comparison with upstream remote inference
-- [ ] **[open]** Which further items from the proposal (predictive triggering, adaptive chunk length, adaptive
-      steps, caching, shared server)
+- [ ] Bench: all fault conditions (`lab/experiments/replication/`) on the replay robot, the 2 chosen models (M2-M8)
+- [ ] Robot eval `sort_one_faults`: 4 headline conditions (spikes, drops, disconnect, mixture) + baseline, 20 trials
+      each (M1-M6) (decision B)
+- [ ] Latency estimators (Jacobson-Karels, max of last 10, others), offline on the logged turnarounds (M5)
+- [ ] DRTC against upstream remote inference: same model, normal network and spikes
+- [ ] **[open]** Further items from the proposal (predictive triggering, adaptive chunk length, adaptive steps,
+      caching, shared server), as time allows (presentation date)
+- [ ] Edge eval `sort_one_edge`: the Raspberry Pi as robot computer (EVALUATION.md)

@@ -1,4 +1,9 @@
-# Workflow: from a new dataset to trained models
+# Workflow
+
+- **Part 1: from a new dataset to trained models** (below): record, review, register, train.
+- **[Part 2: evaluation](#part-2-evaluation)**: official robot trials, results, reports.
+
+# Part 1: from a new dataset to trained models
 
 The whole path, in order, with every command. Details on each part: [DATA.md](DATA.md) (recording and editing),
 [TRAIN.md](TRAIN.md) (training). The example throughout is sorting B, `so101_sort_two_v1`.
@@ -227,3 +232,36 @@ in [PLAN.md](PLAN.md)).
 - A new task with per-episode instructions (sorting C), a new recipe or model, a new server.
 
 Paste the last lines of the window (or the dry run's output) with the question.
+
+---
+
+# Part 2: evaluation
+
+**Status (2026-11-20): being built** (lab/PLAN.md, Phase 5 steps 1-8). Each step is added here once it is tested;
+until a step is marked ready, ask Claude. How results are stored and why: [EVALUATION.md](EVALUATION.md). What
+every number means: [METRICS.md](METRICS.md).
+
+The path, once built:
+
+```
+lab/evals/<eval>.yaml  →  lab eval freeze  →  commit + push
+model server (laptop GPU / A100 / H200): start the eval's servers
+robot computer (laptop, later the Pi): lab eval run <eval> --server <host>   (20 trials per model, rounds)
+lab eval report <eval>   (any machine)
+```
+
+| Step | Ready |
+|---|---|
+| Test runs go to `results/scratch/` (never mixed with official results) | not yet |
+| Writing an eval file, `lab eval freeze`, `lab eval status` | not yet |
+| Serving an eval on the laptop GPU, the A100 or the H200 | not yet |
+| `lab eval run`: trials, keys `s` / `f`, resume, `lab eval void`, video, push | not yet |
+| `lab eval report` | not yet |
+| `lab eval offline` (held-out action error, M9) | not yet |
+
+Rules that already hold:
+
+- Only `lab eval run` makes official results. Anything you try by hand is a test run.
+- The official copy of every result is the private Hub dataset `orangemoon599/drtc-results`. Nothing analysis needs
+  is kept on the GPU servers.
+- Old results (before 2026-11-20) are in `results/archive/`.

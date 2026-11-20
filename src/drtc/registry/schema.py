@@ -151,6 +151,7 @@ class Settings(BaseModel):
     trackio_private: bool = True
     wandb_project: str | None = None  # every training run also logs here (drtc.compat.wandb_mirror); None = off
     wandb_entity: str | None = None
+    results_repo: str | None = None  # the one official copy of evaluation results (lab/EVALUATION.md), a Hub dataset
 
 
 # --- recipes and models -------------------------------------------------------------------------------------------
