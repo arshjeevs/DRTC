@@ -8,7 +8,7 @@ current as results come in. The plan and its status: [PLAN.md](PLAN.md).*
 **Contents:** [1 Summary](#1-summary) · [2 Problem](#2-problem-and-motivation) · [3 Claim](#3-the-claim) ·
 [4 Setup](#4-setup) · [5 System](#5-what-we-built) · [6 Datasets](#6-datasets) · [7 Models](#7-models-and-training) ·
 [8 Method](#8-method) · [9 Results](#9-results) · [10 Limitations](#10-limitations) ·
-[11 Future work](#11-future-work) · [12 Slides](#12-presentation-outline) · [13 Sources](#13-where-everything-is) ·
+[11 Future work](#11-future-work) · [12 Report and slides](#12-the-report-and-the-presentation) · [13 Sources](#13-where-everything-is) ·
 [14 References](#14-references)
 
 ---
@@ -344,23 +344,38 @@ trials):
 - RTC in-painting (Black et al. 2025) for the flow-matching models on top of DRTC.
 - An edge fallback: a small model (ACT) on the robot computer takes over while the server is unreachable.
 
-## 12. Presentation outline
+## 12. The report and the presentation
 
-| # | Slide | Content (section) |
-|---|---|---|
-| 1 | Title | Reliable remote VLA control on a low-cost robot |
-| 2 | Problem | big models on a remote GPU; the network breaks the robot (2) |
-| 3 | Claim | faults hurt, DRTC recovers, smoothing improves the motion (3) |
-| 4 | Setup | SO-101, cameras, **the laptop as the robot computer**, A100 server, the network numbers (4) |
-| 5 | DRTC | trigger, estimator, cooldown; our four fixes (5.2) |
-| 6 | Smoothing | Butterworth filter, adaptive playback (5.3) |
-| 7 | Experiment | 3 datasets, 7 models, 4 conditions, the fault mix, 10 trials in rounds (6-8) |
-| 8 | Result: success | the 4 x 2 success table with intervals (9.1, figure 1) |
-| 9 | Result: motion | jerk and stalls, the joint-angle plot with the fault windows (9.1, figures 2-4) |
-| 10 | Each fault alone | the bench (9.2) |
-| 11 | All models | baselines and offline M9/M10 (9.3, 9.4) |
-| 12 | Video | one trial per condition (figure 5) |
-| 13 | Limitations, future work | (10, 11) |
+**Report (LaTeX):** `report/` (`make` there: results -> numbers, tables, figures -> `report/report.pdf`). How to
+add things: [report/README.md](../report/README.md). Photos to add: [report/assets/README.md](../report/assets/README.md).
+
+**Presentation:** the Slides deck https://claude.ai/artifact/JsUD9Vp56hRnTS5qU7VGcJ (private to the owner; 16:9;
+plays videos; downloads as PowerPoint or PDF). Its figures are the report's, at slide size
+(`report/generated/slides/fig_*.png`, uploaded to the deck); after `make` in `report/`, Claude re-uploads the changed
+ones and points the slides at them.
+
+| # | Slide (id) | Content | Placeholders |
+|---|---|---|---|
+| 1 | cover | title, names, institution | names, guide, institution, date |
+| 2 | problem | why remote inference; the network fails | video: a condition-2 trial |
+| 3 | remote | diagram: robot computer, network, GPU server; round-trip numbers | |
+| 4 | failure | the 1 s give-up rule; the fault mix timeline | |
+| 5 | claim | the three-part claim, one line per click | |
+| 6 | drtc | trigger, estimator, cooldown; our four fixes | |
+| 7 | smoothing | Butterworth filter, adaptive playback | |
+| 8 | setup | hardware facts; **the laptop as the robot computer** | photo: the setup |
+| 9 | design | the four conditions in the figures' colours; 80 trials | |
+| 10 | success | figure: success per condition; 0% -> 60% / 80% | |
+| 11 | videos | the same faults, three ways | videos: conditions 2, 3, 4 |
+| 12 | motion | figure: jerk; 5-7.5x smoother; GR00T stalls 65% -> 24% | |
+| 13 | timeline | figure: one trial per condition over time | |
+| 14 | bench | figure: each fault alone; 8 of 8 vs 0 of 8 | |
+| 15 | offline | figure: M9/M10; baselines in progress | (the baselines, when run) |
+| 16 | limits | limits and next steps | |
+| 17 | close | the three results, one per click; questions | |
+
+The trial videos exist for every robot trial (`results/evals/<eval>/sessions/*/trials/<cond>/<model>/tNN/video/
+{scene,wrist}.mp4`), so the video placeholders can be filled from real trials.
 
 ## 13. Where everything is
 

@@ -1,5 +1,7 @@
 # The project report (LaTeX)
 
+*The presentation is a separate Slides deck built from the same figures: see [lab/REPORT.md](../lab/REPORT.md), section 12.*
+
 The report we submit. Everything in it that comes from an experiment (numbers in the text, tables, graphs) is
 generated from the result files, so it updates when new results arrive. The text is written in `chapters/`.
 
