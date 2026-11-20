@@ -1033,10 +1033,10 @@ step, each step tested and added to [WORKFLOW.md](WORKFLOW.md) part 2 so the use
 - [x] 1. `lab run` and every non-official run write to `results/scratch/<date>/` (`lab results` reads only scratch)
 - [x] 2. Eval files (`lab/evals/`), `lab eval check|freeze|status|list`; rounds seeded per (seed, round); first eval
        `sort_one_baseline` frozen (ACT, SmolVLA, GR00T N1.5, Diffusion at their final checkpoints)
-- [ ] 3. Serving the same way on the laptop GPU, A100, H200: all models of an eval at once; the robot computer reaches
+- [x] 3. Serving the same way on the laptop GPU, A100, H200: all models of an eval at once; the robot computer reaches
        them (A100 directly or tunnelled, H200 through an SSH tunnel to the container); servers report model version and
        GPU
-- [ ] 4. Logging for metrics v1: `chunks.csv` (turnaround, server inference time, estimate at send, chunk-switch
+- [x] 4. Logging for metrics v1: `chunks.csv` (turnaround, server inference time, estimate at send, chunk-switch
        disagreement), measured joints in `ticks.csv`
 - [ ] 5. `lab eval run`: rounds, seeded order, keys `s`/`f`, time limit, resume, `lab eval void`, video, session
        folders, pull before / push after

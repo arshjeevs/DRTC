@@ -19,8 +19,13 @@ Cooldown re-request (option b, decided 2026-11-18): with cooldown on, a request 
 sent (freshest wins). Inside upstream's server rules: a BUSY reply (the old inference still running) backs off one
 action interval; a STALE "duplicate" reply for the request in flight (a duplicated message) is ignored. Every
 recovery action is logged (recovery.csv).
-Metrics: one row per control tick (queue length, whether an action was available, request pending, latency
-estimate, accepted chunks, last turnaround), written as CSV when the engine stops.
+Metrics (lab/METRICS.md v1), written as CSV when the engine stops:
+- ticks.csv, one row per control tick: queue length, whether an action was available, request pending, latency
+  estimate, accepted chunks, last turnaround, chunk length; the commanded joints (cmd.<joint>) and the latest measured
+  joints (meas.<joint>), in the model's dataset units;
+- chunks.csv, one row per chunk reply: when its request was sent and its reply arrived, turnaround, the latency
+  estimate at send (M5), the server's own timings (M6), the chunk's length, and at each switch to a new chunk the
+  overlap with the queued actions and their mean arm-joint distance (M8a, DRTC's chunk_mean_l2).
 """
 
 from __future__ import annotations
@@ -95,6 +100,8 @@ class DRTCRuntime(ChunkRuntime):
         self.horizon: int | None = None  # H: the last accepted chunk's length
         self.last_turnaround: float | None = None
         self.not_before = 0.0  # backoff after a BUSY reply
+        self.sent: dict[str, tuple[float, float | None]] = {}  # request_id -> (sent at, latency estimate then)
+        self.chunk_log: list[list] = []  # CHUNK_FIELDS rows, monotonic times
 
     def abandon(self, request_id: str, backoff: float = 0.0) -> bool:
         """Give up the request in flight (its late reply is then discarded as stale)."""
@@ -127,10 +134,29 @@ class DRTCRuntime(ChunkRuntime):
             return max(self.horizon - self.s_min, 1) * self.interval
         return super().effective_refill
 
+    def begin(self, observation):
+        request = super().begin(observation)
+        if request is not None:
+            est = self.turnaround if self._completed else None
+            self.sent[request.request_id] = (request.submitted_at,
+                                             est if est is not None and math.isfinite(est) else None)
+        return request
+
     def accept(self, request, chunk, *, task_version: int) -> bool:
         completed = self._completed
         submitted = request.submitted_at
+        overlap, l2 = 0, None
+        try:  # the switch, measured on the queue before the new chunk replaces its future (read only)
+            snap = self.queue.snapshot()
+            anchor = request.observation.action_cursor
+            if anchor is not None and snap.canonical_actions is not None:
+                trim = snap.cursor - anchor
+                if 0 <= trim < len(chunk.canonical_actions):
+                    overlap, l2 = switch_disagreement(snap.canonical_actions, chunk.canonical_actions[trim:])
+        except Exception:  # noqa: BLE001 - a metric must never stop the robot
+            pass
         accepted = super().accept(request, chunk, task_version=task_version)
+        rtt = None
         if self._completed > completed:  # super measured this request's turnaround
             rtt = self.clock() - submitted
             self.last_turnaround = rtt
@@ -138,6 +164,12 @@ class DRTCRuntime(ChunkRuntime):
                 self.estimator.update(rtt)
         if accepted:
             self.horizon = int(chunk.execution_steps)
+        sd = getattr(chunk, "server_durations", None) or {}
+        sent_at, est = self.sent.pop(request.request_id, (submitted, None))
+        parts = [sd.get(k) for k in ("preprocessing", "policy", "postprocessing")]
+        total = sum(p for p in parts if p is not None) if any(p is not None for p in parts) else None
+        self.chunk_log.append([sent_at, self.clock(), request.request_id, int(bool(accepted)), rtt, est, *parts, total,
+                               int(chunk.execution_steps), overlap, l2])
         return accepted
 
 
@@ -181,6 +213,23 @@ def make_estimator(cfg: DRTCInferenceConfig):
 
 
 TICK_FIELDS = ["t", "action", "queue", "pending", "latency_est", "accepted", "last_turnaround", "horizon"]
+CHUNK_FIELDS = ["t_sent", "t_received", "request_id", "accepted", "turnaround_s", "estimate_at_send_s",
+                "server_preprocessing_s", "server_policy_s", "server_postprocessing_s", "server_total_s", "steps",
+                "overlap_steps", "switch_l2"]
+ARM_JOINTS = 5  # SO101 action order: five arm joints in degrees, then the gripper (lab/METRICS.md "Terms")
+
+
+def switch_disagreement(previous, future) -> tuple[int, float | None]:
+    """Overlap steps and mean arm-joint Euclidean distance between the queued and the new chunk's actions (M8a)."""
+    if previous is None or future is None:
+        return 0, None
+    n = min(len(previous), len(future))
+    if n == 0:
+        return 0, None
+    import torch
+
+    d = torch.linalg.vector_norm(previous[:n, :ARM_JOINTS].float() - future[:n, :ARM_JOINTS].float(), dim=1)
+    return n, float(d.mean())
 
 
 class DRTCEngine(RemoteInferenceEngine):
@@ -202,6 +251,9 @@ class DRTCEngine(RemoteInferenceEngine):
             self.latency = self.runtime.latency
         self._ticks: list[list] = []
         self._t0 = time.monotonic()
+        self._joint_names: list[str] = []  # from the first observation (keys ending in .pos)
+        self._measured: list[float] | None = None
+        self.observers: list = []  # callables(obs dict) on every robot observation (e.g. the trial video)
         self.action_filter = None
         if isinstance(cfg, DRTCInferenceConfig) and cfg.action_filter == "butterworth":
             from drtc.control.action_filter import ButterworthFilter
@@ -312,6 +364,20 @@ class DRTCEngine(RemoteInferenceEngine):
             self.faults.start()  # fault windows are on the run's clock, from here
         super().start()
 
+    def notify_observation(self, obs: dict) -> None:
+        try:
+            if not self._joint_names:
+                self._joint_names = [k[:-4] for k in obs if k.endswith(".pos")]
+            self._measured = [float(obs[f"{j}.pos"]) for j in self._joint_names]
+        except Exception:  # noqa: BLE001 - metrics never stop the robot
+            pass
+        for fn in self.observers:
+            try:
+                fn(obs)
+            except Exception:  # noqa: BLE001
+                pass
+        super().notify_observation(obs)
+
     def get_action(self, obs_frame):
         action = super().get_action(obs_frame)
         if action is not None and self.action_filter is not None:
@@ -326,6 +392,8 @@ class DRTCEngine(RemoteInferenceEngine):
             None if est is None or not math.isfinite(est) else round(est, 4), rt._completed,
             None if getattr(rt, "last_turnaround", None) is None else round(rt.last_turnaround, 4),
             getattr(rt, "horizon", None),
+            None if action is None else [round(float(x), 4) for x in action.detach().cpu().flatten().tolist()],
+            None if self._measured is None else [round(x, 4) for x in self._measured],
         ])
         return action
 
@@ -341,10 +409,21 @@ class DRTCEngine(RemoteInferenceEngine):
             path = getattr(self.config, "metrics_path", None)
             if path and self._ticks:
                 Path(path).parent.mkdir(parents=True, exist_ok=True)
+                n = len(self._joint_names) or max((len(r[-2] or r[-1] or []) for r in self._ticks), default=0)
+                names = self._joint_names or [f"j{i}" for i in range(n)]
                 with open(path, "w", newline="") as f:
                     w = csv.writer(f)
-                    w.writerow(TICK_FIELDS)
-                    w.writerows(self._ticks)
+                    w.writerow(TICK_FIELDS + [f"cmd.{j}" for j in names] + [f"meas.{j}" for j in names])
+                    for r in self._ticks:
+                        cmd, meas = r[-2], r[-1]
+                        w.writerow(r[:-2] + (cmd or [None] * n)[:n] + (meas or [None] * n)[:n])
+            rt = self.runtime
+            if path and getattr(rt, "chunk_log", None):
+                with open(Path(path).with_name("chunks.csv"), "w", newline="") as f:
+                    w = csv.writer(f)
+                    w.writerow(CHUNK_FIELDS)
+                    for r in rt.chunk_log:
+                        w.writerow([round(r[0] - self._t0, 4), round(r[1] - self._t0, 4), *r[2:]])
             if path and self.recovery:
                 with open(Path(path).with_name("recovery.csv"), "w", newline="") as f:
                     w = csv.writer(f)

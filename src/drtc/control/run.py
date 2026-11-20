@@ -87,7 +87,7 @@ def robot_flags(reg: Registry, model_id: str, robot: str, episode: int, log_path
 
 
 def build(reg: Registry, experiment: str, model: str | None, robot: str, episode: int, endpoint: str,
-          duration: float | None, run_dir: Path) -> tuple[list[str], dict, list[str]]:
+          duration: float | None, run_dir: Path, deployment: str | None = None) -> tuple[list[str], dict, list[str]]:
     from drtc.control.serve import camera_renames, deployment_name, semantics_for
 
     composed = reg.compose(experiment, model_override=model)
@@ -115,7 +115,7 @@ def build(reg: Registry, experiment: str, model: str | None, robot: str, episode
         **robot_flags(reg, model_id, robot, episode, run_dir / "robot_commands.jsonl"),
         "inference.type": "drtc",
         "inference.endpoint": endpoint,
-        "inference.deployment": deployment_name(model_id),
+        "inference.deployment": deployment or deployment_name(model_id),
         "inference.semantics": sem["joints"],
         "inference.mode": "chunk",
         "inference.chunk_merge": "aligned",
@@ -152,6 +152,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--robot", choices=["rig", "replay"], default="rig")
     ap.add_argument("--episode", type=int, default=0, help="replay robot: which episode of the model's dataset")
     ap.add_argument("--endpoint", default="tcp/127.0.0.1:7447", help="the policy server's Zenoh endpoint")
+    ap.add_argument("--deployment", help="the deployment name to ask for (default: from the model's name; an eval's "
+                                         "servers add the frozen commit, see `lab eval servers`)")
     ap.add_argument("--trials", type=int, default=1)
     ap.add_argument("--duration", type=float, help="seconds per trial (default: the experiment's duration_s)")
     ap.add_argument("--note", default="")
@@ -172,7 +174,7 @@ def main(argv: list[str] | None = None) -> int:
             model_id = reg.compose(a.experiment, model_override=a.model)["model"]
             run_dir = RESULTS / f"{datetime.now():%Y%m%d}" / exp_id / model_id / run_id
             cmd, composed, notes = build(reg, a.experiment, a.model, a.robot, a.episode, a.endpoint, a.duration,
-                                         run_dir)
+                                         run_dir, a.deployment)
         except RegistryError as e:
             print(f"lab run: {e}", file=sys.stderr)
             return 1
