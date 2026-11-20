@@ -10,6 +10,10 @@ Decided one item at a time; it replaces the evaluation plans further down wherev
 evals and benches (sort_one_baseline_v2, sort_one_faults, the bench_* evals) are side results: valid, shown in the
 report, not the main experiment.
 
+**Archive (2026-11-20, the user: "start fresh with respect to the DRTC experiments"):** every result made before
+this scope (robot evals and benches) moved unchanged to `results/archive/2026-11-20-before-scope/` (laptop and H200;
+the results store keeps its copy), their eval files to `lab/evals/archive/`. Side results, usable in the report.
+
 **Claim.** In client-server robot inference, network faults lower the task scores; **DRTC recovers them**; **smoothing**
 then improves the motion.
 
