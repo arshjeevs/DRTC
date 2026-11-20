@@ -95,11 +95,12 @@ def old_experiments(tmp_path_factory) -> Path:
 
 # The groups the minor had (its composer is the reference); groups added later (bench/, 2026-11-20) use models and keys
 # the minor never knew, so there is nothing to compare them with.
-MINOR_GROUPS = {"replication", "smoothing", "smoke"}
+MINOR_GROUPS = {"replication", "smoothing", "smoke"}  # in lab/experiments/archive/ since 2026-11-20
 EXPERIMENTS = sorted(
     str(p.relative_to(ROOT / "lab" / "experiments").with_suffix(""))
     for p in (ROOT / "lab" / "experiments").rglob("*.yaml")
-    if not p.name.startswith("_") and p.relative_to(ROOT / "lab" / "experiments").parts[0] in MINOR_GROUPS
+    if not p.name.startswith("_") and p.relative_to(ROOT / "lab" / "experiments").parts[:1] == ("archive",)
+    and p.relative_to(ROOT / "lab" / "experiments").parts[1] in MINOR_GROUPS
 )
 
 
@@ -117,5 +118,5 @@ def test_compose_without_a_known_host(reg, monkeypatch):
     """On a machine that is not in hosts.yaml the client defaults to the network's client host."""
     monkeypatch.delenv("LAB_HOST", raising=False)
     monkeypatch.setattr(type(reg), "current_host", lambda self: None)
-    merged = reg.compose("smoothing/baseline")
+    merged = reg.compose("archive/smoothing/baseline")
     assert merged["client_host"] == reg.hosts["pi"].label

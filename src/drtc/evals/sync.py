@@ -1,4 +1,4 @@
-"""The results store (lab/EVALUATION.md rule 5): the private Hub dataset in lab/lab.yaml `results_repo`.
+"""The results store (lab/docs/EVALUATION.md rule 5): the private Hub dataset in lab/lab.yaml `results_repo`.
 
 Its layout mirrors results/: evals/<eval>/sessions/<session>/... (robot) and bench/<eval>/sessions/... (replay robot).
 - pull: downloads the sessions this machine does not have yet. A session already here is never overwritten (it may

@@ -9,9 +9,9 @@ models:
   - diffusion_sort_one_v1_full
   - groot_sort_one_v1_full
 conditions:
-  upstream: bench/upstream_disconnect
-  drtc: bench/disconnect
-  drtc_smooth: bench/playback_disconnect
+  upstream: archive/bench/upstream_disconnect
+  drtc: archive/bench/disconnect
+  drtc_smooth: archive/bench/playback_disconnect
 video: false
 robot: replay
 

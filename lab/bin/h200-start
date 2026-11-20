@@ -1,6 +1,6 @@
 #!/bin/bash
 # H200 GPU server only (host gpuh200): start the DRTC container the way the server guide prescribes
-# ("Tensorflow & PyTorch in H200 GPU Server", PyTorch steps 2-5). See lab/H200.md.
+# ("Tensorflow & PyTorch in H200 GPU Server", PyTorch steps 2-5). See lab/docs/H200.md.
 #
 #   tmux new -s drtc_lab            # keeps the container alive after you log out
 #   ~/drtc_lab/lab/bin/h200-start   # then, inside the container: lab/bin/h200-setup (once), jupyter-notebook

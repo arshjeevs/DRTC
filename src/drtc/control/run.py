@@ -4,7 +4,7 @@ The experiment (lab/experiments/<group>/<name>.yaml, composed _defaults < rig < 
 minor) becomes one lerobot-rollout run with the drtc engine (drtc.control.engine) against a policy server started
 with `lab serve <model>`. These are test runs: results/scratch/<date>/<experiment>/<model>/<run_id>/ with config.yaml,
 ticks.csv (one row per control tick), run.json; one row per run in results/scratch/index.csv. Official trials are
-made only by `lab eval run` (lab/EVALUATION.md); reports never read scratch.
+made only by `lab eval run` (lab/docs/EVALUATION.md); reports never read scratch.
 
 Robot: the current rig (lab/rigs), in the model's dataset joint units, or `--robot replay`: the replay robot
 playing an episode of the model's dataset (no hardware; timing, scheduling and faults, not task success).
@@ -26,7 +26,7 @@ import yaml
 
 from drtc.registry import Registry, RegistryError
 
-RESULTS = Path("results") / "scratch"  # test runs only (lab/EVALUATION.md rule 6)
+RESULTS = Path("results") / "scratch"  # test runs only (lab/docs/EVALUATION.md rule 6)
 INDEX_FIELDS = ["run_id", "experiment", "model", "trial", "success", "started_at", "duration_s", "git_commit",
                 "git_dirty", "note", "run_dir", "robot", "host", "outcome"]
 # Composed experiment keys this run applies; anything else that is set is reported as not applied yet.
@@ -239,7 +239,7 @@ def rollout_once(cmd: list[str], run_dir: Path, on_context=None) -> tuple[str, s
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="lab run", description=__doc__.split("\n\n")[0])
-    ap.add_argument("experiment", help="group/name under lab/experiments, e.g. replication/baseline")
+    ap.add_argument("experiment", help="group/name under lab/experiments, e.g. main/baseline")
     ap.add_argument("--model", help="use this registry model instead of the experiment's")
     ap.add_argument("--robot", choices=["rig", "replay"], default="rig")
     ap.add_argument("--episode", type=int, default=0, help="replay robot: which episode of the model's dataset")

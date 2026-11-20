@@ -1,4 +1,4 @@
 #!/bin/bash
 # Old name kept for compatibility: lab list
-source "$(dirname "$0")/_env"
+source "$(dirname "$0")/../_env"
 exec "$LAB" list "$@"

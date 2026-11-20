@@ -12,10 +12,10 @@ models:
   - groot_sort_one_v1_full
   - diffusion_sort_one_v1_full
 conditions:
-  baseline: bench/butterworth      # DRTC defaults (the robot baseline's settings)
-  none: bench/none                 # no smoothing at all
-  blend: bench/blend               # upstream blending at the chunk switch
-  playback: bench/playback         # smoothing A: adaptive playback
+  baseline: archive/bench/butterworth      # DRTC defaults (the robot baseline's settings)
+  none: archive/bench/none                 # no smoothing at all
+  blend: archive/bench/blend               # upstream blending at the chunk switch
+  playback: archive/bench/playback         # smoothing A: adaptive playback
 video: false
 robot: replay
 

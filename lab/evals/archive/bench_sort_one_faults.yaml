@@ -10,13 +10,13 @@ models:
   - groot_sort_one_v1_full
   - diffusion_sort_one_v1_full
 conditions:
-  baseline: bench/butterworth
-  spikes: bench/spikes
-  drops: bench/drops
-  dups: bench/dups
-  reorder: bench/reorder
-  disconnect: bench/disconnect
-  mixture: bench/mixture
+  baseline: archive/bench/butterworth
+  spikes: archive/bench/spikes
+  drops: archive/bench/drops
+  dups: archive/bench/dups
+  reorder: archive/bench/reorder
+  disconnect: archive/bench/disconnect
+  mixture: archive/bench/mixture
 video: false
 robot: replay
 

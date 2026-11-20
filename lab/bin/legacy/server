@@ -1,5 +1,5 @@
 #!/bin/bash
 # Old name kept for compatibility: the new policy server serves ONE model: lab serve <model> (lab serve -h).
-source "$(dirname "$0")/_env"
+source "$(dirname "$0")/../_env"
 [ -n "$1" ] || { echo "usage: lab/bin/server <model>   (the new server serves one registry model; see lab serve -h)"; exit 1; }
 exec "$LAB" serve "$@"

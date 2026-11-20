@@ -9,9 +9,9 @@ models:
   - diffusion_sort_one_v1_full
   - groot_sort_one_v1_full
 conditions:
-  upstream: bench/upstream_spikes
-  drtc: bench/spikes
-  drtc_smooth: bench/playback_spikes
+  upstream: archive/bench/upstream_spikes
+  drtc: archive/bench/spikes
+  drtc_smooth: archive/bench/playback_spikes
 video: false
 robot: replay
 

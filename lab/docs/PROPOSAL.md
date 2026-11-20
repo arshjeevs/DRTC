@@ -43,7 +43,7 @@ DRTC (asynchronous action chunking with real-time-chunking inpainting and latenc
 | Training | `lab/bin/train`: model registry (`lab/models.yaml`), full or LoRA fine-tuning, resume, Hub push, wandb logging; SmolVLA, π0, π0.5, X-VLA, ACT |
 | Serving | DRTC policy server (GPU) + robot client, full and LoRA checkpoints, automatic venv selection for π0 / π0.5 |
 | Experiments | `lab/bin/run`: 10 network-fault conditions (latency spikes, drops, duplicates, reordering, disconnects, mixture), per-trial metrics and success labels |
-| Platforms | Linux laptop, Raspberry Pi, Windows (`lab/WINDOWS.md`), Docker on GPU servers |
+| Platforms | Linux laptop, Raspberry Pi, Windows (`lab/docs/WINDOWS.md`), Docker on GPU servers |
 | Pre-validation | Models run on the hardware and complete the task; the full pipeline works end to end |
 
 ## 6. Methods

@@ -1,4 +1,4 @@
-"""`lab eval run <eval> --server <laptop|a100|h200>`: one session of official trials (lab/EVALUATION.md).
+"""`lab eval run <eval> --server <laptop|a100|h200>`: one session of official trials (lab/docs/EVALUATION.md).
 
 1. Checks: the eval is frozen and valid, the git tree is clean, the plan is the one earlier sessions used, the rig
    check passes (real robot), and every served model answers with its frozen version.

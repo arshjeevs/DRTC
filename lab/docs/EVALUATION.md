@@ -1,7 +1,7 @@
 # Evaluation: how results are made and stored
 
-Agreed with the user on 2026-11-20. Metrics: [METRICS.md](METRICS.md). Plan: [PLAN.md](PLAN.md) Phases 5-8. The
-step-by-step commands for the user: [WORKFLOW.md](WORKFLOW.md), part 2.
+Agreed with the user on 2026-11-20. Metrics: [METRICS.md](../METRICS.md). Plan: [PLAN.md](../PLAN.md) Phases 5-8. The
+step-by-step commands for the user: [WORKFLOW.md](../WORKFLOW.md), part 2.
 
 ## Roles
 

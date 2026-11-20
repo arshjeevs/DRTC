@@ -1,5 +1,5 @@
 """`lab eval report <eval>`: trials.csv, metrics.csv and report.md, always rebuilt from all sessions present
-(lab/EVALUATION.md rule 3; metrics: lab/METRICS.md v1)."""
+(lab/docs/EVALUATION.md rule 3; metrics: lab/METRICS.md v1)."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-# Phase 6 baseline, cube in the box (lab/PLAN.md Phase 6; lab/EVALUATION.md; metrics: lab/METRICS.md v1).
+# Phase 6 baseline, cube in the box (lab/PLAN.md Phase 6; lab/docs/EVALUATION.md; metrics: lab/METRICS.md v1).
 # The new full fine-tunes on cubebox v0 and v1 against the two models kept from the minor (minor results: GR00T
 # LoRA 80%, SmolVLA LoRA 90%), all as trained, in one eval so that they are compared in the same sessions
 # (METRICS.md rule 5). Each model is always given its own dataset's instruction: v0 "Pick the green cube and place it
@@ -16,7 +16,7 @@ models:
   - groot_cubebox_v1_lora_raw       # kept from the minor (80%)
   - smolvla_cubebox_v0_lora_raw     # kept from the minor (90%)
 conditions:
-  baseline: replication/baseline     # DRTC with its defaults, no faults
+  baseline: archive/replication/baseline     # DRTC with its defaults, no faults
 video: true
 
 # Written by `lab eval freeze`: the Hub commit each model is served at. Do not edit by hand.

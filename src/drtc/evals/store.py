@@ -1,4 +1,4 @@
-"""Where an eval's results live (lab/EVALUATION.md, "Layout"), and reading them back.
+"""Where an eval's results live (lab/docs/EVALUATION.md, "Layout"), and reading them back.
 
 results/evals/<eval>/sessions/<YYYYMMDD-HHMM>-<machine>/
     session.json

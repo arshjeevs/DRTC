@@ -1,4 +1,4 @@
-"""Eval files (lab/evals/<eval>.yaml): one study's fixed plan (lab/EVALUATION.md).
+"""Eval files (lab/evals/<eval>.yaml): one study's fixed plan (lab/docs/EVALUATION.md).
 
 An eval names the models, the conditions (experiment settings from lab/experiments), the trials per model and
 condition (METRICS.md rule 1), the success rule and the time limit. `lab eval freeze` pins every model to the Hub

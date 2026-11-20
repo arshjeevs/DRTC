@@ -1,6 +1,6 @@
 # Datasets: recording and editing
 
-> The whole path from recording to training, in order: [WORKFLOW.md](WORKFLOW.md).
+> The whole path from recording to training, in order: [WORKFLOW.md](../WORKFLOW.md).
 
 Everything on the laptop, in the `major` setup:
 

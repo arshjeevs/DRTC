@@ -1,6 +1,6 @@
 """Summaries of test runs (results/scratch/<date>/<experiment>/<model>/<run_id>/): `lab results [--experiment E]`.
 
-Official results are summarised by `lab eval report` (lab/EVALUATION.md).
+Official results are summarised by `lab eval report` (lab/docs/EVALUATION.md).
 
 Per run, from ticks.csv (one row per control tick) and faults.csv:
 - ticks, stalls (ticks without an action), the longest stall in seconds, chunks accepted;

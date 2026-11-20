@@ -1,4 +1,4 @@
 #!/bin/bash
 # Old name kept for compatibility: lab run <experiment> [--model M] [--robot rig|replay] (lab run -h)
-source "$(dirname "$0")/_env"
+source "$(dirname "$0")/../_env"
 exec "$LAB" run "$@"

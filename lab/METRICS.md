@@ -4,7 +4,7 @@
 official result and the final presentation use these definitions. A change makes a new version (v2): the definitions here stay as they are, the change and its date are
 added below, and `lab eval report` recomputes every trial from its raw files, so old and new results stay comparable.
 
-Where the data comes from: [EVALUATION.md](EVALUATION.md) (one folder per trial; raw files never edited).
+Where the data comes from: [EVALUATION.md](docs/EVALUATION.md) (one folder per trial; raw files never edited).
 
 ## Terms
 

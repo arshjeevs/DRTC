@@ -1,1 +1,1 @@
-"""Official evaluations (lab/EVALUATION.md, lab/METRICS.md): `lab eval ...`."""
+"""Official evaluations (lab/docs/EVALUATION.md, lab/METRICS.md): `lab eval ...`."""

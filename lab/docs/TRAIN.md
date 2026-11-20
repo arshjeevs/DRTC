@@ -1,6 +1,6 @@
 # Training
 
-> The whole path from recording to training, in order: [WORKFLOW.md](WORKFLOW.md).
+> The whole path from recording to training, in order: [WORKFLOW.md](../WORKFLOW.md).
 
 Training runs on the GPU servers: the **H200** (you run it) and the **A100** (Claude runs it over SSH). Recipes
 are fixed (`lab/recipes/`, the originals from Phase 2); a model is a recipe applied to a dataset.

@@ -11,9 +11,9 @@ models:
   - diffusion_sort_one_v1_full
   - groot_sort_one_v1_full
 conditions:
-  baseline: replication/baseline   # DRTC defaults, no injected fault
-  spikes: robot/spikes
-  disconnect: robot/disconnect
+  baseline: archive/replication/baseline   # DRTC defaults, no injected fault
+  spikes: archive/robot/spikes
+  disconnect: archive/robot/disconnect
 video: true
 
 # Written by `lab eval freeze`: the Hub commit each model is served at. Do not edit by hand.

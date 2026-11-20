@@ -1,4 +1,4 @@
-"""Serving an eval's models, and reaching them from the robot computer (lab/EVALUATION.md, "Roles").
+"""Serving an eval's models, and reaching them from the robot computer (lab/docs/EVALUATION.md, "Roles").
 
 Model server side, `lab eval serve <eval>` (laptop GPU, A100, or the H200 container):
 - every model of the frozen eval (or `--models` a subset) in its own policy server, started one after the other;
@@ -197,7 +197,7 @@ def connect(reg: Registry, spec: S.EvalSpec, server: str, models: list[str] | No
                            capture_output=True, text=True)
         target = r.stdout.strip()
         if r.returncode != 0 or not target:
-            raise RegistryError(f"the {container} container is not running on {server}: start it (lab/H200.md)")
+            raise RegistryError(f"the {container} container is not running on {server}: start it (lab/docs/H200.md)")
     endpoints = {}
     for m in chosen:
         local = port(spec, m) + TUNNEL_OFFSET

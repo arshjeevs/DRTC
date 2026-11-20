@@ -8,9 +8,9 @@ models:
   - smolvla_sort_one_v1_full
   - groot_sort_one_v1_full
 conditions:
-  baseline: bench/butterworth
-  rtc: bench/rtc                   # upstream guided RTC
-  rtc_playback: bench/rtc_playback # RTC + smoothing A
+  baseline: archive/bench/butterworth
+  rtc: archive/bench/rtc                   # upstream guided RTC
+  rtc_playback: archive/bench/rtc_playback # RTC + smoothing A
 video: false
 robot: replay
 

@@ -1,4 +1,4 @@
-# Phase 6 baseline, sorting A (lab/PLAN.md Phase 6; lab/EVALUATION.md; metrics: lab/METRICS.md v1).
+# Phase 6 baseline, sorting A (lab/PLAN.md Phase 6; lab/docs/EVALUATION.md; metrics: lab/METRICS.md v1).
 # Every trained sorting A model, as trained (no smoothing method, no faults), 20 trials each. The two best go on to
 # Phases 7-8 (decision A, 2026-11-20). The task instruction comes from the models' dataset (so101_sort_one_v1).
 description:  Phase 6 baseline, sorting A, restarted after the GR00T fixes (every trained model, as trained)
@@ -12,7 +12,7 @@ models:
   - groot_sort_one_v1_full
   - diffusion_sort_one_v1_full
 conditions:
-  baseline: replication/baseline     # DRTC with its defaults (lab/experiments/_defaults.yaml), no faults
+  baseline: archive/replication/baseline     # DRTC with its defaults (lab/experiments/_defaults.yaml), no faults
 video: true
 
 # Written by `lab eval freeze`: the Hub commit each model is served at. Do not edit by hand.

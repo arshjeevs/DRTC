@@ -77,8 +77,8 @@ that only `lab eval run` makes official results. Anything you try by hand is a t
 
 # Part 1: from a new dataset to trained models
 
-The whole path, in order, with every command. Details on each part: [DATA.md](DATA.md) (recording and editing),
-[TRAIN.md](TRAIN.md) (training). The example throughout is sorting B, `so101_sort_two_v1`.
+The whole path, in order, with every command. Details on each part: [DATA.md](docs/DATA.md) (recording and editing),
+[TRAIN.md](docs/TRAIN.md) (training). The example throughout is sorting B, `so101_sort_two_v1`.
 
 ```
 laptop:  plan → set up the scene → record → review / edit → commit recorded.yaml
@@ -248,7 +248,7 @@ The dry run should show the held-out count you recorded (`held out: [...]`, 10 e
 ## 7. Train on the H200
 
 In the `drtc_lab` container (Jupyter terminal, or `docker exec -it drtc_lab bash`; first-time setup is in
-[H200.md](H200.md)):
+[H200.md](docs/H200.md)):
 
 ```bash
 cd /workspace/drtc_major && . ./.server.env && git pull && uv sync --frozen --extra gpu --extra sim --python /usr/bin/python3
@@ -309,7 +309,7 @@ Paste the last lines of the window (or the dry run's output) with the question.
 
 # Part 2: evaluation
 
-Official robot trials, from the plan to the report. Why it works this way: [EVALUATION.md](EVALUATION.md). What
+Official robot trials, from the plan to the report. Why it works this way: [EVALUATION.md](docs/EVALUATION.md). What
 every number means: [METRICS.md](METRICS.md). The example throughout is `sort_one_baseline` (Phase 6: ACT,
 SmolVLA, GR00T N1.5 and Diffusion on sorting A, 20 trials each).
 
@@ -396,7 +396,7 @@ Pick whichever server is free that day. **The whole session uses one server**, a
 |---|---|---|
 | A100 | `ssh b230968ee@192.168.5.13` | `cd ~/drtc_major && git pull && tmux new -s serve '.venv/bin/lab eval serve sort_one_baseline; bash'` |
 | (A100 after a lock change) | `ssh b230968ee@192.168.5.13` | `cd ~/drtc_major && git pull && lab/bin/a100-setup` (**never a plain `uv sync` on the A100**: it installs CUDA 13 builds its driver cannot run) |
-| H200 | the `drtc_lab` container ([H200.md](H200.md)) | `cd /workspace/drtc_major && . ./.server.env && git pull && uv sync --frozen --extra gpu --extra sim --python /usr/bin/python3`, then `tmux new -s serve '.venv/bin/lab eval serve sort_one_baseline; bash'` |
+| H200 | the `drtc_lab` container ([H200.md](docs/H200.md)) | `cd /workspace/drtc_major && . ./.server.env && git pull && uv sync --frozen --extra gpu --extra sim --python /usr/bin/python3`, then `tmux new -s serve '.venv/bin/lab eval serve sort_one_baseline; bash'` |
 | laptop GPU | a laptop terminal | `lab eval serve sort_one_baseline --models act_sort_one_v1_full,diffusion_sort_one_v1_full` |
 
 It starts the models one after the other and prints each one's status:

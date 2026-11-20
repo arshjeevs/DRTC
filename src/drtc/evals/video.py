@@ -1,4 +1,4 @@
-"""Trial video (lab/EVALUATION.md): every camera of the rig, as the robot computer saw it, one MP4 per camera.
+"""Trial video (lab/docs/EVALUATION.md): every camera of the rig, as the robot computer saw it, one MP4 per camera.
 
 Frames come from the engine's observation hook (drtc.control.engine.DRTCEngine.observers) and are encoded in a
 background thread (H.264, libx264 'veryfast'), so the control loop never waits: when the encoder falls behind, frames

@@ -10,9 +10,9 @@ models:
   - diffusion_sort_one_v1_full
   - groot_sort_one_v1_full
 conditions:
-  upstream: bench/upstream
-  drtc: bench/butterworth
-  drtc_smooth: bench/playback
+  upstream: archive/bench/upstream
+  drtc: archive/bench/butterworth
+  drtc_smooth: archive/bench/playback
 video: false
 robot: replay
 

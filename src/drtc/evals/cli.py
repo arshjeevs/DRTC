@@ -1,4 +1,4 @@
-"""`lab eval list | check | freeze | status | serve | servers` (lab/EVALUATION.md). More come with Phase 5 steps 5-7."""
+"""`lab eval list | check | freeze | status | serve | servers` (lab/docs/EVALUATION.md). More come with Phase 5 steps 5-7."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ def cmd_list(reg: Registry, a) -> int:
     d = S.evals_dir(reg)
     names = sorted(p.stem for p in d.glob("*.yaml")) if d.is_dir() else []
     if not names:
-        print("no evals yet (lab/evals/<eval>.yaml; see lab/EVALUATION.md)")
+        print("no evals yet (lab/evals/<eval>.yaml; see lab/docs/EVALUATION.md)")
         return 0
     for n in names:
         try:
@@ -57,7 +57,7 @@ def cmd_freeze(reg: Registry, a) -> int:
         changed = [m for m in sp.models if sp.frozen.get(m) != current.get(m)]
         print(f"lab eval freeze: {a.eval} already has {len(started)} trials at its frozen versions, and these models "
               f"changed on the Hub since: {', '.join(changed)}.\n"
-              f"  A frozen plan with trials is never changed (lab/EVALUATION.md rule 4): make a new eval for the new "
+              f"  A frozen plan with trials is never changed (lab/docs/EVALUATION.md rule 4): make a new eval for the new "
               f"versions, e.g. lab/evals/{a.eval}_v2.yaml.", file=sys.stderr)
         return 1
     path = S.eval_path(reg, a.eval)
@@ -215,7 +215,7 @@ def cmd_report(reg: Registry, a) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(prog="lab eval", description="Official evaluations (lab/EVALUATION.md)")
+    ap = argparse.ArgumentParser(prog="lab eval", description="Official evaluations (lab/docs/EVALUATION.md)")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("list", help="every eval: trials done, frozen or not").set_defaults(fn=cmd_list)
     for name, fn, help_ in (("check", cmd_check, "check an eval file against the registry"),
@@ -236,7 +236,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--models", help="only these models (comma-separated)")
     p.add_argument("--keep", action="store_true", help="keep the SSH tunnel open afterwards")
     p.set_defaults(fn=cmd_servers)
-    p = sub.add_parser("run", help="on the robot computer: a session of official trials (s/f keys; lab/EVALUATION.md)")
+    p = sub.add_parser("run", help="on the robot computer: a session of official trials (s/f keys; lab/docs/EVALUATION.md)")
     p.add_argument("eval")
     p.add_argument("--server", required=True, choices=["local", "laptop", "a100", "h200"], help="where the models are served")
     p.add_argument("--models", help="only these models (comma-separated), e.g. the ones a small GPU can serve")

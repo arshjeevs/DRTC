@@ -1,4 +1,4 @@
-"""Eval files, rounds and the results layout (lab/EVALUATION.md, lab/METRICS.md rules 1-3)."""
+"""Eval files, rounds and the results layout (lab/docs/EVALUATION.md, lab/METRICS.md rules 1-3)."""
 
 import json
 
@@ -11,7 +11,7 @@ from drtc.registry import Registry
 
 def make_spec(**kw):
     base = dict(description="t", success="done", time_limit_s=30, trials=3, models=["a", "b", "c"],
-                conditions={"baseline": "replication/baseline"})
+                conditions={"baseline": "main/baseline"})
     base.update(kw)
     return S.EvalSpec.model_validate(base)
 
@@ -228,8 +228,8 @@ def test_every_bench_and_robot_experiment_parses():
     from drtc.control.run import build
 
     reg = Registry()
-    exps = [str(p.relative_to(reg.lab / "experiments").with_suffix("")) for g in ("bench", "robot")
-            for p in (reg.lab / "experiments" / g).glob("*.yaml")] + ["replication/baseline"]
+    exps = [str(p.relative_to(reg.lab / "experiments").with_suffix("")) for g in ("archive/bench", "archive/robot")
+            for p in (reg.lab / "experiments" / g).glob("*.yaml")] + ["archive/replication/baseline"]
     exps += [str(p.relative_to(reg.lab / "experiments").with_suffix("")) for p in (reg.lab / "experiments" / "main").glob("*.yaml")]
     exps += [str(p.relative_to(reg.lab / "experiments").with_suffix("")) for p in (reg.lab / "experiments" / "bench_main").glob("*.yaml")]
     for exp in exps:

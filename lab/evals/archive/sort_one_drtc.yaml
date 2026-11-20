@@ -14,9 +14,9 @@ models:
   - diffusion_sort_one_v1_full
   - groot_sort_one_v1_full
 conditions:
-  upstream: robot/upstream          # the normal stuff: no DRTC
-  drtc: replication/baseline        # DRTC (with today's fixes), as in sort_one_baseline_v2
-  drtc_smooth: robot/drtc_smooth    # DRTC + smoothing A
+  upstream: archive/robot/upstream          # the normal stuff: no DRTC
+  drtc: archive/replication/baseline        # DRTC (with today's fixes), as in sort_one_baseline_v2
+  drtc_smooth: archive/robot/drtc_smooth    # DRTC + smoothing A
 video: true
 
 # Written by `lab eval freeze`: the Hub commit each model is served at. Do not edit by hand.
