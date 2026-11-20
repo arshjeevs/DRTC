@@ -442,5 +442,7 @@ The report is rebuilt every time, so never edit it. Tell Claude when an eval is 
 Measured from the laptop over WiFi to the A100, through the SSH tunnel: about **390-450 ms** turnaround for ACT, of
 which the model takes about 40 ms. Ping is 7 ms and the upload speed 42 Mbit/s, so it isn't simply bandwidth; the
 cause is still being looked into (lab/PLAN.md). On the laptop's own GPU it is about 36 ms. It's recorded in every
-trial (M4, M6), and reports never mix servers. Every model served from the same server gets the same network delay;
-models with short chunks (GR00T 16 actions = 0.5 s) have the least room for it.
+trial (M4, M6), and reports never mix servers. Every model served from the same server gets the same network delay,
+but models with short chunks have the least room for it: on the replay robot over this link GR00T (16 actions =
+0.5 s) stalled 74% of the time, Diffusion 46%, while ACT (100) and SmolVLA (50) hardly stall. Expect GR00T to pause
+often when served from the A100 or H200 from this laptop.

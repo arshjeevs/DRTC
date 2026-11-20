@@ -73,3 +73,8 @@ Where the data comes from: [EVALUATION.md](EVALUATION.md) (one folder per trial;
 ## Changes
 
 None yet (v1).
+
+Clarification (2026-11-20, still v1, before any official trial): while the arm holds through a stall, the control
+loop does not ask for actions, so those ticks have no row in `ticks.csv`. M2, M3, M7 and M8b therefore use the tick
+grid from the first action to the end of the run (marked by the last row): every tick without a new action is a
+stall tick, and the commanded position is held through it.
