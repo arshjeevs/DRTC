@@ -1,4 +1,4 @@
-"""`lab eval list | check | freeze | status` (lab/EVALUATION.md). More commands come with Phase 5 steps 3-7."""
+"""`lab eval list | check | freeze | status | serve | servers` (lab/EVALUATION.md). More come with Phase 5 steps 5-7."""
 
 from __future__ import annotations
 
@@ -108,6 +108,44 @@ def cmd_status(reg: Registry, a) -> int:
     return 0
 
 
+def _models(arg: str | None) -> list[str] | None:
+    return [m.strip() for m in arg.split(",") if m.strip()] if arg else None
+
+
+def cmd_serve(reg: Registry, a) -> int:
+    from drtc.evals import serving
+
+    return serving.serve(reg, a.eval, _models(a.models), a.device)
+
+
+def cmd_servers(reg: Registry, a) -> int:
+    """Reach the eval's servers on one model server and ask each model to describe itself."""
+    from drtc.evals import serving
+
+    sp = S.load(reg, a.eval)
+    if not S.is_frozen(sp):
+        raise RegistryError(f"{a.eval} is not frozen (lab eval freeze {a.eval})")
+    conn = serving.connect(reg, sp, a.server, _models(a.models))
+    bad = 0
+    try:
+        print(f"{a.eval} on {a.server}:")
+        for m, ep in conn.endpoints.items():
+            d = serving.probe(ep, serving.deployment(sp, m))
+            if "error" in d:
+                bad += 1
+                print(f"  {m:32s} NOT REACHABLE: {d['error']}")
+            else:
+                state = "ready" if d.get("ready") else "LOADING"
+                print(f"  {m:32s} {state:7s} commit {sp.frozen[m][:8]}  checkpoint {d.get('artifact_identity', '?')[:19]}"
+                      f"  {ep}")
+    finally:
+        if not a.keep:
+            conn.close()
+    if bad:
+        print(f"{bad} not reachable: is `lab eval serve {a.eval}` running on {a.server}?")
+    return 1 if bad else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="lab eval", description="Official evaluations (lab/EVALUATION.md)")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -119,6 +157,17 @@ def main(argv: list[str] | None = None) -> int:
         p = sub.add_parser(name, help=help_)
         p.add_argument("eval", help="the eval's name (lab/evals/<eval>.yaml)")
         p.set_defaults(fn=fn)
+    p = sub.add_parser("serve", help="on a model server: serve every model of a frozen eval (Ctrl-C stops them)")
+    p.add_argument("eval")
+    p.add_argument("--models", help="only these models (comma-separated), e.g. when the GPU is too small for all")
+    p.add_argument("--device", default="cuda")
+    p.set_defaults(fn=cmd_serve)
+    p = sub.add_parser("servers", help="on the robot computer: check that the eval's models answer on a server")
+    p.add_argument("eval")
+    p.add_argument("--server", required=True, choices=["laptop", "a100", "h200"])
+    p.add_argument("--models", help="only these models (comma-separated)")
+    p.add_argument("--keep", action="store_true", help="keep the SSH tunnel open afterwards")
+    p.set_defaults(fn=cmd_servers)
     a = ap.parse_args(argv)
     reg = Registry()
     try:

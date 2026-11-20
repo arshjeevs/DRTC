@@ -23,8 +23,23 @@ from drtc.registry import Registry, RegistryError
 JOINT_SEMANTICS = {True: "so101-degrees-gripper-percent-v1", False: "so101-range100-gripper-percent-v1"}
 
 
-def deployment_name(model_id: str) -> str:
-    return model_id.replace("_", "-")
+def deployment_name(model_id: str, revision: str | None = None) -> str:
+    """The name a client asks for. With a revision (eval serving), the Hub commit is part of the name, so a client
+    can only ever reach the model version its frozen eval names."""
+    name = model_id.replace("_", "-")
+    return f"{name}-{revision[:8]}" if revision else name
+
+
+# What a policy server needs from a model repo: the root (the served checkpoint). checkpoints/<step>/ holds the
+# training state for resuming (optimizer, several GB for the VLAs) and is never downloaded for serving.
+SERVE_IGNORE = ["checkpoints/*", "checkpoints/**"]
+
+
+def fetch_checkpoint(repo: str, revision: str | None = None) -> Path:
+    """Download (or find in the Hub cache) only the served checkpoint of a model repo."""
+    from huggingface_hub import snapshot_download
+
+    return Path(snapshot_download(repo, revision=revision, ignore_patterns=SERVE_IGNORE))
 
 
 def semantics_for(reg: Registry, model_id: str) -> dict:
@@ -85,6 +100,8 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="lab serve", description=__doc__.split("\n\n")[0])
     ap.add_argument("model")
     ap.add_argument("--path", help="serve this local checkpoint folder instead of the model's Hub repo")
+    ap.add_argument("--revision", help="serve this Hub commit of the model repo (lab eval serve passes the frozen one)")
+    ap.add_argument("--deployment", help="the deployment name clients ask for (default: from the model's name)")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--listen", default="tcp/127.0.0.1:7447", help="Zenoh endpoint to listen on")
     ap.add_argument("--robot-type", help="declared robot type (default: the dataset rig's), e.g. replay for tests")
@@ -98,7 +115,9 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     if a.robot_type:
         cfg["robot_type"] = a.robot_type
-    out = Path("outputs/serve") / f"{a.model}.yaml"
+    if a.deployment:
+        cfg["deployment"] = a.deployment
+    out = Path("outputs/serve") / f"{a.deployment or a.model}.yaml"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(yaml.safe_dump(cfg, sort_keys=False))
     print(f"server config: {out}\n" + yaml.safe_dump(cfg, sort_keys=False) if a.dry_run else f"server config: {out}")
@@ -115,12 +134,15 @@ def main(argv: list[str] | None = None) -> int:
         from drtc.compat.serve import install_loader, needs_compat, prepare_checkpoint
 
         hub = cfg["model"]["repo_or_path"]
-        if needs_compat(hub):  # a model carried over from the minor (old checkpoint format)
-            local = prepare_checkpoint(hub)
+        if needs_compat(hub, a.revision):  # a model carried over from the minor (old checkpoint format)
+            local = prepare_checkpoint(hub, a.revision)
             print(f"old-format checkpoint {hub}: serving the converted copy {local}", flush=True)
-            cfg["model"]["repo_or_path"] = str(local)
-            out.write_text(yaml.safe_dump(cfg, sort_keys=False))
             install_loader()
+        else:
+            local = fetch_checkpoint(hub, a.revision)
+            print(f"serving {hub} at {a.revision or 'its latest commit'} from {local}", flush=True)
+        cfg["model"]["repo_or_path"] = str(local)
+        out.write_text(yaml.safe_dump(cfg, sort_keys=False))
     sys.argv = ["lerobot-policy-server", f"--config_path={out}", *extra]
     return lerobot_policy_server.main() or 0
 

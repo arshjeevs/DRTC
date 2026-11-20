@@ -43,7 +43,7 @@ def prepare_checkpoint(hub: str, revision: str | None = None) -> Path:
     """A local copy of an old-format checkpoint that LeRobot 0.7's server can read."""
     from huggingface_hub import snapshot_download
 
-    src = Path(snapshot_download(hub, revision=revision))
+    src = Path(snapshot_download(hub, revision=revision, ignore_patterns=["checkpoints/*", "checkpoints/**"]))
     dst = CACHE / hub.replace("/", "--") / src.name  # src.name: the snapshot's commit
     if (dst / ".complete").exists():
         return dst
