@@ -5,3 +5,5 @@ smolvla_cubebox_v0_full: {recipe: smolvla_authors, dataset: so101_cubebox_v0, st
   notes: 'SmolVLA on trimmed v0; original recipe (action expert only)'}
 act_cubebox_v0_full: {recipe: act_original, dataset: so101_cubebox_v0, status: planned,
   notes: 'ACT on trimmed v0; original recipe'}
+groot_cubebox_v0_full: {recipe: groot_n15_nvidia, dataset: so101_cubebox_v0, status: planned,
+  notes: 'GR00T N1.5 on trimmed v0; original recipe. Locked scope 2026-11-20: one of the 2 experiment models on all 3 datasets'}
