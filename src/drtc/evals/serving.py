@@ -84,6 +84,15 @@ def serve(reg: Registry, name: str, models: list[str] | None, device: str, ready
     unknown = [m for m in chosen if m not in sp.models]
     if unknown:
         raise RegistryError(f"not in {name}: {', '.join(unknown)} (its models: {', '.join(sp.models)})")
+    import signal
+
+    # Stop cleanly on Ctrl-C and on `kill` (SIGTERM), also when started in the background from a script: a background
+    # process of a non-interactive shell ignores SIGINT, so the servers kept running (H200, 2026-11-20).
+    def _stop(signum, frame):
+        raise KeyboardInterrupt
+
+    signal.signal(signal.SIGINT, _stop)
+    signal.signal(signal.SIGTERM, _stop)
     listen_host = "0.0.0.0" if in_container() else "127.0.0.1"
     busy = [f"{m} (port {port(sp, m)})" for m in chosen if not port_free(port(sp, m), listen_host)]
     if busy:

@@ -110,13 +110,19 @@ def render(reg, name, sp, trials, mrows) -> str:
     # comparisons against the baseline condition
     conds = list(sp.conditions)
     base = "baseline" if "baseline" in conds else conds[0]
-    others = [c for c in conds if c != base]
-    if others:
-        L += [f"## Against `{base}` (same model; METRICS.md rule 5)", "",
-              "p-values: Fisher's exact test (M1), Mann-Whitney U (the others). Δ = condition minus baseline (medians).",
+    # Comparisons: every condition against the reference (`baseline`, else the first), and each condition against
+    # the one before it in the eval file (e.g. upstream -> drtc -> drtc_smooth: claim 1 and claim 2).
+    pairs = [(c, base) for c in conds if c != base]
+    pairs += [(conds[i], conds[i - 1]) for i in range(1, len(conds)) if (conds[i], conds[i - 1]) not in pairs
+              and conds[i - 1] != base]
+    for ref in dict.fromkeys(r for _, r in pairs):
+        others = [c for c, r in pairs if r == ref]
+        L += [f"## Against `{ref}` (same model; METRICS.md rule 5)", "",
+              f"p-values: Fisher's exact test (M1), Mann-Whitney U (the others). Δ = condition minus `{ref}` (medians).",
               ""]
         heads = ([("M1_success", "M1")] if rig else []) + [(c, lbl.split(" (")[0]) for c, lbl, _ in cols]
         L += ["| Condition | Model | " + " | ".join(h for _, h in heads) + " |", "|---|---|" + "---|" * len(heads)]
+        base = ref
         for c in others:
             for m in sp.models:
                 a, b = groups.get((c, m), []), groups.get((base, m), [])
