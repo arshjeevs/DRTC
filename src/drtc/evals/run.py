@@ -262,8 +262,10 @@ def session_run(reg: Registry, name: str, server: str, models: list[str] | None,
         if missing:
             raise RegistryError(f"not served on {server}: {'; '.join(missing)}. Start `lab eval serve {name}` there"
                                 + (" or pass --models with the ones that are" if not models else ""))
-        host = reg.hosts.get(server)
+        host = reg.current_host() if server == "local" else reg.hosts.get(server)
         gpu = host.gpus[0].name if host and host.gpus else None
+        if server == "local" and host is not None:
+            server = f"local ({host.id})"
         mach = machine(reg)
         session = store.sessions_dir(name, root) / f"{datetime.now():%Y%m%d-%H%M}-{mach}"
         session.mkdir(parents=True, exist_ok=True)

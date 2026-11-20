@@ -16,6 +16,7 @@ the client's request deadline (action_timeout_s), which upstream treats as a ter
 
 from __future__ import annotations
 
+import random
 import threading
 import time
 from collections import deque
@@ -29,15 +30,22 @@ KINDS = ("drop_obs", "drop_action", "dup_obs", "dup_action", "reorder_obs", "reo
 class FaultPlan:
     windows: dict[str, list[tuple[float, float]]] = field(default_factory=dict)
     spikes: list[list] = field(default_factory=list)  # [start_s, delay_s, used]
+    # a steady network delay on every reply: (base_s, jitter_s, seed); jitter is uniform in [0, jitter]
+    latency: tuple[float, float, int] | None = None
 
     @classmethod
     def from_dict(cls, spec: dict) -> "FaultPlan":
         windows = {k: [(float(w["start_s"]), float(w["duration_s"])) for w in spec.get(k) or []] for k in KINDS}
         spikes = [[float(s["start_s"]), float(s["delay_ms"]) / 1000.0, False] for s in spec.get("spikes") or []]
-        return cls({k: v for k, v in windows.items() if v}, spikes)
+        lat = spec.get("latency")
+        latency = None
+        if lat:
+            latency = (float(lat.get("base_ms", 0)) / 1000.0, float(lat.get("jitter_ms", 0)) / 1000.0,
+                       int(lat.get("seed", 0)))
+        return cls({k: v for k, v in windows.items() if v}, spikes, latency)
 
     def __bool__(self) -> bool:
-        return bool(self.windows or self.spikes)
+        return bool(self.windows or self.spikes or self.latency)
 
     def active(self, kind: str, t: float) -> bool:
         return any(start <= t < start + dur for start, dur in self.windows.get(kind, ()))
@@ -50,6 +58,9 @@ class _ReplyChannel:
         self._inner, self._inj = inner, injector
         self._stash: deque = deque()  # duplicates and released held-back replies, delivered first
         self._held = None
+        self._delayed: deque = deque()  # (release time, payload): the steady network delay (latency)
+        lat = injector.plan.latency
+        self._rng = random.Random(lat[2]) if lat else None
 
     def __getattr__(self, name):  # oversized, dropped, ... pass through
         return getattr(self._inner, name)
@@ -57,7 +68,35 @@ class _ReplyChannel:
     def get(self, timeout=None):
         if self._stash:
             return self._stash.popleft()
-        payload = self._inner.get(timeout=timeout)  # raises Empty like the real channel
+        if self._rng is not None:
+            payload = self._delayed_get(timeout)
+        else:
+            payload = self._inner.get(timeout=timeout)  # raises Empty like the real channel
+        return self._faults(payload)
+
+    def _delayed_get(self, timeout):
+        """Hold every reply until its release time, never blocking longer than the caller's timeout: like a slow
+        network, a late reply is just not there yet (so the cooldown sees it as late)."""
+        base, jitter, _ = self._inj.plan.latency
+        deadline = time.monotonic() + (timeout if timeout is not None else 1e9)
+        while True:
+            now = time.monotonic()
+            if self._delayed and self._delayed[0][0] <= now:
+                return self._delayed.popleft()[1]
+            try:
+                wait = max(0.0, min(deadline, self._delayed[0][0] if self._delayed else deadline) - now)
+                payload = self._inner.get(timeout=max(wait, 0.001))
+                release = now + base + self._rng.uniform(0.0, jitter)
+                if self._delayed:
+                    release = max(release, self._delayed[-1][0])  # a network keeps order
+                self._delayed.append((release, payload))
+                self._inj.record("latency", self._inj.now(), round(release - now, 4))
+            except Empty:
+                pass
+            if time.monotonic() >= deadline:
+                raise Empty
+
+    def _faults(self, payload):
         inj = self._inj
         t = inj.now()
         if inj.plan.active("disconnect", t) or inj.plan.active("drop_action", t):

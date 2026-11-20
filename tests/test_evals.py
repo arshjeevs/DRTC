@@ -176,3 +176,26 @@ def test_request_delay_never_exceeds_the_chunk(monkeypatch):
     assert out.delay == 16 and rt.pending.delay == 16
     rt.max_delay = 20
     assert rt.begin(None).delay == 17  # within the chunk: unchanged
+
+
+def test_latency_fault_delays_replies_without_blocking():
+    import queue as _q
+    import time as _t
+
+    from drtc.control.faults import FaultInjector, FaultPlan, _ReplyChannel
+
+    inner = _q.Queue()
+    inj = FaultInjector(FaultPlan.from_dict({"latency": {"base_ms": 200, "jitter_ms": 0}}))
+    inj.start()
+    ch = _ReplyChannel(inner, inj)
+    inner.put(b"a")
+    inner.put(b"b")
+    t0 = _t.monotonic()
+    try:
+        ch.get(timeout=0.05)  # not there yet: a short wait times out, as on a slow network
+        raise AssertionError("delivered too early")
+    except _q.Empty:
+        pass
+    assert ch.get(timeout=1.0) == b"a" and _t.monotonic() - t0 >= 0.19
+    assert ch.get(timeout=1.0) == b"b"  # order kept
+    assert any(e[1] == "latency" for e in inj.events)

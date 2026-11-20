@@ -103,10 +103,33 @@ def check(reg: Registry, spec: EvalSpec) -> list[str]:
             reg.experiment_path(exp)
         except RegistryError as e:
             problems.append(f"condition {c!r}: {e}")
+    from drtc.control.serve import RTC_POLICIES
+
+    for c, exp in spec.conditions.items():
+        try:
+            rtc = condition_rtc(reg, exp)
+        except RegistryError:
+            continue
+        for m in spec.models:
+            if rtc and m in reg.models and reg.resolve(m).policy not in RTC_POLICIES:
+                problems.append(f"condition {c!r} uses RTC, which {m} ({reg.resolve(m).policy}) does not have: put RTC "
+                                f"conditions in an eval of RTC models only")
     for m in spec.frozen:
         if m not in spec.models:
             problems.append(f"frozen lists {m!r}, which is not in models")
     return problems
+
+
+def condition_rtc(reg: Registry, experiment: str) -> bool:
+    """RTC only when the condition's own experiment file asks for it (drtc.control.run.rtc_requested)."""
+    from drtc.control.run import rtc_requested
+
+    return rtc_requested(reg, experiment)
+
+
+def needs_rtc(reg: Registry, spec: EvalSpec, model: str) -> bool:
+    """Serve this model with guided RTC: one of the eval's conditions asks for it."""
+    return any(condition_rtc(reg, exp) for exp in spec.conditions.values())
 
 
 def task_of(reg: Registry, spec: EvalSpec) -> str:

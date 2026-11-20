@@ -31,7 +31,7 @@ INDEX_FIELDS = ["run_id", "experiment", "model", "trial", "success", "started_at
                 "git_dirty", "note", "run_dir", "robot", "host", "outcome"]
 # Composed experiment keys this run applies; anything else that is set is reported as not applied yet.
 APPLIED = {"cooldown", "cooldown_cap", "epsilon", "action_filter_mode", "action_filter_butterworth_cutoff", "action_filter_gain", *("drop_obs", "drop_action", "dup_obs", "dup_action", "reorder_obs", "reorder_action", "disconnect",
-              "spikes"), "estimator", "s_min", "latency_k", "latency_alpha", "latency_beta", "duration_s", "fps", "task",
+              "spikes", "latency"), "estimator", "s_min", "latency_k", "latency_alpha", "latency_beta", "duration_s", "fps", "task",
            "policy_type", "pretrained_name_or_path", "finetune", "model", "name", "description", "train",
            "rtc_enabled", "num_flow_matching_steps", "actions_per_chunk"}
 APPLIED_PREFIXES = ("robot_", "camera", "client_host", "server_host", "gpu")
@@ -39,11 +39,11 @@ APPLIED_PREFIXES = ("robot_", "camera", "client_host", "server_host", "gpu")
 PENDING = {"smoothness_guidance": "smoothing C (D6)", "playback_mode": "smoothing A (D6)",
            "playback_min_rate": "smoothing A (D6)", "playback_margin_steps": "smoothing A (D6)",
            "playback_rate_slew": "smoothing A (D6)", "rtc_sigma_d": "RTC (D6)",
-           "rtc_prefix_attention_schedule": "RTC (D6)", 
+           "rtc_prefix_attention_schedule": "RTC settings are the server's (upstream defaults)", 
             
            "full_diagnostics": "old client diagnostics"}
 FAULT_KEYS = ("drop_obs", "drop_action", "dup_obs", "dup_action", "reorder_obs", "reorder_action", "disconnect",
-              "spikes")
+              "spikes", "latency")
 
 
 def append_index(rows: list[dict], index: Path | None = None) -> None:
@@ -86,6 +86,17 @@ def robot_flags(reg: Registry, model_id: str, robot: str, episode: int, log_path
     return flags
 
 
+def rtc_requested(reg: Registry, experiment: str) -> bool:
+    """Guided RTC is used only when the experiment file itself sets `rtc_enabled: true` (2026-11-20).
+
+    Recipes and models also carry an `rtc_enabled` (the minor's serve hints, e.g. SmolVLA's), which never switched
+    anything on before RTC was wired; honouring them would quietly turn running baselines into RTC runs.
+    """
+    from drtc.registry.registry import load_yaml
+
+    return load_yaml(reg.experiment_path(experiment)).get("rtc_enabled") is True
+
+
 def build(reg: Registry, experiment: str, model: str | None, robot: str, episode: int, endpoint: str,
           duration: float | None, run_dir: Path, deployment: str | None = None) -> tuple[list[str], dict, list[str]]:
     from drtc.control.serve import camera_renames, deployment_name, semantics_for
@@ -108,8 +119,6 @@ def build(reg: Registry, experiment: str, model: str | None, robot: str, episode
             continue
         elif k in PENDING and k not in off and v not in (None, False, 0, 0.0, "fixed", "none"):
             notes.append(f"{k}={v}: {PENDING[k]} (not applied yet)")
-    if composed.get("rtc_enabled"):
-        notes.append("rtc_enabled: runs as plain chunks until RTC deployments are wired (D6)")
     sem = semantics_for(reg, model_id)
     flags = {
         **robot_flags(reg, model_id, robot, episode, run_dir / "robot_commands.jsonl"),
@@ -117,7 +126,7 @@ def build(reg: Registry, experiment: str, model: str | None, robot: str, episode
         "inference.endpoint": endpoint,
         "inference.deployment": deployment or deployment_name(model_id),
         "inference.semantics": sem["joints"],
-        "inference.mode": "chunk",
+        "inference.mode": "rtc_guided" if rtc_requested(reg, experiment) else "chunk",
         "inference.chunk_merge": "aligned",
         "inference.scheduler": "drtc",
         "inference.estimator": composed.get("estimator", "jk"),

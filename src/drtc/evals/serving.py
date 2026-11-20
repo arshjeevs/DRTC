@@ -33,7 +33,7 @@ from drtc.registry import Registry, RegistryError
 PORT_BLOCKS_START = 7500  # eval blocks: 7500-9999, 10 ports each
 TUNNEL_OFFSET = 10000
 MAX_MODELS = 10
-SERVERS = ("laptop", "a100", "h200")
+SERVERS = ("local", "laptop", "a100", "h200")  # local: this machine (e.g. the bench inside the H200 container)
 
 
 def deployment(spec: S.EvalSpec, model: str) -> str:
@@ -98,6 +98,8 @@ def serve(reg: Registry, name: str, models: list[str] | None, device: str, ready
             log = logs / f"{m}.log"
             cmd = [sys.executable, "-m", "drtc.cli", "serve", m, "--revision", sp.frozen[m], "--deployment",
                    deployment(sp, m), "--listen", f"tcp/{listen_host}:{port(sp, m)}", "--device", device]
+            if S.needs_rtc(reg, sp, m):
+                cmd.append("--rtc")
             fh = open(log, "w")
             proc = subprocess.Popen(cmd, stdout=fh, stderr=subprocess.STDOUT)
             procs.append((m, proc, log))
@@ -166,7 +168,7 @@ def connect(reg: Registry, spec: S.EvalSpec, server: str, models: list[str] | No
     if server not in SERVERS:
         raise RegistryError(f"server must be one of {', '.join(SERVERS)}")
     chosen = models or spec.models
-    if server == "laptop":
+    if server in ("laptop", "local"):
         return Connection(server, {m: f"tcp/127.0.0.1:{port(spec, m)}" for m in chosen})
     ssh, container = _ssh_target(reg, server)
     sock = Path.home() / ".ssh" / f"lab-{server}.sock"

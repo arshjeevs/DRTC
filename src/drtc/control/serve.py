@@ -30,6 +30,12 @@ def deployment_name(model_id: str, revision: str | None = None) -> str:
     return f"{name}-{revision[:8]}" if revision else name
 
 
+# Policies that declare guided RTC in LeRobot 0.7 (SmolVLA upstream; GR00T N1.5 through our plugin). ACT and Diffusion
+# have none: an RTC condition on them is refused by `lab eval check`.
+RTC_POLICIES = {"smolvla", "groot_n15", "pi0", "pi05"}
+RTC_EXECUTION_HORIZON = 10  # upstream's default (RTCConfig.execution_horizon)
+
+
 # What a policy server needs from a model repo: the root (the served checkpoint). checkpoints/<step>/ holds the
 # training state for resuming (optimizer, several GB for the VLAs) and is never downloaded for serving.
 SERVE_IGNORE = ["checkpoints/*", "checkpoints/**"]
@@ -83,10 +89,13 @@ def server_config(reg: Registry, model_id: str, path: str | None = None, device:
         h, w, c = f["shape"]
         features.append({"name": renames.get(key, key), "shape": [h, w, c], "dtype": "uint8", "kind": "rgb",
                          "semantics": sem["cameras"].get(cam, f"rgb-{cam}-v1")})
+    execution = {"supported_modes": modes or ["chunk"], "action_fps": float(meta.fps)}
+    if any(m != "chunk" for m in execution["supported_modes"]):
+        execution["rtc"] = {"enabled": True, "mode": "guided", "execution_horizon": RTC_EXECUTION_HORIZON}
     return {
         "deployment": deployment_name(model_id),
         "model": {"repo_or_path": path or r.hub, "revision": None, "device": device},
-        "execution": {"supported_modes": modes or ["chunk"], "action_fps": float(meta.fps)},
+        "execution": execution,
         "zenoh": {"mode": "peer", "listen_endpoints": [listen]},
         "semantics": sem["joints"],
         "robot_type": reg.rigs[r.dataset.rig].robot.type if reg.rigs[r.dataset.rig].robot else "so101_follower",
@@ -102,6 +111,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--path", help="serve this local checkpoint folder instead of the model's Hub repo")
     ap.add_argument("--revision", help="serve this Hub commit of the model repo (lab eval serve passes the frozen one)")
     ap.add_argument("--deployment", help="the deployment name clients ask for (default: from the model's name)")
+    ap.add_argument("--rtc", action="store_true", help="also serve guided RTC (SmolVLA, GR00T N1.5); clients choose it "
+                                                       "per session with an rtc_enabled experiment")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--listen", default="tcp/127.0.0.1:7447", help="Zenoh endpoint to listen on")
     ap.add_argument("--robot-type", help="declared robot type (default: the dataset rig's), e.g. replay for tests")
@@ -109,7 +120,9 @@ def main(argv: list[str] | None = None) -> int:
     a, extra = ap.parse_known_args(argv)
     reg = Registry()
     try:
-        cfg = server_config(reg, a.model, a.path, a.device, a.listen)
+        if a.rtc and reg.resolve(a.model).policy not in RTC_POLICIES:
+            raise RegistryError(f"{a.model}: its policy ({reg.resolve(a.model).policy}) has no RTC")
+        cfg = server_config(reg, a.model, a.path, a.device, a.listen, modes=["chunk", "rtc_guided"] if a.rtc else None)
     except RegistryError as e:
         print(f"lab serve: {e}", file=sys.stderr)
         return 1
