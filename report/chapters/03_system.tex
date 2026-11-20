@@ -1,0 +1,197 @@
+\chapter{System Design and Implementation}\label{ch:system}
+
+\section{Overview}
+
+Figure~\ref{fig:architecture} shows the system. The robot computer, a laptop, reads two cameras and the arm's joint
+positions, sends observations to a GPU server, and executes the returned chunks of actions on the arm at 30~Hz. Between
+the two, a fault injector can delay, drop, duplicate or reorder messages. Everything on the robot computer except the
+scheduler and the smoothing is LeRobot~0.7 as it ships; the server is LeRobot's policy server, unchanged.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/architecture}
+  \caption{The system. The robot computer runs the control loop at 30~Hz; the scheduler decides when to request the
+           next chunk, and the smoothing shapes the commands sent to the arm. Faults are injected where a real network
+           would cause them, so both the shipped client and \drtc{} react to them with their own logic.}
+  \label{fig:architecture}
+\end{figure}
+
+\section{Hardware}\label{sec:hardware}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Hardware and software.}
+  \label{tab:hardware}
+  \begin{tabularx}{\textwidth}{l X}
+    \toprule
+    Component & Description \\
+    \midrule
+    Arm & SO-101 follower arm~\cite{so101} with six Feetech servos; an identical leader arm for recording \\
+    Cameras & Wrist: Zebronics Zeb Live Pro, $800\times600$ MJPG at 30~fps. Scene: an Android phone over USB
+              (DroidCam), $800\times600$ at 30~fps \\
+    Robot computer & Laptop (Linux, NVIDIA RTX~4060 Laptop GPU, 8~GB), running the control loop and the client;
+                     used for every experiment in this report \\
+    Model server & NVIDIA A100 80~GB (a shared GPU server) for every robot experiment \\
+    Training and offline tests & NVIDIA H200 (141~GB, shared, in a container) and the A100 \\
+    Network & Laptop to server over WiFi and the local network. Each request carries both camera images
+              uncompressed ($2\times800\times600\times3$~bytes $\approx$ 2.9~MB) and the joint state \\
+    Software & LeRobot~0.7.0, PyTorch~2.14.1, Python~3.12; our layer, the \texttt{lab} command (Section~\ref{sec:impl}) \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \photo[0.9\textwidth]{setup.jpg}{The whole setup: the SO-101 arm, the task board, the cameras and the laptop.}
+  \caption{The experimental setup.}
+  \label{fig:setup}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \begin{subfigure}[t]{0.48\textwidth}
+    \centering
+    \photo[\textwidth]{arm_wrist_camera.jpg}{The follower arm with the wrist camera.}
+    \caption{Follower arm and wrist camera.}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.48\textwidth}
+    \centering
+    \photo[\textwidth]{scene_camera.jpg}{The scene camera (phone) and its view of the task.}
+    \caption{Scene camera.}
+  \end{subfigure}
+  \caption{The robot and its cameras.}
+  \label{fig:robot}
+\end{figure}
+
+\section{The baseline: LeRobot remote inference}\label{sec:baseline}
+
+The baseline is LeRobot~0.7's remote-inference client as it ships. With $q_t$ queued actions, an action period
+$\Delta = 1/30$~s and a turnaround estimate $\hat L$, it requests the next chunk when
+\begin{equation}
+  q_t\,\Delta \;\le\; \max\!\left(T_{\mathrm{refill}},\; \hat L + \Delta\right),
+\end{equation}
+where $T_{\mathrm{refill}}=0.5$~s and $\hat L$ is the largest of the last 100 measured turnarounds. It keeps one request
+in flight; a reply that misses its deadline is a fault; and when no action is available for the starvation grace of
+1~s, it ends the run.
+
+\section{\drtc{} on LeRobot 0.7}\label{sec:drtc}
+
+We implemented \drtc's scheduling inside LeRobot's own runtime, replacing only the decision of when to request and
+when to give up on a request. All of LeRobot's checks stay in place: one request in flight, observation freshness,
+generations, deadlines and latched faults.
+
+\paragraph{Trigger.} A chunk is requested when $q_t \le H - s_{\min}$, with $H$ the length of the last accepted chunk.
+We use $s_{\min}=20$ steps for \smolvla{} ($H=50$) and $s_{\min}=8$ for \groot{} ($H=16$).
+
+\paragraph{Latency estimate.} For every measured turnaround $R$, the Jacobson--Karels estimator updates a smoothed mean
+$\bar R$ and a smoothed mean deviation $D$,
+\begin{equation}
+  D \leftarrow (1-\beta)\,D + \beta\,|R-\bar R|, \qquad \bar R \leftarrow (1-\alpha)\,\bar R + \alpha R, \qquad
+  \hat L = \bar R + k\,D,
+\end{equation}
+with $\alpha=1/8$, $\beta=1/4$ (as in TCP~\cite{rfc6298}) and $k=1.5$.
+
+\paragraph{Cooldown.} A request not answered within its cooldown $c$ is given up and a fresh observation is sent. In
+\drtc{} the cooldown is the latency estimate in steps, capped at $H/2$, plus a margin of $\varepsilon$ steps. Ours is
+\begin{equation}
+  c = \max\!\left(2,\; \left\lceil \tilde L / \Delta \right\rceil + \varepsilon\right)\Delta, \qquad
+  \tilde L = \max\!\left(\hat L,\; \max_{i\,\in\,\text{last 10}} R_i\right),
+\end{equation}
+with $\varepsilon = 1$, and before the first reply $c = \max\!\left((s_{\min}+\varepsilon)\Delta,\;
+T_{\mathrm{start}}\right)$ with the start-up timeout $T_{\mathrm{start}}=10$~s.
+
+\paragraph{Holding through stalls.} Under \drtc{} the arm holds its last commanded position while no action is
+available and continues when a chunk arrives; the run is not ended after one second.
+
+\paragraph{Fixes found on the real setup.} Table~\ref{tab:fixes} lists the four changes to \drtc{} that the
+experiments required. Each was found as a failure on the real robot and verified on the replay bench before the main
+experiment.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Failure modes of \drtc{} on the real setup and our fixes.}
+  \label{tab:fixes}
+  \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{0.21\textwidth} X X}
+    \toprule
+    Failure & Cause & Fix \\
+    \midrule
+    \groot{} never received a chunk & The cooldown is capped at $H/2$: 8 steps (0.27~s) for a 16-action chunk, while
+      replies took 0.4--0.7~s, so every request was given up before its reply & The cooldown is never shorter than the
+      measured latency (no cap; the original cap remains an option) \\
+    A storm of re-requests & Replies close to the estimate were given up; the server, still computing them, slowed
+      further & The cooldown also covers the slowest of the last 10 replies \\
+    The robot never started on a slow link & Before the first reply the cooldown is only $s_{\min}+\varepsilon$ steps
+      & Until the first reply, wait up to the start-up timeout \\
+    \enquote{Invalid RTC delay} errors & The requested inference delay could exceed the server's chunk & Cap the
+      delay at the server's prediction steps \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\section{Smoothing}\label{sec:smoothing}
+
+\paragraph{Butterworth filter.} Every commanded arm position passes through a causal second-order Butterworth low-pass
+filter per joint, with a cutoff of 3~Hz at the 30~Hz control rate, implemented as second-order sections. A gain $g=1.4$
+on each step compensates the filter's loss of amplitude: with $y_t$ the filter output, the command is
+$u_t = u_{t-1} + g\,(y_t - u_{t-1})$. The filter keeps its state across chunk boundaries, which smooths the switch from
+one chunk to the next, and is reset when motion is invalidated.
+
+\paragraph{Adaptive playback.} When the queue would empty before the next chunk arrives, the actions are played more
+slowly instead of the arm stopping. With $n_t$ the expected ticks until the next chunk (from the latency estimate and
+the time since the request was sent), the playback rate is
+\begin{equation}
+  r^\star_t = \mathrm{clip}\!\left(\frac{q_t}{n_t + m},\; r_{\min},\; 1\right), \qquad
+  r_t = r_{t-1} + \mathrm{clip}\!\left(r^\star_t - r_{t-1},\, -\sigma,\, \sigma\right),
+\end{equation}
+with $r_{\min}=0.5$, a margin $m=4$ steps and a slew limit $\sigma=0.05$ per tick. A phase $\phi$ advances by $r_t$
+per tick, and the command is interpolated linearly between the two actions around it. With a full queue, $r_t=1$ and
+playback is unchanged.
+
+\section{Network fault injection}\label{sec:faults}
+
+Faults are injected in the client's transport, where a real network would cause them, so that the scheduler, the
+deadlines and the starvation logic all respond as they would to a real fault. The injector supports dropping,
+duplicating and reordering observations and replies, latency spikes (a one-time extra delay of a reply), disconnects
+(both directions dropped) and, on the bench, a constant latency with jitter. Every injected fault is logged.
+
+The experiments use one fixed \emph{fault mix} (Figure~\ref{fig:faultmix}), on the trial's clock: a latency spike of
++1~s at 2~s, every reply dropped from 4 to 5~s, and a full outage from 6 to 7.5~s.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/faultmix}
+  \caption{The fault mix of conditions 2--4, in seconds from the start of a trial.}
+  \label{fig:faultmix}
+\end{figure}
+
+\section{Evaluation framework}\label{sec:evalsys}
+
+\paragraph{Evaluation plans.} Each evaluation is a file that fixes the task, the written success rule, the time limit,
+the policies and the conditions. Before the first trial it is \emph{frozen}: every policy is pinned to its exact model
+version, so all trials of an evaluation use the same models.
+
+\paragraph{Rounds.} Trials run in rounds. Each round runs every policy under every condition once, in a seeded random
+order, so slow drifts (light, motor temperature) affect all conditions alike. The operator resets the scene, starts
+the trial, and presses a key for success or failure.
+
+\paragraph{Records.} Every trial stores its raw logs (one row per control tick and per chunk, the injected faults, the
+scheduler's recovery actions), its configuration and a video from each camera. Raw files are never edited; a trial
+with a setup mistake is marked void with a reason, kept, and listed in the report. Sessions are pushed to a shared,
+private results store, and the reports are rebuilt from the raw files, so every number in this report can be traced to
+its trials.
+
+\paragraph{Bench.} A replay robot plays recorded held-out episodes as the camera input, without an arm, so the network
+behaviour of every condition can be measured without operator time. It reports the timing and smoothness metrics but
+not task success.
+
+\paragraph{Offline evaluation.} Without a robot, each trained policy predicts chunks from held-out recorded
+observations; the predictions are compared with the recorded actions, and the inference time and GPU memory are
+measured.
+
+\section{Implementation}\label{sec:impl}
+
+The project is a Python layer on top of LeRobot~0.7, which is used as a pinned dependency. A registry of YAML files
+describes the datasets, training recipes, models, rigs, machines, experiment conditions and evaluation plans; a single
+command, \texttt{lab}, trains, serves, runs and evaluates from it. The \drtc{} engine, the fault injector, the smoothing
+and the evaluation framework are covered by automated tests. Appendix~\ref{app:repro} lists the commands that reproduce
+the results.

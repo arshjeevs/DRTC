@@ -1,0 +1,70 @@
+\chapter{Introduction}\label{ch:intro}
+
+\section{Motivation}
+
+Robots can now learn manipulation skills from a few dozen human demonstrations. Early policies of this kind, such as
+Action Chunking with Transformers (ACT)~\cite{zhao2023act} and Diffusion Policy~\cite{chi2023diffusion}, are small
+networks trained for one task. Vision-language-action (VLA) models extend them with a pretrained vision-language
+backbone that reads camera images, the robot's joint state and a written instruction, and outputs actions; examples
+are \smolvla~\cite{shukor2025smolvla}, the GR00T family~\cite{nvidia2025gr00t}, \pizerofive~\cite{pi2025pi05} and
+MolmoAct~2~\cite{molmoact2}. These models have from about half a billion to several billion parameters and need a GPU.
+
+A low-cost arm, however, is driven by a small computer: a laptop or a single-board computer such as a Raspberry Pi.
+The practical arrangement is \emph{remote inference}: the robot computer sends each observation over the network to a
+GPU server, and the server replies with a \emph{chunk} of future actions that the robot executes at its control rate
+(30~actions per second here). Because one reply carries many actions, the robot can keep moving while the next request
+is in flight, which is what makes remote inference workable at all~\cite{shukor2025smolvla}.
+
+The network is the weak point. WiFi links show latency spikes, lose messages and drop out for short periods. When a
+reply is late or lost, the robot's queue of actions empties and the arm stops. The remote-inference client shipped with
+LeRobot~0.7~\cite{lerobot}, the open robot-learning library this project builds on, treats a run without actions for
+one second as a terminal fault and ends it, so a short outage ends the task.
+
+Distributed Real-Time Chunking (\drtc)~\cite{vial2026drtc} is a recent scheduling method for exactly this setting: it
+requests the next chunk early, estimates the latency the way TCP estimates round-trip times, and re-requests with a
+fresh observation when a reply is overdue. It has not, to our knowledge, been evaluated independently against the
+shipped LeRobot client on task success under controlled network faults.
+
+\section{Problem statement}
+
+How much do network faults lower the task success of remote inference on a low-cost robot arm, can \drtc{} recover
+the lost performance, and can the robot's motion be kept smooth while it does?
+
+\section{Objectives}
+
+\begin{enumerate}[label=O\arabic*.]
+\item Measure the effect of network faults on the task success of LeRobot~0.7's remote inference as it ships.
+\item Port \drtc{} to LeRobot~0.7 and measure whether it recovers task success under the same faults.
+\item Add command smoothing and measure the quality of the motion under faults.
+\item Make these measurements repeatable and statistically sound: fixed plans, randomised trial order, raw logs of
+      every trial, and automatic reports.
+\item Train seven policies with their authors' recipes on three datasets and report their baseline performance and
+      inference cost.
+\end{enumerate}
+
+The project's claim, fixed before the main experiment, is: \emph{network faults lower the task success of
+client-server robot inference; \drtc{} recovers it; smoothing then improves the motion.}
+
+\section{Contributions}
+
+\begin{enumerate}
+\item An implementation of \drtc{} inside LeRobot~0.7's remote-inference runtime that keeps all of LeRobot's own
+      safety checks, with four fixes for failure modes that appeared on real hardware with long-latency, short-chunk
+      models (Section~\ref{sec:drtc}).
+\item Command smoothing for remote inference: a causal Butterworth filter and latency-adaptive playback
+      (Section~\ref{sec:smoothing}).
+\item Network fault injection at the transport and an evaluation framework: evaluation plans frozen before the first
+      trial, seeded rounds, per-trial raw logs and videos, a shared results store and automatic reports with
+      confidence intervals and significance tests (Sections~\ref{sec:faults} and~\ref{sec:evalsys}).
+\item A controlled robot study of \R{main/n} trials (two policies, four conditions), a bench with each fault type
+      alone on a replay robot, and an offline evaluation of the trained policies (Chapter~\ref{ch:results}).
+\end{enumerate}
+
+\section{Organisation of the report}
+
+Chapter~\ref{ch:background} introduces action-chunking policies, remote inference, real-time chunking and \drtc.
+Chapter~\ref{ch:system} describes the system: hardware, the baseline, our \drtc{} implementation, smoothing, fault
+injection and the evaluation framework. Chapter~\ref{ch:setup} gives the datasets, policies, conditions, protocol and
+metrics. Chapter~\ref{ch:results} reports the results, Chapter~\ref{ch:discussion} discusses them with their
+limitations, and Chapter~\ref{ch:conclusion} concludes. The appendices list the training recipes, the full metric
+definitions and how to reproduce the results.

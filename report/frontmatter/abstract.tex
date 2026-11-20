@@ -1,0 +1,26 @@
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+\thispagestyle{plain}
+
+Vision-language-action models are too large to run on the small computer that drives a low-cost robot arm, so they are
+served from a remote GPU and every action depends on the network. When the network delays or loses messages, the
+robot's queue of actions empties and the arm stops; the remote-inference client shipped with LeRobot~0.7 then ends the
+run after one second without actions. This project studies that failure on an SO-101 arm and tests whether Distributed
+Real-Time Chunking (\drtc), a scheduling method designed for unreliable networks, recovers it.
+
+We port \drtc{} onto LeRobot~0.7's remote inference, fix four failure modes that appeared on real hardware with
+long-latency, short-chunk models, add command smoothing (a Butterworth low-pass filter and latency-adaptive playback),
+and build an evaluation framework with network fault injection, frozen evaluation plans, randomised trial order and
+automatic statistical reports. In a sorting task with two policies (\smolvla{} and \groot), served from an A100 to a
+laptop over WiFi, a fixed mix of a latency spike, dropped replies and a full outage lowered task success from
+\R{main/smolvla/baseline/M1} and \R{main/groot/baseline/M1} to \R{main/smolvla/faults/M1} for both models. With
+\drtc{} under the same faults, success was \R{main/smolvla/drtc/M1} and \R{main/groot/drtc/M1}
+(\R{main/smolvla/p/faults-drtc/M1} and \R{main/groot/p/faults-drtc/M1} against the faulted baseline), and no trial
+was ended by a fault. Smoothing reduced the jerk of the commanded motion by a factor of \R{main/smolvla/jerkratio} and
+\R{main/groot/jerkratio} (both $p<0.001$) without lowering success (\R{main/smolvla/smooth/M1} and
+\R{main/groot/smooth/M1}). A replay-robot bench with each fault type alone, and an offline evaluation of the trained
+policies' held-out action error and inference cost, support these results.
+
+\vspace{1em}
+\noindent\textbf{Keywords:} robot learning, vision-language-action models, remote inference, action chunking,
+network faults, real-time chunking, motion smoothing.

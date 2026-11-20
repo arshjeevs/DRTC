@@ -1,0 +1,80 @@
+% Packages, layout and the report's own macros. Colour appears only inside figures (graphs and diagrams);
+% text, links, tables and headings stay black.
+
+% --- page and type ---------------------------------------------------------------------------------------------------
+\usepackage[a4paper,left=30mm,right=25mm,top=25mm,bottom=25mm,headheight=15pt]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{mathptmx}          % Times for text and mathematics
+\usepackage{textcomp}
+\usepackage{microtype}
+\usepackage{setspace}
+\onehalfspacing
+\usepackage{amsmath,amssymb,bm}
+\usepackage{csquotes}
+
+% --- headings, headers ------------------------------------------------------------------------------------------------
+\usepackage{titlesec}
+\titleformat{\chapter}[display]{\normalfont\bfseries}{\large\MakeUppercase{\chaptertitlename}\ \thechapter}{8pt}{\LARGE}
+\titlespacing*{\chapter}{0pt}{0pt}{24pt}
+\titleformat{\section}{\normalfont\large\bfseries}{\thesection}{0.8em}{}
+\titleformat{\subsection}{\normalfont\normalsize\bfseries}{\thesubsection}{0.8em}{}
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\nouppercase{\leftmark}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\fancypagestyle{plain}{\fancyhf{}\fancyfoot[C]{\thepage}\renewcommand{\headrulewidth}{0pt}}
+
+% --- figures and tables -----------------------------------------------------------------------------------------------
+\usepackage{graphicx}
+\usepackage{xcolor}            % used only inside figures
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,backgrounds,calc,shapes.geometric}
+\usepackage{float}
+\usepackage{placeins}
+\usepackage[font=small,labelfont=bf,labelsep=period]{caption}
+\usepackage{subcaption}
+\usepackage{booktabs,tabularx,multirow,makecell,array,threeparttable,longtable}
+\usepackage{adjustbox}
+\usepackage{enumitem}
+\setlist{itemsep=2pt,topsep=4pt}
+\usepackage{listings}
+\lstset{basicstyle=\ttfamily\footnotesize,columns=fullflexible,breaklines=true,frame=single,framerule=0.4pt}
+
+% --- references and links (black) --------------------------------------------------------------------------------------
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage[hidelinks,bookmarksnumbered]{hyperref}
+\usepackage{xurl}
+\usepackage[nottoc]{tocbibind}
+
+% --- the report's own macros -----------------------------------------------------------------------------------------
+% Results: report/scripts/build.py writes generated/numbers.tex with \setR{key}{value}; the text writes \R{key}.
+% A key that the results do not give yet prints "(pending)", so the text can be written before the result exists.
+\makeatletter
+\newcommand{\setR}[2]{\expandafter\def\csname R@#1\endcsname{#2}}
+\newcommand{\R}[1]{\ifcsname R@#1\endcsname\csname R@#1\endcsname\else\pending\fi}
+\makeatother
+\newcommand{\pending}{\textit{(pending)}}
+\InputIfFileExists{generated/numbers.tex}{}{}
+
+% A framed box standing in for something not made yet (a photo, a figure, a table).
+\newcommand{\placeholderbox}[3][0.8\textwidth]{%
+  \fbox{\parbox[c][#2][c]{#1}{\centering\small\itshape #3}}}
+% Generated tables and figures (from the results); "pending" until the build script has made them.
+\newcommand{\gentable}[1]{\IfFileExists{generated/#1.tex}{\input{generated/#1.tex}}%
+  {\placeholderbox[0.9\textwidth]{3cm}{Table pending: \texttt{generated/\detokenize{#1}.tex} is made when its results exist.}}}
+\newcommand{\genfigure}[2][\textwidth]{\IfFileExists{generated/#2.pdf}{\includegraphics[width=#1]{generated/#2.pdf}}%
+  {\placeholderbox[0.9\textwidth]{5cm}{Figure pending: \texttt{generated/\detokenize{#2}.pdf} is made when its results exist.}}}
+% Photographs and video stills (assets/): the photo when the file exists, else a box saying what to put there.
+\newcommand{\photo}[3][0.8\textwidth]{\IfFileExists{assets/#2}{\includegraphics[width=#1]{assets/#2}}%
+  {\placeholderbox[#1]{5.5cm}{Photo to add: \texttt{assets/\detokenize{#2}}\\[4pt] #3}}}
+
+% Names used throughout
+\newcommand{\drtc}{DRTC}
+\newcommand{\lerobot}{LeRobot}
+\newcommand{\smolvla}{SmolVLA}
+\newcommand{\groot}{GR00T~N1.5}
+\newcommand{\pizerofive}{$\pi_{0.5}$}
+\newcommand{\degree}{$^\circ$}
+\newcommand{\jerkunit}{$10^3\,^\circ/\mathrm{s}^3$}

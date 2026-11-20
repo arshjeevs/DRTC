@@ -1,0 +1,167 @@
+\chapter{Experimental Setup}\label{ch:setup}
+
+\section{Tasks and datasets}
+
+Three datasets were recorded on the SO-101 by teleoperation at 30~fps (Table~\ref{tab:datasets}). The idle start and
+end of every episode were trimmed automatically. In each dataset a fixed, randomly chosen (seeded) set of episodes is
+held out: it is never used for training and serves the offline evaluation (Section~\ref{sec:offline}). The first
+cube-in-box dataset was an initial, smaller recording on an earlier camera arrangement; the second repeats the task
+with more demonstrations. The sorting task is the main task of this report: a coloured cube must be placed in the
+square of the same colour.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Datasets. Joint units: degrees, or LeRobot's normalised range for the earlier recordings.}
+  \label{tab:datasets}
+  \small
+  \gentable{tab_datasets}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \begin{subfigure}[t]{0.48\textwidth}
+    \centering
+    \photo[\textwidth]{task_sort_one.jpg}{The sorting task: the cube and the coloured squares, seen by the scene camera.}
+    \caption{Sorting.}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.48\textwidth}
+    \centering
+    \photo[\textwidth]{task_cubebox.jpg}{The cube-in-box task.}
+    \caption{Cube in box.}
+  \end{subfigure}
+  \caption{The two tasks.}
+  \label{fig:tasks}
+\end{figure}
+
+\section{Policies and training}\label{sec:policies}
+
+Seven policies were chosen to span small task-specific models and large VLAs: \smolvla, \groot, GR00T~N1.7,
+\pizerofive, MolmoAct~2, ACT and Diffusion Policy. Each is trained with its authors' published recipe, unchanged
+(Appendix~\ref{app:recipes}), so that differences between them come from the models and not from our tuning. Training
+ran on the H200 and A100 servers; every run was logged, and every checkpoint was stored. The checkpoint served to the
+robot is the one with the lowest loss on the held-out episodes.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Training status on 20 November 2026 (trained: on the model hub; training: running; planned: not started).}
+  \label{tab:training}
+  \small
+  \begin{tabular}{l c c c}
+    \toprule
+    Policy & Cube in box v0 & Cube in box v1 & Sorting \\
+    \midrule
+    \smolvla & trained & trained & trained \\
+    \groot & trained & trained & trained \\
+    ACT & -- & training & trained \\
+    Diffusion Policy & -- & training & trained \\
+    GR00T N1.7 & -- & planned & planned \\
+    \pizerofive & -- & planned & planned \\
+    MolmoAct 2 & -- & planned & training \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Conditions}\label{sec:conditions}
+
+Four conditions are compared (Table~\ref{tab:conditions}). The network is the real WiFi link in all of them; conditions
+2--4 add the fault mix of Figure~\ref{fig:faultmix}. Condition~2 against~1 measures the cost of the faults, 3
+against~2 whether \drtc{} recovers it, and 4 against~3 what smoothing adds.
+
+\begin{table}[htbp]
+  \centering
+  \caption{The four conditions.}
+  \label{tab:conditions}
+  \begin{tabularx}{\textwidth}{c l l X}
+    \toprule
+    \# & Condition & Network & Robot side \\
+    \midrule
+    1 & Baseline & normal & LeRobot remote inference as shipped: no \drtc, no filter, ends the run after 1~s
+      without actions \\
+    2 & Baseline + faults & fault mix & as 1 \\
+    3 & \drtc{} + faults & fault mix & \drtc{} with our fixes; no filter; holds the arm through stalls \\
+    4 & \drtc{} + smoothing + faults & fault mix & as 3, with the Butterworth filter and adaptive playback \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Which policies are evaluated under which conditions.}
+  \label{tab:plan}
+  \small
+  \begin{tabularx}{\textwidth}{l X l}
+    \toprule
+    Dataset & Policies & Conditions \\
+    \midrule
+    Sorting & \smolvla, \groot & 1--4 (the main experiment) \\
+    Sorting & all seven & 1 \\
+    Cube in box v1 & all seven & 1 \\
+    Cube in box v0 & \smolvla, \groot & 1 \\
+    Bench (replay robot) & \smolvla, \groot{} on sorting & 1--4, with each fault type alone and the mix \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\section{Protocol}
+
+\begin{itemize}
+\item \textbf{Trials.} Ten valid trials per policy, condition and task, in rounds with a seeded random order
+      (Section~\ref{sec:evalsys}). The operator chooses the object layout of each round; all trials of a round use it.
+\item \textbf{Success.} The operator presses the success key before the time limit (30~s for sorting) when the task's
+      written success rule is met. For sorting: \emph{the cube is fully inside the square of its colour and the gripper
+      has let go of it.}
+\item \textbf{Faults.} A trial ended by a terminal fault after the arm has started moving is a failure. A fault before
+      the first action is a setup problem: that trial is repeated.
+\item \textbf{Validity.} A trial is voided only for a setup mistake (an object not on its mark, a cable caught), never
+      for a policy's failure; voided trials are kept and listed.
+\item \textbf{Machines.} For every robot experiment the laptop was the robot computer and the A100 the model server.
+\end{itemize}
+
+\section{Metrics}\label{sec:metrics}
+
+Table~\ref{tab:metrics} summarises the metrics; Appendix~\ref{app:metrics} gives the full definitions. Every metric is
+first reduced to one value per trial and then summarised over the trials (median and interquartile range), so long
+trials do not weigh more than short ones. Times are measured on one machine's monotonic clock and never across
+machines.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Metrics.}
+  \label{tab:metrics}
+  \small
+  \begin{tabularx}{\textwidth}{l l X}
+    \toprule
+    & Metric & Definition \\
+    \midrule
+    M1 & Success rate & Successful trials over valid trials, with a Wilson 95\% interval \\
+    M1f & Ended by a fault & Trials that a terminal fault ended after the first action \\
+    M1t & Time to success & From the first action to the success key \\
+    M2 & Stall fraction & Share of control ticks after the first action without a new action \\
+    M3 & Stalls & Number of stall events; the longest stall in seconds \\
+    M4 & Turnaround & From sending an observation to receiving its chunk (median and 95th percentile) \\
+    M5 & Estimate error & The scheduler's latency estimate minus the measured turnaround \\
+    M6 & Inference time & The server's reported time per chunk; $\mathrm{M4}-\mathrm{M6}$ is the network share \\
+    M7 & Jerk & Root mean square of the third time derivative of the commanded arm joints \\
+    M8 & Chunk switch, largest step & Disagreement between chunks at a switch; the largest change between two ticks \\
+    M9 & Held-out error & Offline: mean absolute error of the first 15 predicted actions on held-out episodes \\
+    M10 & Inference cost & Offline: inference time over 200 requests, and peak GPU memory \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+With $T$ the ticks after the first action and $s_t=1$ when tick $t$ has no new action, the stall fraction is
+$\mathrm{M2} = \frac{1}{T}\sum_t s_t$. With $q_{j,t}$ the commanded position of arm joint $j$ on the 30~Hz tick grid
+(held through stalls), the jerk is
+\begin{equation}
+  \mathrm{M7} = \sqrt{\frac{1}{5\,(T-3)} \sum_{j=1}^{5} \sum_{t} \Bigl( f^3\,\bigl(q_{j,t+3} - 3q_{j,t+2} + 3q_{j,t+1}
+  - q_{j,t}\bigr) \Bigr)^{2}}, \qquad f = 30~\mathrm{Hz},
+\end{equation}
+reported in \jerkunit. Lower is smoother.
+
+\section{Statistical analysis}
+
+Success rates are reported with Wilson 95\% intervals~\cite{wilson1927}. Differences in success between two
+conditions of the same policy are tested with Fisher's exact test~\cite{fisher1935}, and differences in the other
+metrics with the two-sided Mann--Whitney $U$ test~\cite{mann1947} on the per-trial values. Comparisons are made only
+within one evaluation (same sessions, interleaved trials). We report $p$-values without correction for multiple
+comparisons and read them with the effect sizes; Section~\ref{sec:limits} discusses this.

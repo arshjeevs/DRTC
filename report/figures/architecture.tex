@@ -1,0 +1,44 @@
+% System overview: robot computer, network with fault injection, GPU server. Colour is allowed in figures.
+\definecolor{robotfill}{HTML}{EAF2FC}
+\definecolor{robotline}{HTML}{2A78D6}
+\definecolor{serverfill}{HTML}{FDEEE7}
+\definecolor{serverline}{HTML}{EB6834}
+\definecolor{netfill}{HTML}{F0EFEC}
+\definecolor{ink}{HTML}{0B0B0B}
+\definecolor{ink2}{HTML}{52514E}
+\begin{tikzpicture}[
+  font=\small, node distance=4mm and 6mm,
+  blk/.style={draw=#1, rounded corners=2pt, thick, fill=white, align=center, minimum height=8mm, inner sep=3pt},
+  arr/.style={-{Latex[length=2.2mm]}, thick, ink2},
+]
+% robot computer
+\node[blk=robotline, minimum width=27mm] (cams) {Cameras\\ wrist, scene};
+\node[blk=robotline, minimum width=27mm, below=of cams] (arm) {SO-101 arm\\ (follower)};
+\node[blk=robotline, minimum width=30mm, right=10mm of cams] (sched) {Scheduler\\ upstream \textbar{} \drtc};
+\node[blk=robotline, minimum width=30mm, below=of sched] (queue) {Action queue};
+\node[blk=robotline, minimum width=30mm, below=of queue] (smooth) {Smoothing\\ filter, playback};
+\begin{scope}[on background layer]
+  \node[draw=robotline, fill=robotfill, rounded corners=4pt, thick, fit=(cams)(arm)(sched)(queue)(smooth),
+        inner sep=5mm, label={[font=\small\bfseries, text=ink]above:Robot computer (laptop), 30~Hz}] (rc) {};
+\end{scope}
+% network
+\node[draw=ink2, fill=netfill, rounded corners=3pt, thick, minimum width=24mm, minimum height=33mm, align=center,
+      right=14mm of queue] (net) {Network\\ (WiFi)\\[6pt] \textbf{fault}\\ \textbf{injection}};
+% server
+\node[blk=serverline, minimum width=30mm, right=14mm of net, yshift=8mm] (ps) {Policy server\\ (LeRobot 0.7)};
+\node[blk=serverline, minimum width=30mm, below=of ps] (pol) {Policy\\ \smolvla{} \textbar{} \groot};
+\begin{scope}[on background layer]
+  \node[draw=serverline, fill=serverfill, rounded corners=4pt, thick, fit=(ps)(pol), inner sep=5mm,
+        label={[font=\small\bfseries, text=ink]above:GPU server (A100)}] (srv) {};
+\end{scope}
+% flows
+\draw[arr] (cams) -- node[above, font=\scriptsize]{images} (sched);
+\draw[arr] (sched.east) -- ++(4mm,0) |- ([yshift=4mm]net.west) node[pos=0.75, above, font=\scriptsize]{observation};
+\draw[arr] ([yshift=4mm]net.east) -- node[above, font=\scriptsize]{} ([yshift=-2mm]ps.west);
+\draw[arr] (ps) -- (pol);
+\draw[arr] ([yshift=-4mm]pol.west) -- ++(-4mm,0) |- ([yshift=-6mm]net.east);
+\draw[arr] ([yshift=-6mm]net.west) -- node[below, font=\scriptsize, pos=0.45]{chunk ($H$ actions)} (queue.east);
+\draw[arr] (queue) -- (smooth);
+\draw[arr] (smooth.west) -| node[pos=0.25, below, font=\scriptsize]{commands} (arm.south);
+\draw[arr, densely dotted] (arm.north) -- node[left, font=\scriptsize]{joint state} (cams.south);
+\end{tikzpicture}

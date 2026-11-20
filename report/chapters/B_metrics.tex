@@ -1,0 +1,49 @@
+\chapter{Metric Definitions}\label{app:metrics}
+
+The metrics were fixed before the main experiment and revised once, on the same day and before its first trial, so
+that a trial ended by a fault counts as a failure instead of being repeated. A \emph{tick} is one 30~Hz control step of
+the robot computer; the \emph{first action} is the first tick that executes an action from a chunk; \emph{arm joints}
+are the five joints other than the gripper, in degrees.
+
+\begin{table}[htbp]
+\centering
+\caption{Metric definitions.}\label{tab:metricsfull}
+\small
+\begin{tabularx}{\textwidth}{@{}l p{0.2\textwidth} X@{}}
+\toprule
+& Metric & Definition \\
+\midrule
+M1 & Success rate & The operator presses the success key before the time limit and the result meets the written
+  success rule. A failure key, the time limit, or a terminal fault after the first action is a failure. Reported as
+  successes over valid trials with a Wilson 95\% interval. \\
+M1f & Ended by a fault & Trials that a terminal fault ended after the first action (failures in M1). \\
+M1t & Time to success & Seconds from the first action to the success key; successful trials only. \\
+M2 & Stall fraction & Ticks after the first action at which no new action was available (the arm holds), over all
+  ticks after the first action. \\
+M3 & Stall events, longest stall & A stall event is a run of consecutive stall ticks; the longest stall is the longest
+  run, in seconds. \\
+M4 & Turnaround & For every accepted chunk, the time on the robot computer from sending the observation to receiving
+  its chunk; per trial the median and the 95th percentile. \\
+M5 & Latency estimate error & For every accepted chunk, the scheduler's latency estimate when the request was sent,
+  minus the measured turnaround (positive: an overestimate). \\
+M6 & Server inference time & For every accepted chunk, the server's reported time to produce it. M4 minus M6 is the
+  network and queueing share. \\
+M7 & Jerk & The commanded arm-joint positions on the tick grid (held through stalls), third finite difference times
+  $30^3$, root mean square over the five arm joints and all ticks after the first action, in \jerkunit. \\
+M8a & Chunk switch disagreement & At every switch to a new chunk, over the steps both chunks cover, the mean Euclidean
+  distance between their arm-joint actions. \\
+M8b & Largest step & The largest change of any arm joint between two consecutive commanded positions. \\
+M9 & Held-out action error & On the held-out episodes, from every 10th frame, the policy predicts a chunk from the
+  recorded observation; the first 15 predicted actions are compared with the 15 recorded actions that follow. Mean
+  absolute error: arm joints (mean of the five) and gripper. Flow and diffusion policies: one sample with a fixed
+  seed. \\
+M10 & Inference time, GPU memory & The server's inference time over 200 requests from held-out observations after 10
+  warm-up requests (median and 95th percentile), and the peak GPU memory. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\paragraph{Reporting rules.} Ten valid trials per condition, policy and task, in rounds with a seeded random order. A
+trial voided for a setup mistake is listed but not counted. Every metric is reduced to one value per trial before it is
+summarised. Comparisons are made within one evaluation, against its baseline condition. A report never averages over
+different robot computers or servers. On the replay robot, M2--M8 are reported but not M1.

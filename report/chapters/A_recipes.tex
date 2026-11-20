@@ -1,0 +1,30 @@
+\chapter{Training Recipes}\label{app:recipes}
+
+Every policy is trained with its authors' published recipe; Table~\ref{tab:recipes} summarises them. The full recipe
+of each, with every flag, is in the project's registry (\texttt{lab/recipes/}).
+
+\begin{table}[htbp]
+  \centering
+  \caption{Training recipes.}
+  \label{tab:recipes}
+  \small
+  \begin{tabularx}{\textwidth}{l X l l c}
+    \toprule
+    Policy & Recipe source; what is trained & Steps $\times$ batch & Learning rate & Chunk \\
+    \midrule
+    \smolvla & The \smolvla{} authors~\cite{shukor2025smolvla}; action expert only, vision-language model frozen &
+      20k $\times$ 64 & $10^{-4}$ & 50 \\
+    \groot & NVIDIA's SO-101 recipe~\cite{nvidia2025gr00t}; projector and diffusion transformer, language model and
+      vision frozen & 10k $\times$ 32 & $10^{-4}$ & 16 \\
+    GR00T N1.7 & NVIDIA's and LeRobot's SO-101 recipe; projector, diffusion transformer and VL layer norm; relative arm
+      actions & 20k $\times$ 64 & $10^{-4}$ & 16 \\
+    \pizerofive & The openpi configuration for a joint-space arm~\cite{pi2025pi05}; full fine-tuning; relative joints
+      & 20k $\times$ 64 & $2.5\times10^{-5}$ & 50 \\
+    MolmoAct 2 & The MolmoAct~2 authors~\cite{molmoact2}; LoRA (rank 64) on the vision-language model, connector and
+      action expert trained & 50k $\times$ 16 & $5\times10^{-5}$ & 30 \\
+    ACT & Zhao et al.~\cite{zhao2023act}; full training & 100k $\times$ 8 & $10^{-5}$ & 100 \\
+    Diffusion Policy & Chi et al.'s real-robot configuration~\cite{chi2023diffusion}; ResNet-18 from scratch & 600
+      epochs $\times$ 64 & $10^{-4}$ & 48 (24 executed) \\
+    \bottomrule
+  \end{tabularx}
+\end{table}

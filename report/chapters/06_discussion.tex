@@ -1,0 +1,60 @@
+\chapter{Discussion}\label{ch:discussion}
+
+\section{Why the shipped client fails under faults}
+
+The shipped client treats one second without actions as a terminal fault. Every fault in the mix lasts about that long
+or longer: the spike delays one reply by a second, the drop window loses every reply for a second, and the outage lasts
+one and a half. Once the queue is empty, the grace runs out before the next chunk can arrive and the run ends. The bench
+shows that each fault alone is enough (Section~\ref{sec:bench}). Under faults, the failures therefore come from the
+scheduling and its give-up rule, not from the policies: the same policies succeeded in most trials on the normal
+network.
+
+\section{Why \drtc{} recovers}
+
+\drtc{} changes two things that matter here. It holds the arm when the queue is empty instead of ending the run, and it
+re-requests with a fresh observation when a reply is overdue, so the first chunk after a fault is computed from the
+current scene. Because the policies are closed-loop, they continue the task from wherever the arm stopped. Under the
+fault mix this was enough to bring success back to a level not significantly different from the fault-free baseline
+for both policies.
+
+\section{Short-chunk policies}\label{sec:shortchunk}
+
+\groot's chunk holds 16 actions, 0.53~s at 30~Hz, barely longer than its round trip of about 0.45~s. Even on the
+normal network its queue empties before the next chunk is ready, and the arm stood still in
+\R{main/groot/baseline/M2} of the ticks. This is a property of the combination of chunk length and latency rather than
+of the network faults, and it is where adaptive playback helps most: slowing down instead of stopping cut the stall
+fraction to \R{main/groot/smooth/M2}. The cost is speed: slower playback lengthens the trial a little
+(time to success \R{main/groot/drtc/M1t} with \drtc{} alone, \R{main/groot/smooth/M1t} with smoothing). For policies
+with long chunks, such as \smolvla{} with 50 actions, the queue rarely runs dry and playback stays at full rate.
+
+\section{Smoothness and success}
+
+The filter and adaptive playback made the motion markedly smoother, with no loss of success; the success rates with
+smoothing were higher than with \drtc{} alone for both policies, but with ten trials per condition that difference is
+not significant. The low jerk of condition~2 should not be read as smooth motion: in those trials the arm stood still
+for long stretches or the run ended early, so there was less motion to measure.
+
+\section{Limitations}\label{sec:limits}
+
+\begin{itemize}
+\item \textbf{Sample size.} Ten trials per cell give wide intervals (for example \R{main/smolvla/drtc/M1ci} around
+      \R{main/smolvla/drtc/M1}), so only large differences are significant.
+\item \textbf{Scope.} The main experiment covers one task and two policies; the baselines of the other policies and
+      tasks are still being run.
+\item \textbf{Operator judgement.} Success is judged by the operator, who knows the condition; the success rule was
+      written down before the first trial to limit this.
+\item \textbf{Multiple comparisons.} The $p$-values are not corrected for the number of comparisons; the main
+      comparisons (Table~\ref{tab:tests}) were fixed in advance.
+\item \textbf{Shared servers.} Other users' jobs ran on the A100 and H200, so inference times include contention.
+\item \textbf{Fixed faults.} The fault mix occurs at the same times in every trial, unlike a real network, and the
+      bench simulates latency.
+\item \textbf{Uncompressed images.} About 260~ms of each round trip is the network share, mostly the 2.9~MB of raw
+      images per request; compression would shorten it and change the timing.
+\end{itemize}
+
+\section{Lessons from the implementation}
+
+Three of the four fixes in Table~\ref{tab:fixes} concern the cooldown, and all three appeared only with a slow link and
+a short chunk. A rule that is reasonable on a fast local link (a cooldown capped at half a chunk) gives up every request
+when the round trip is longer than half a chunk. Testing the scheduler on the replay bench with the latency measured on
+the robot reproduced these failures quickly, which made the bench the main development tool.

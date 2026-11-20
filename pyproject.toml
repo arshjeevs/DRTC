@@ -33,6 +33,8 @@ gpu = [
 ]
 # Runs the robot-side control loop without hardware (lerobot_robot_replay: --robot.type=replay).
 sim = ["lerobot_robot_replay"]
+# The report's figures (report/, `make -C report`).
+report = ["matplotlib>=3.9,<4"]
 
 [project.scripts]
 lab = "drtc.cli:main"

@@ -1,0 +1,26 @@
+\chapter{Conclusion and Future Work}\label{ch:conclusion}
+
+\section{Conclusion}
+
+We studied remote inference of vision-language-action policies on a low-cost SO-101 arm under network faults. With
+the remote-inference client shipped in LeRobot~0.7, a mix of a latency spike, dropped replies and a short outage lowered
+task success on a sorting task from \R{main/smolvla/baseline/M1} and \R{main/groot/baseline/M1} to
+\R{main/smolvla/faults/M1} and \R{main/groot/faults/M1}. Our implementation of Distributed Real-Time Chunking, with four
+fixes for slow links and short chunks, recovered success to \R{main/smolvla/drtc/M1} and \R{main/groot/drtc/M1} under
+the same faults, and no trial was ended by a fault. Command smoothing then reduced the jerk of the motion by factors
+of \R{main/smolvla/jerkratio} and \R{main/groot/jerkratio} without lowering success. A bench with each fault alone
+reproduced the pattern. The claim of the project, that network faults lower the task score, \drtc{} recovers it, and
+smoothing improves the motion, is supported for both policies tested.
+
+\section{Future work}
+
+\begin{itemize}
+\item \textbf{Edge robot computer.} Run the same experiments with a Raspberry Pi~5 as the robot computer; it has been
+      set up with the same software.
+\item \textbf{More tasks and policies.} Complete the baselines of all seven policies and repeat the main experiment on
+      the cube-in-box task.
+\item \textbf{Compression.} Compress the camera images to shorten the round trip.
+\item \textbf{Real-time chunking.} Combine \drtc's scheduling with RTC in-painting for the flow-matching policies.
+\item \textbf{Edge fallback.} Run a small policy (ACT) on the robot computer to keep moving while the server is
+      unreachable.
+\end{itemize}

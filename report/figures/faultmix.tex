@@ -1,0 +1,20 @@
+% The fault mix of conditions 2-4 on the trial's clock (seconds from the trial start).
+\definecolor{band}{HTML}{E1E0D9}
+\definecolor{ink}{HTML}{0B0B0B}
+\definecolor{ink2}{HTML}{52514E}
+\definecolor{spike}{HTML}{EB6834}
+\begin{tikzpicture}[x=11mm, y=7mm, font=\small]
+  \draw[ink2, thick, -{Latex[length=2mm]}] (0,0) -- (10.6,0) node[right]{s};
+  \foreach \t in {0,...,10} { \draw[ink2] (\t,0) -- (\t,-0.15) node[below, font=\scriptsize]{\t}; }
+  % latency spike: the reply due after 2 s arrives 1 s late
+  \draw[spike, very thick, -{Latex[length=2mm]}] (2,0.35) -- (3,0.35);
+  \fill[spike] (2,0.35) circle (2pt);
+  \node[above, align=center, font=\scriptsize] at (2.5,0.5) {latency spike\\ +1~s at 2~s};
+  % every reply dropped 4-5 s
+  \fill[band, draw=ink2] (4,0.15) rectangle (5,0.85);
+  \node[above, align=center, font=\scriptsize] at (4.5,0.9) {replies dropped\\ 4--5~s};
+  % full outage 6-7.5 s
+  \fill[band, draw=ink2] (6,0.15) rectangle (7.5,0.85);
+  \draw[ink2] (6,0.15) -- (7.5,0.85) (6,0.85) -- (7.5,0.15);
+  \node[above, align=center, font=\scriptsize] at (6.75,0.9) {outage, both directions\\ 6--7.5~s};
+\end{tikzpicture}

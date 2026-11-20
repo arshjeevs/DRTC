@@ -1,0 +1,188 @@
+\chapter{Results}\label{ch:results}
+
+\section{The \drtc{} experiment}\label{sec:main}
+
+The main experiment ran \smolvla{} and \groot{} on the sorting task under the four conditions: \R{main/n} valid trials
+in \R{main/sessions} sessions. One further trial was not counted, because the arm's motor bus was not found when it
+started (a setup fault before the first action). Figure~\ref{fig:success} and Table~\ref{tab:success} give the task
+success.
+
+\begin{figure}[htbp]
+  \centering
+  \genfigure{fig_main_success}
+  \caption{Task success per condition, with Wilson 95\% intervals (10 trials per bar). Conditions: 1~baseline,
+           2~baseline with faults, 3~\drtc{} with faults, 4~\drtc{} with smoothing and faults.}
+  \label{fig:success}
+\end{figure}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Task success, its 95\% interval, and the trials ended by a fault.}
+  \label{tab:success}
+  \small
+  \gentable{tab_main_success}
+\end{table}
+
+\subsection{Network faults break the shipped client}
+
+Under the fault mix, neither policy completed a single trial: \smolvla's success fell from \R{main/smolvla/baseline/M1}
+to \R{main/smolvla/faults/M1} (\R{main/smolvla/p/baseline-faults/M1}) and \groot's from \R{main/groot/baseline/M1} to
+\R{main/groot/faults/M1} (\R{main/groot/p/baseline-faults/M1}). The shipped client ended \R{main/smolvla/faults/M1f}
+of \smolvla's and \R{main/groot/faults/M1f} of \groot's trials with a terminal fault; the other trials failed as well.
+
+\subsection{\drtc{} recovers task success}
+
+With \drtc{} under the same faults, success was \R{main/smolvla/drtc/M1} for \smolvla{}
+(\R{main/smolvla/p/faults-drtc/M1} against the faulted baseline) and \R{main/groot/drtc/M1} for \groot{}
+(\R{main/groot/p/faults-drtc/M1}), and no trial was ended by a fault (\R{main/smolvla/drtc/M1f} and
+\R{main/groot/drtc/M1f}). Against the fault-free baseline the difference is not significant at this sample size
+(\smolvla: \R{main/smolvla/drtc/M1} against \R{main/smolvla/baseline/M1}, \R{main/smolvla/p/baseline-drtc/M1};
+\groot: \R{main/groot/drtc/M1} against \R{main/groot/baseline/M1}, \R{main/groot/p/baseline-drtc/M1}).
+
+\subsection{Smoothing improves the motion}
+
+Smoothing lowered the jerk of the commanded motion from \R{main/smolvla/drtc/M7} to \R{main/smolvla/smooth/M7}~\jerkunit{}
+for \smolvla{} (\R{main/smolvla/p/drtc-smooth/M7}) and from \R{main/groot/drtc/M7} to \R{main/groot/smooth/M7} for
+\groot{} (\R{main/groot/p/drtc-smooth/M7}), factors of \R{main/smolvla/jerkratio} and \R{main/groot/jerkratio}
+(Figure~\ref{fig:jerk}). The largest step between two ticks fell from \R{main/smolvla/drtc/M8b} to
+\R{main/smolvla/smooth/M8b} (\R{main/smolvla/p/drtc-smooth/M8b}) and from \R{main/groot/drtc/M8b} to
+\R{main/groot/smooth/M8b} (\R{main/groot/p/drtc-smooth/M8b}). For \groot, adaptive playback also cut the time without
+new actions from \R{main/groot/drtc/M2} to \R{main/groot/smooth/M2} of the ticks (\R{main/groot/p/drtc-smooth/M2};
+Figure~\ref{fig:stall}). Success did not fall: \R{main/smolvla/smooth/M1} and \R{main/groot/smooth/M1}
+(\R{main/smolvla/p/drtc-smooth/M1} and \R{main/groot/p/drtc-smooth/M1} against \drtc{} alone).
+Table~\ref{tab:tests} collects these comparisons.
+
+\begin{figure}[htbp]
+  \centering
+  \genfigure{fig_main_jerk}
+  \caption{Jerk of the commanded arm motion, one dot per trial; the bar and number give the median.}
+  \label{fig:jerk}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \genfigure{fig_main_stall}
+  \caption{Stall fraction: the share of control ticks without a new action, one dot per trial.}
+  \label{fig:stall}
+\end{figure}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Comparisons between conditions (Fisher's exact test for success, Mann--Whitney $U$ for the others; values
+           are the medians of the per-trial values, the later condition first).}
+  \label{tab:tests}
+  \small
+  \begin{adjustbox}{max width=\textwidth}
+  \gentable{tab_main_tests}
+  \end{adjustbox}
+\end{table}
+
+\subsection{Behaviour over time}
+
+Figure~\ref{fig:timeline} follows one \smolvla{} trial per condition, chosen as the trial with the median jerk of its
+condition (for condition~2, among the trials ended by a fault). Under the shipped client, the latency spike delays a
+reply, the queue runs dry, and one second later the run is ended. With \drtc, the arm holds through the spike, the
+dropped replies and the outage, and continues each time a chunk arrives. With smoothing, the same trajectory is
+followed without the small jumps at chunk switches.
+
+\begin{figure}[htbp]
+  \centering
+  \genfigure{fig_main_timeline}
+  \caption{One \smolvla{} trial per condition: the most-moving arm joint's commanded position over time. Grey bands:
+           the fault windows; short dark ticks: stalls; $\times$: the run ended by a fault.}
+  \label{fig:timeline}
+\end{figure}
+
+\subsection{Timing}
+
+The median turnaround on the normal network was \R{main/smolvla/baseline/M4med} for \smolvla{}, of which
+\R{main/smolvla/baseline/M6} was inference on the server, and \R{main/groot/baseline/M4med} for \groot{}, of which
+\R{main/groot/baseline/M6} was inference. The rest, \R{main/smolvla/baseline/net} and \R{main/groot/baseline/net},
+is the network and queueing share, mostly the transfer of the uncompressed images. Under the faults with \drtc{},
+\groot's 95th-percentile turnaround rose to \R{main/groot/drtc/M4p95} and its latency estimate exceeded the measured
+turnaround by \R{main/groot/drtc/M5}; with smoothing they were \R{main/groot/smooth/M4p95} and
+\R{main/groot/smooth/M5}. Table~\ref{tab:motion} lists all timing and smoothness metrics.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Timing and smoothness, medians over trials. Condition numbers as in Table~\ref{tab:conditions}.}
+  \label{tab:motion}
+  \small
+  \begin{adjustbox}{max width=\textwidth}
+  \gentable{tab_main_motion}
+  \end{adjustbox}
+\end{table}
+
+\section{Each fault on its own: the bench}\label{sec:bench}
+
+On the replay robot, each fault of the mix was applied alone and together, with the network latency simulated as
+measured on the robot (250~ms $\pm$ 20~ms on every reply), for both policies and all four conditions (8 runs each;
+Figure~\ref{fig:bench}, Table~\ref{tab:bench}). Each fault alone was enough for the shipped client to end every
+\smolvla{} run (spike \R{bench/spike/smolvla/faults/M1f}, dropped replies \R{bench/drops/smolvla/faults/M1f}, outage
+\R{bench/outage/smolvla/faults/M1f}), including the single 1-second latency spike. Under \drtc{} no run was ended by
+a fault in any fault type (for example \R{bench/mix/smolvla/drtc/M1f} and \R{bench/mix/groot/drtc/M1f} under the
+mix). Smoothing lowered the jerk under every fault type, for example under the mix from \R{bench/mix/smolvla/drtc/M7}
+to \R{bench/mix/smolvla/smooth/M7} for \smolvla{} and from \R{bench/mix/groot/drtc/M7} to
+\R{bench/mix/groot/smooth/M7} for \groot. The bench reproduces the robot's pattern, which supports reading the robot
+results as an effect of the scheduling rather than of the particular sessions.
+
+\begin{figure}[htbp]
+  \centering
+  \genfigure{fig_bench}
+  \caption{Bench (replay robot): runs ended by a fault (top; the numbers are runs out of 8) and jerk (bottom), for each
+           fault type alone and the mix.}
+  \label{fig:bench}
+\end{figure}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Bench results per fault type: runs ended by a fault (out of 8), stall fraction and jerk (medians).}
+  \label{tab:bench}
+  \small
+  \begin{adjustbox}{max width=\textwidth}
+  \gentable{tab_bench}
+  \end{adjustbox}
+\end{table}
+
+\section{Offline evaluation of the policies}\label{sec:offline}
+
+Table~\ref{tab:offline} and Figure~\ref{fig:offline} give the held-out action error (M9) and the inference cost (M10)
+of the trained policies, measured on the \R{offline/gpu} while two training jobs shared it, which is how a shared
+server is used in practice. On sorting, \smolvla{} had the lowest arm error (\R{offline/sortone/smolvla/M9arm}\degree),
+followed by Diffusion Policy (\R{offline/sortone/diffusion/M9arm}\degree), \groot{} (\R{offline/sortone/groot/M9arm}\degree)
+and ACT (\R{offline/sortone/act/M9arm}\degree). ACT was the fastest (\R{offline/sortone/act/M10} per chunk,
+\R{offline/sortone/act/M10gb}), \groot{} the largest (\R{offline/sortone/groot/M10gb}). For two policies the last
+checkpoint had a lower held-out error than the one selected by held-out loss (Table~\ref{tab:offline}), so the two
+criteria do not always agree. The remaining policies are added as their training finishes.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Offline evaluation: held-out action error of the served and the last checkpoint (sorting in degrees; cube in
+           box in LeRobot's normalised units), and inference time and peak GPU memory over 200 requests.}
+  \label{tab:offline}
+  \small
+  \begin{adjustbox}{max width=\textwidth}
+  \gentable{tab_offline}
+  \end{adjustbox}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \genfigure{fig_offline}
+  \caption{Offline evaluation: held-out arm error on sorting (left) and inference time per chunk, median to 95th
+           percentile (right).}
+  \label{fig:offline}
+\end{figure}
+
+\section{Baselines of all policies}\label{sec:baselines}
+
+The baseline of every policy on every task (condition~1, ten trials each) is run as the trainings finish
+(Table~\ref{tab:training}). \pending{} Results will appear here.
+
+\section{Earlier results}
+
+Before the scope of this study was fixed, two evaluations ran on the sorting task with \drtc{} and its filter on the
+normal network and under faults, with 20 trials per cell and an earlier version of the metrics, in which a trial ended
+by a fault was repeated rather than counted. On the normal network \smolvla{} and Diffusion Policy reached 80\%, ACT
+75\% and \groot{} 20\%. These results are valid but were made under different settings (\drtc{} with its filter, an
+earlier version of the metrics and of the scheduler), so they are not combined with the results above.

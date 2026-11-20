@@ -1,0 +1,42 @@
+% The project report. Build: `make` in this folder (results -> generated/ -> report.pdf). See README.md.
+\documentclass[12pt,a4paper,oneside]{report}
+\input{preamble}
+\input{config}
+
+\hypersetup{pdftitle={\ReportTitle},pdfsubject={Project report}}
+
+\begin{document}
+
+% --- front matter -----------------------------------------------------------------------------------------------------
+\pagenumbering{roman}
+\input{frontmatter/titlepage}
+\ifcertificate\input{frontmatter/certificate}\fi
+\ifdeclaration\input{frontmatter/declaration}\fi
+\ifacknowledgements\input{frontmatter/acknowledgements}\fi
+\input{frontmatter/abstract}
+\tableofcontents
+\listoffigures
+\listoftables
+\input{frontmatter/abbreviations}
+
+% --- chapters ---------------------------------------------------------------------------------------------------------
+\cleardoublepage
+\pagenumbering{arabic}
+\include{chapters/01_introduction}
+\include{chapters/02_background}
+\include{chapters/03_system}
+\include{chapters/04_setup}
+\include{chapters/05_results}
+\include{chapters/06_discussion}
+\include{chapters/07_conclusion}
+
+% --- references and appendices ----------------------------------------------------------------------------------------
+\bibliographystyle{unsrtnat}
+\bibliography{references}
+
+\appendix
+\include{chapters/A_recipes}
+\include{chapters/B_metrics}
+\include{chapters/C_reproducibility}
+
+\end{document}

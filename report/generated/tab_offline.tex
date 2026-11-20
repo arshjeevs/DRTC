@@ -1,0 +1,18 @@
+\begin{tabular}{l l c rrr rrr}
+\toprule
+ & & Held-out & \multicolumn{3}{c}{M9 held-out error} & \multicolumn{3}{c}{M10 inference} \\
+\cmidrule(lr){4-6}\cmidrule(lr){7-9}
+Dataset & Model & episodes / predictions & arm (served) & arm (last) & gripper & median (ms) & p95 (ms) & memory (GB) \\
+\midrule
+Sorting & SmolVLA & 8 / 180 & 2.13 & 2.13 & 2.32 & 97 & 125 & 1.0 \\
+ & GR00T N1.5 & 8 / 180 & 3.03 & 3.03 & 2.86 & 167 & 235 & 5.7 \\
+ & ACT & 8 / 180 & 3.20 & 3.20 & 2.50 & 42 & 68 & 0.3 \\
+ & Diffusion Policy & 8 / 180 & 2.43 & 2.43 & 2.88 & 179 & 209 & 1.3 \\
+\addlinespace
+Cube in box v0 & SmolVLA & 5 / 124 & 2.78 & 2.45 & 3.52 & 99 & 122 & 1.0 \\
+ & GR00T N1.5 & 5 / 124 & 3.37 & 3.37 & 4.32 & 183 & 268 & 5.7 \\
+\addlinespace
+Cube in box v1 & SmolVLA & 10 / 212 & 2.98 & 2.98 & 2.90 & 96 & 118 & 1.0 \\
+ & GR00T N1.5 & 10 / 212 & 4.28 & 3.72 & 3.20 & 180 & 233 & 5.7 \\
+\bottomrule
+\end{tabular}

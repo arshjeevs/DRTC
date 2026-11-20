@@ -1,0 +1,72 @@
+\chapter{Background and Related Work}\label{ch:background}
+
+\section{Learning manipulation from demonstrations}
+
+In imitation learning a policy $\pi$ maps an observation $o_t$ (camera images and the robot's joint positions) to an
+action $a_t$ (target joint positions) and is trained on demonstrations recorded by a human. With low-cost arms such as
+the SO-101~\cite{so101}, demonstrations are recorded by teleoperation: the operator moves a \emph{leader} arm by hand
+and an identical \emph{follower} arm copies it, while cameras and joint encoders are recorded at a fixed rate. LeRobot
+stores such recordings as datasets of episodes and trains policies on them~\cite{lerobot}.
+
+\section{Action chunking}
+
+Predicting one action per step makes policies sensitive to compounding errors and to the timing of inference.
+\emph{Action chunking} predicts a sequence of $H$ future actions $A_t=(a_t,\dots,a_{t+H-1})$ from one observation.
+ACT~\cite{zhao2023act} introduced chunking with a transformer conditional variational autoencoder. Diffusion
+Policy~\cite{chi2023diffusion} generates the chunk by iterative denoising. Most current VLAs generate chunks with a
+\emph{flow-matching} action head conditioned on the backbone's features: \smolvla~\cite{shukor2025smolvla} pairs a
+small vision-language model with an action expert, GR00T~N1.5 and~N1.7~\cite{nvidia2025gr00t} use a diffusion
+transformer over a 3-billion-parameter model, and \pizerofive~\cite{pi2025pi05} a larger flow-matching expert.
+MolmoAct~2~\cite{molmoact2} adds reasoning about actions in space. The chunk length differs widely: 16 actions for
+GR00T, 50 for \smolvla{} and \pizerofive, 100 for ACT, which matters for remote inference (Section~\ref{sec:shortchunk}).
+
+\section{Asynchronous and remote inference}\label{sec:bg-remote}
+
+If the robot waits for each chunk before moving, it pauses for every inference. \emph{Asynchronous} inference requests
+the next chunk while the current one is still being executed, so execution and inference overlap; \smolvla{}'s authors
+proposed this in a client-server form~\cite{shukor2025smolvla}. LeRobot~0.7 ships a remote-inference stack built on this
+idea: a policy server on the GPU machine and a client on the robot computer, connected through the Zenoh protocol.
+The client keeps a queue of actions, has at most one request in flight, discards replies that arrive after their
+deadline, and requests the next chunk when the queued actions fall to about one round trip. If no action is available
+for a configured \emph{starvation grace} (one second by default), it ends the run with a fault.
+
+\section{Real-time chunking}
+
+Consecutive chunks are predicted from different observations, so the actions at the boundary between them can
+disagree and the arm jumps when execution switches chunks. Real-Time Chunking (RTC)~\cite{black2025rtc} treats the
+next chunk as an in-painting problem: while generating it with a flow-matching policy, the actions that will still be
+executed from the current chunk are fixed as a prefix, so the new chunk continues them smoothly. RTC needs a
+flow-matching policy and an estimate of how many actions will be executed before the new chunk arrives.
+
+\section{Distributed Real-Time Chunking}\label{sec:bg-drtc}
+
+\drtc~\cite{vial2026drtc} combines asynchronous inference with RTC and makes the client resilient to an unreliable
+network:
+\begin{itemize}
+\item \textbf{Trigger.} A new chunk is requested when the queue holds at most $H-s_{\min}$ actions, where $H$ is the
+      chunk length and $s_{\min}$ a fixed number of steps.
+\item \textbf{Latency estimation.} The round-trip time is estimated with the Jacobson--Karels
+      estimator~\cite{jacobson1988congestion,rfc6298} that TCP uses for its retransmission timer: a smoothed mean
+      plus a multiple of a smoothed mean deviation.
+\item \textbf{Cooldown.} A request that is not answered within a cooldown derived from the latency estimate is given
+      up, and a fresh observation is sent instead; the freshest observation always wins.
+\item \textbf{Message semantics.} Messages between threads and the merging of chunks into the action schedule are
+      modelled as last-write-wins registers from the literature on conflict-free replicated data
+      types~\cite{shapiro2011crdt}, so reordered and duplicated messages are absorbed.
+\end{itemize}
+Its author evaluated it with injected faults on an SO-101 arm. The present work ports its scheduling into LeRobot~0.7's
+runtime and evaluates it against the shipped client on task success.
+
+\section{Smoothing robot commands}
+
+Robot commands that change abruptly excite the arm's mechanics and look unnatural. A standard remedy is a causal
+low-pass filter on the commanded positions; the Butterworth filter~\cite{butterworth1930} has a maximally flat pass
+band. A second remedy, specific to chunked control, is to vary the playback rate: when the next chunk will arrive late,
+executing the queued actions more slowly avoids a full stop.
+
+\section{Summary}
+
+Remote inference makes large policies usable on low-cost robots, but the shipped client gives up quickly under network
+faults. \drtc{} proposes a scheduling that tolerates such faults. What is missing is an independent, controlled
+comparison on a physical robot, against the shipped client, with task success as the outcome and with the motion
+quality measured as well. This report provides one.

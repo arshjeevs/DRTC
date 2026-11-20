@@ -1,0 +1,27 @@
+\chapter{Reproducing the Results}\label{app:repro}
+
+All results are produced by the project's \texttt{lab} command from versioned files: the evaluation plan pins every
+policy to its exact model version, and every trial's raw logs are kept in the results store. The main experiment is
+reproduced as follows.
+
+\begin{lstlisting}[language=bash]
+# on the GPU server: serve every policy of the evaluation (pinned versions)
+lab eval serve sort_one_drtc_main
+
+# on the robot computer, with the arm and cameras connected
+lab eval servers sort_one_drtc_main --server a100   # every policy reports "ready"
+lab eval run sort_one_drtc_main --server a100       # rounds; s = success, f = failure
+
+# any machine: rebuild the report from every session's raw files
+lab eval report sort_one_drtc_main --pull
+
+# the bench (replay robot): servers and replay robot on the same GPU server
+lab eval serve bench_main_mix
+lab eval run bench_main_mix --server local
+
+# the offline evaluation (any GPU server)
+lab eval offline --models smolvla_sort_one_v1_full,groot_sort_one_v1_full
+\end{lstlisting}
+
+The figures, tables and numbers of this report are generated from the same result files by
+\texttt{report/scripts/build.py} (\texttt{make} in the \texttt{report} folder).
