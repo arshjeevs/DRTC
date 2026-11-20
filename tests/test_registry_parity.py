@@ -93,10 +93,13 @@ def old_experiments(tmp_path_factory) -> Path:
     return out
 
 
+# The groups the minor had (its composer is the reference); groups added later (bench/, 2026-11-20) use models and keys
+# the minor never knew, so there is nothing to compare them with.
+MINOR_GROUPS = {"replication", "smoothing", "smoke"}
 EXPERIMENTS = sorted(
     str(p.relative_to(ROOT / "lab" / "experiments").with_suffix(""))
     for p in (ROOT / "lab" / "experiments").rglob("*.yaml")
-    if not p.name.startswith("_")
+    if not p.name.startswith("_") and p.relative_to(ROOT / "lab" / "experiments").parts[0] in MINOR_GROUPS
 )
 
 
