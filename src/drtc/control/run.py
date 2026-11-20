@@ -30,7 +30,7 @@ RESULTS = Path("results") / "scratch"  # test runs only (lab/EVALUATION.md rule 
 INDEX_FIELDS = ["run_id", "experiment", "model", "trial", "success", "started_at", "duration_s", "git_commit",
                 "git_dirty", "note", "run_dir", "robot", "host", "outcome"]
 # Composed experiment keys this run applies; anything else that is set is reported as not applied yet.
-APPLIED = {"blend_steps", "blend_weight", "cooldown", "cooldown_cap", "epsilon", "playback_mode", "playback_min_rate", "playback_margin_steps",
+APPLIED = {"scheduler", "blend_steps", "blend_weight", "cooldown", "cooldown_cap", "epsilon", "playback_mode", "playback_min_rate", "playback_margin_steps",
            "playback_rate_slew", "action_filter_mode", "action_filter_butterworth_cutoff", "action_filter_gain", *("drop_obs", "drop_action", "dup_obs", "dup_action", "reorder_obs", "reorder_action", "disconnect",
               "spikes", "latency"), "estimator", "s_min", "latency_k", "latency_alpha", "latency_beta", "duration_s", "fps", "task",
            "policy_type", "pretrained_name_or_path", "finetune", "model", "name", "description", "train",
@@ -131,7 +131,8 @@ def build(reg: Registry, experiment: str, model: str | None, robot: str, episode
         # with the new chunk's, (1 - w) * old + w * new; 0 = off (the default)
         "inference.blend_steps": int(composed.get("blend_steps", 0)),
         "inference.blend_weight": float(composed.get("blend_weight", 0.5)),
-        "inference.scheduler": "drtc",
+        # drtc: DRTC's trigger; upstream: LeRobot's own (refill when the queued playback reaches the turnaround)
+        "inference.scheduler": str(composed.get("scheduler", "drtc")),
         "inference.estimator": composed.get("estimator", "jk"),
         "inference.s_min": int(composed.get("s_min", 20)),
         "inference.latency_k": float(composed.get("latency_k", 1.5)),

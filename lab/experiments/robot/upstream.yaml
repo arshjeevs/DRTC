@@ -1,0 +1,11 @@
+# The "normal stuff": LeRobot 0.7's own remote inference, without DRTC (sort_one_drtc, condition `upstream`).
+# Upstream's scheduler (refill when queued playback reaches max(refill_seconds, turnaround + one step)), upstream's
+# latency estimate (the max of recent turnarounds), no cooldown re-request, no action filter. Kept equal to the DRTC
+# conditions on purpose, so only DRTC's own parts differ: aligned chunk merge, the arm holding through stalls instead
+# of ending the trial, the request delay capped at the chunk length (an upstream bug fix), raw image encoding.
+description: Upstream LeRobot remote inference (no DRTC)
+model: smolvla_sort_one_v1_full
+scheduler: upstream
+estimator: upstream
+cooldown: false
+action_filter_mode: none
