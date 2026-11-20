@@ -1,0 +1,28 @@
+# Phase 6 baseline, cube in the box (lab/PLAN.md Phase 6; lab/EVALUATION.md; metrics: lab/METRICS.md v1).
+# The new full fine-tunes on cubebox v0 and v1 against the two models kept from the minor (minor results: GR00T
+# LoRA 80%, SmolVLA LoRA 90%), all as trained, in one eval so that they are compared in the same sessions
+# (METRICS.md rule 5). Each model is always given its own dataset's instruction: v0 "Pick the green cube and place it
+# in the box", v1 "Pick up the green cube and put it inside the box."
+description: Phase 6 baseline, cube in the box (v0, v1 and the kept minor models, as trained)
+task: Put the green cube in the box (each model gets its own dataset's wording)
+success: The green cube ends inside the box and the gripper is open, before the time limit.
+time_limit_s: 30
+trials: 20                # valid trials per model (METRICS.md rule 1)
+seed: 0
+models:
+  - act_cubebox_v0_full             # new, cubebox v0 (trimmed)
+  - smolvla_cubebox_v0_full         # new, cubebox v0 (trimmed)
+  - groot_cubebox_v1_full           # new, cubebox v1 (trimmed)
+  - groot_cubebox_v1_lora_raw       # kept from the minor (80%)
+  - smolvla_cubebox_v0_lora_raw     # kept from the minor (90%)
+conditions:
+  baseline: replication/baseline     # DRTC with its defaults, no faults
+video: true
+
+# Written by `lab eval freeze`: the Hub commit each model is served at. Do not edit by hand.
+frozen:
+  act_cubebox_v0_full: '33d0cf3c6c645d349f856c29a302e00f77b24f93'
+  smolvla_cubebox_v0_full: '8beffbfd55565206d78c0632cf54a12a3b2f830f'
+  groot_cubebox_v1_full: 'b873dec480a25ad2d47d00bf2cbfdd49b092b9f0'
+  groot_cubebox_v1_lora_raw: '8f9c7913c5ac1a99cd35207ed240363b9bd2c956'
+  smolvla_cubebox_v0_lora_raw: '0e24e7e65d0fcdc48e1a6e21dbadf63af2e0f02d'
