@@ -4,7 +4,8 @@ Model server side, `lab eval serve <eval>` (laptop GPU, A100, or the H200 contai
 - every model of the frozen eval (or `--models` a subset) in its own policy server, started one after the other;
 - each serves exactly its frozen Hub commit (only the served checkpoint is downloaded), under a deployment name that
   contains the commit (drtc.control.serve.deployment_name), so a client can only reach the frozen version;
-- port 7460 + the model's place in the eval's list; listening on 127.0.0.1, or on all interfaces inside the H200's
+- ports: each eval has its own block of 10 (from its name, so two evals can be served on one machine at once), and
+  each model the port at its place in the eval's list; listening on 127.0.0.1, or on all interfaces inside the H200's
   container (only reachable from the H200 host, which the tunnel goes through);
 - logs in logs/serve/<eval>/<model>.log (debugging only: nothing for analysis is stored on a model server).
 
@@ -12,7 +13,7 @@ Robot computer side:
 - laptop: the servers are local (tcp/127.0.0.1:<port>);
 - A100: one SSH connection (key login) forwarding every model's port;
 - H200: one SSH connection (the password is typed once) that finds the container's address and forwards every port
-  into it. Local ports are 17460 + i, so a tunnel never clashes with servers running on the laptop.
+  into it. Local tunnel ports are the server ports + 10000, so a tunnel never clashes with servers on the laptop.
 - probe(): asks a deployment to describe itself (no session is opened): ready, checkpoint identity, software.
 """
 
@@ -29,8 +30,9 @@ from pathlib import Path
 from drtc.evals import spec as S
 from drtc.registry import Registry, RegistryError
 
-BASE_PORT = 7460
-TUNNEL_BASE_PORT = 17460
+PORT_BLOCKS_START = 7500  # eval blocks: 7500-9999, 10 ports each
+TUNNEL_OFFSET = 10000
+MAX_MODELS = 10
 SERVERS = ("laptop", "a100", "h200")
 
 
@@ -40,8 +42,31 @@ def deployment(spec: S.EvalSpec, model: str) -> str:
     return deployment_name(model, spec.frozen[model])
 
 
+def base_port(spec: S.EvalSpec) -> int:
+    """The first port of the eval's block: the same on every machine (computed from the eval's description and models,
+    which identify it), different for different evals."""
+    import zlib
+
+    key = (spec.description + "|" + ",".join(spec.models)).encode()
+    return PORT_BLOCKS_START + (zlib.crc32(key) % 250) * 10
+
+
 def port(spec: S.EvalSpec, model: str) -> int:
-    return BASE_PORT + spec.models.index(model)
+    if len(spec.models) > MAX_MODELS:
+        raise RegistryError(f"an eval serves at most {MAX_MODELS} models")
+    return base_port(spec) + spec.models.index(model)
+
+
+def port_free(p: int, host: str = "127.0.0.1") -> bool:
+    import socket
+
+    with socket.socket() as sk:
+        sk.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            sk.bind((host, p))
+            return True
+        except OSError:
+            return False
 
 
 def in_container() -> bool:
@@ -60,6 +85,10 @@ def serve(reg: Registry, name: str, models: list[str] | None, device: str, ready
     if unknown:
         raise RegistryError(f"not in {name}: {', '.join(unknown)} (its models: {', '.join(sp.models)})")
     listen_host = "0.0.0.0" if in_container() else "127.0.0.1"
+    busy = [f"{m} (port {port(sp, m)})" for m in chosen if not port_free(port(sp, m), listen_host)]
+    if busy:
+        raise RegistryError(f"ports in use on this machine: {', '.join(busy)}. Is `lab eval serve {name}` already "
+                            f"running (tmux ls)? Stop it there first (Ctrl-C in its window)")
     logs = Path("logs") / "serve" / name
     logs.mkdir(parents=True, exist_ok=True)
     procs: list[tuple[str, subprocess.Popen, Path]] = []
@@ -160,7 +189,7 @@ def connect(reg: Registry, spec: S.EvalSpec, server: str, models: list[str] | No
             raise RegistryError(f"the {container} container is not running on {server}: start it (lab/H200.md)")
     endpoints = {}
     for m in chosen:
-        local = TUNNEL_BASE_PORT + spec.models.index(m)
+        local = port(spec, m) + TUNNEL_OFFSET
         r = subprocess.run(["ssh", "-S", str(sock), "-O", "forward", "-L", f"{local}:{target}:{port(spec, m)}", ssh],
                            capture_output=True, text=True)
         if r.returncode != 0 and "already" not in r.stderr.lower():

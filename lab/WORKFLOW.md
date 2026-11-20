@@ -329,16 +329,18 @@ Pick whichever server is free that day. **The whole session uses one server**, a
 It starts the models one after the other and prints each one's status:
 
 ```
-  act_sort_one_v1_full             port 7460  starting (loading the model) ... ready in 30 s
-  smolvla_sort_one_v1_full         port 7461  starting (loading the model) ... ready in 547 s
-  groot_sort_one_v1_full           port 7462  starting (loading the model) ... ready in 159 s
-  diffusion_sort_one_v1_full       port 7463  starting (loading the model) ... ready in 34 s
+  act_sort_one_v1_full             port 8840  starting (loading the model) ... ready in 30 s
+  smolvla_sort_one_v1_full         port 8841  starting (loading the model) ... ready in 547 s
+  groot_sort_one_v1_full           port 8842  starting (loading the model) ... ready in 159 s
+  diffusion_sort_one_v1_full       port 8843  starting (loading the model) ... ready in 34 s
 all 4 ready. Leave this running during the session; Ctrl-C stops every server.
 ```
 
 - Wait for **`all N ready`**. SmolVLA compiles its model when it starts (about 9 minutes the first time on the A100).
 - Detach with Ctrl-b d. At the end of the session, attach (`tmux attach -t serve`) and press Ctrl-C.
 - The laptop's 8 GB fits ACT and Diffusion, not GR00T. Then run the session with the same `--models`.
+- Each eval has its own ports, so two evals can be served on one machine at once if the GPU has room. If
+  `lab eval serve` says `ports in use`, that eval is already being served there: `tmux ls`, attach, Ctrl-C.
 - On the H200, the laptop connects through an SSH tunnel into the container: type the server password when
   `lab eval servers` or `lab eval run` asks for it (once per session). **Not tested on the H200 yet:** if it fails the
   first time, paste the message to Claude.
@@ -354,7 +356,7 @@ lab eval servers sort_one_baseline --server a100
 `lab eval servers` connects (A100: by key; H200: asks the password) and asks each model to describe itself:
 
 ```
-  act_sort_one_v1_full             ready   commit 449b9c12  checkpoint sha256:5af906278031  tcp/127.0.0.1:17460
+  act_sort_one_v1_full             ready   commit 449b9c12  checkpoint sha256:5af906278031  tcp/127.0.0.1:18840
   ...
 ```
 
