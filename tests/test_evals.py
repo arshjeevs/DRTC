@@ -231,6 +231,7 @@ def test_every_bench_and_robot_experiment_parses():
     exps = [str(p.relative_to(reg.lab / "experiments").with_suffix("")) for g in ("bench", "robot")
             for p in (reg.lab / "experiments" / g).glob("*.yaml")] + ["replication/baseline"]
     exps += [str(p.relative_to(reg.lab / "experiments").with_suffix("")) for p in (reg.lab / "experiments" / "main").glob("*.yaml")]
+    exps += [str(p.relative_to(reg.lab / "experiments").with_suffix("")) for p in (reg.lab / "experiments" / "bench_main").glob("*.yaml")]
     for exp in exps:
         for robot in ("replay", "rig"):
             cmd, _, _ = build(reg, exp, "groot_sort_one_v1_full", robot, 49, "tcp/127.0.0.1:1", 10, Path("/tmp/x"), "d")

@@ -1,0 +1,10 @@
+description: "Bench condition 2 (drops): upstream as it ships + drops"
+model: smolvla_sort_one_v1_full
+scheduler: upstream
+estimator: upstream
+cooldown: false
+action_filter_mode: none
+starvation_grace_s: 1.0
+drop_action:
+  - {start_s: 4.0, duration_s: 1.0}
+latency: {base_ms: 250, jitter_ms: 20, seed: 0}   # the network part of the robot round trip in sort_one_drtc_main (2026-11-20): ~260 ms
