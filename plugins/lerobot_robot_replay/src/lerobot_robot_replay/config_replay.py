@@ -22,5 +22,6 @@ class ReplayRobotConfig(RobotConfig):
     state: str = "follow"  # follow | dataset
     follow_alpha: float = 0.35  # fraction of the way to the commanded target per observation (~30 Hz)
     loop: bool = False  # at the end: loop the episode, or hold its last frame
+    preload: bool = True  # decode the episode once before the run (30 Hz on a slow or shared CPU), not every tick
     log_path: str | None = None  # where to write the received commands (JSON lines) on disconnect
     cameras: dict = field(default_factory=dict)  # unused: cameras come from the dataset

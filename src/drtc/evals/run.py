@@ -256,6 +256,18 @@ def session_run(reg: Registry, name: str, server: str, models: list[str] | None,
         if bad:
             raise RegistryError("rig check failed: " + "; ".join(bad))
     chosen = models or sp.models
+    if sp.robot == "replay":  # decode every held-out episode once, before the first trial (30 Hz on any CPU)
+        import time as _time
+
+        from lerobot_robot_replay.replay import preload
+
+        t0 = _time.monotonic()
+        todo = sorted({(reg.resolve(m).dataset.repo, reg.resolve(m).dataset.revision, e)
+                       for m in chosen for e in held_out_episodes(reg, m)})
+        print(f"decoding {len(todo)} held-out episodes for the replay robot ...", flush=True)
+        for repo, rev, e in todo:
+            preload(repo, rev, e)
+        print(f"  done in {_time.monotonic() - t0:.0f} s", flush=True)
     conn = serving.connect(reg, sp, server, chosen)
     try:
         artifacts, missing = {}, []
