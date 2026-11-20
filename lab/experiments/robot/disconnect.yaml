@@ -1,0 +1,7 @@
+# Robot fault condition (Phase 8, sort_one_faults): full outages (both directions) early in the trial, on top of
+# the real network. The 2 s outage is longer than most chunks: DRTC's case "a disconnect longer than the queue".
+description: Full outages on the real network, 1 s at 2 s and 2 s at 5 s
+model: smolvla_sort_one_v1_full
+disconnect:
+  - {start_s: 2.0, duration_s: 1.0}
+  - {start_s: 5.0, duration_s: 2.0}

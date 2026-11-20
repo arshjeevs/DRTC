@@ -37,7 +37,7 @@ are fixed (`lab/recipes/`, the originals from Phase 2); a model is a recipe appl
 In the `drtc_lab` container ([H200.md](H200.md) has how to get in):
 
 ```bash
-cd /workspace/drtc_major && . ./.server.env && git pull && uv sync --frozen --extra gpu --python /usr/bin/python3
+cd /workspace/drtc_major && . ./.server.env && git pull && uv sync --frozen --extra gpu --extra sim --python /usr/bin/python3
 .venv/bin/lab check --logging            # once per setup: wandb and HF keys present
 .venv/bin/lab prepare so101_sort_one_v1  # once per new dataset revision: download + prepare for the recipes
 nvidia-smi                               # check that the GPU has room (other students share it)

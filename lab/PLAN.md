@@ -1073,7 +1073,11 @@ step, each step tested and added to [WORKFLOW.md](WORKFLOW.md) part 2 so the use
 - [ ] M9 offline table for every trained model
 - [ ] Eval `sort_one_baseline`: ACT, SmolVLA, GR00T N1.5, Diffusion, 20 trials each (~1 h)
 - [ ] Optional eval `cubebox_baseline`: round 1 models against the kept minor models (GR00T 80%, SmolVLA 90%)
-- [ ] Choose the 2 models for Phases 7-8 (decision A)
+- [x] `sort_one_baseline_v2` done (2026-11-20, 80/80, laptop -> A100): SmolVLA 16/20, Diffusion 16/20, ACT 15/20,
+      GR00T 4/20 (stalls 58%: its 0.5 s chunks cannot cover the ~0.5 s round trip). `sort_one_baseline` (first 5
+      rounds, before the GR00T fixes) is superseded.
+- [x] Chosen for Phases 7-8 (the user, 2026-11-20): **SmolVLA, Diffusion and GR00T N1.5**. GR00T against the top-2
+      rule on purpose: it is the model the network hurts most, so improving it is the strongest DRTC result.
 
 ## Phase 7: Smoothing
 - [ ] Bench: the replay robot plays held-out episodes to the served model with simulated latency (normal and

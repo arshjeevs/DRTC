@@ -1,0 +1,23 @@
+# Phase 8 robot eval: DRTC under network faults on the arm (lab/PLAN.md Phase 8, decision of 2026-11-20: SmolVLA,
+# Diffusion and GR00T N1.5; baseline + latency spikes + disconnect). The real network is the laptop -> server link.
+# 20 trials per model and condition; rounds keep every pair level, so stopping after round N gives N of each.
+description: Phase 8 robot eval, network faults on sorting A (SmolVLA, Diffusion, GR00T N1.5)
+success: The cube is fully inside the square of its colour and the gripper has let go of it, before the time limit.
+time_limit_s: 30
+trials: 20
+seed: 0
+models:
+  - smolvla_sort_one_v1_full
+  - diffusion_sort_one_v1_full
+  - groot_sort_one_v1_full
+conditions:
+  baseline: replication/baseline   # DRTC defaults, no injected fault
+  spikes: robot/spikes
+  disconnect: robot/disconnect
+video: true
+
+# Written by `lab eval freeze`: the Hub commit each model is served at. Do not edit by hand.
+frozen:
+  smolvla_sort_one_v1_full: '246f7e54c3fe33c0f3ef66ded8c4da916995a399'
+  diffusion_sort_one_v1_full: '6e373e1c728c5affc32c505e4d5784f8b37d40e2'
+  groot_sort_one_v1_full: '6b862e61ce462f063ffa5fda9af803e4143038f2'

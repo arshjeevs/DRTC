@@ -101,7 +101,7 @@ lab check && lab train act_sort_two_v1_full --dry-run
 git add lab/models/sort_two_v1.yaml && git commit -m "models: sort_two_v1" && git push
 
 # --- H200, in the drtc_lab container ---
-cd /workspace/drtc_major && . ./.server.env && git pull && uv sync --frozen --extra gpu --python /usr/bin/python3
+cd /workspace/drtc_major && . ./.server.env && git pull && uv sync --frozen --extra gpu --extra sim --python /usr/bin/python3
 .venv/bin/lab prepare so101_sort_two_v1
 nvidia-smi
 tmux new -d -s sort2 -n act '.venv/bin/lab train act_sort_two_v1_full; bash'
@@ -251,7 +251,7 @@ In the `drtc_lab` container (Jupyter terminal, or `docker exec -it drtc_lab bash
 [H200.md](H200.md)):
 
 ```bash
-cd /workspace/drtc_major && . ./.server.env && git pull && uv sync --frozen --extra gpu --python /usr/bin/python3
+cd /workspace/drtc_major && . ./.server.env && git pull && uv sync --frozen --extra gpu --extra sim --python /usr/bin/python3
 .venv/bin/lab check --logging                  # wandb and HF keys present (once per setup is enough)
 .venv/bin/lab prepare so101_sort_two_v1        # download + prepare, once per new dataset revision
 nvidia-smi                                     # the GPU is shared: check there is room
@@ -336,7 +336,7 @@ git add lab/evals/sort_one_baseline.yaml && git commit -m "eval sort_one_baselin
 # A100:   ssh b230968ee@192.168.5.13, then
 cd ~/drtc_major && git pull && tmux new -s serve '.venv/bin/lab eval serve sort_one_baseline; bash'
 # H200:   in the drtc_lab container
-cd /workspace/drtc_major && . ./.server.env && git pull && uv sync --frozen --extra gpu --python /usr/bin/python3
+cd /workspace/drtc_major && . ./.server.env && git pull && uv sync --frozen --extra gpu --extra sim --python /usr/bin/python3
 tmux new -s serve '.venv/bin/lab eval serve sort_one_baseline; bash'
 # laptop GPU (8 GB: the small models only)
 lab eval serve sort_one_baseline --models act_sort_one_v1_full,diffusion_sort_one_v1_full
@@ -395,7 +395,7 @@ Pick whichever server is free that day. **The whole session uses one server**, a
 | Server | Where to type | Command |
 |---|---|---|
 | A100 | `ssh b230968ee@192.168.5.13` | `cd ~/drtc_major && git pull && tmux new -s serve '.venv/bin/lab eval serve sort_one_baseline; bash'` |
-| H200 | the `drtc_lab` container ([H200.md](H200.md)) | `cd /workspace/drtc_major && . ./.server.env && git pull && uv sync --frozen --extra gpu --python /usr/bin/python3`, then `tmux new -s serve '.venv/bin/lab eval serve sort_one_baseline; bash'` |
+| H200 | the `drtc_lab` container ([H200.md](H200.md)) | `cd /workspace/drtc_major && . ./.server.env && git pull && uv sync --frozen --extra gpu --extra sim --python /usr/bin/python3`, then `tmux new -s serve '.venv/bin/lab eval serve sort_one_baseline; bash'` |
 | laptop GPU | a laptop terminal | `lab eval serve sort_one_baseline --models act_sort_one_v1_full,diffusion_sort_one_v1_full` |
 
 It starts the models one after the other and prints each one's status:
@@ -515,7 +515,7 @@ results store like robot sessions.
 In the `drtc_lab` container, one bench at a time:
 
 ```bash
-cd /workspace/drtc_major && . ./.server.env && git pull && uv sync --frozen --extra gpu --python /usr/bin/python3
+cd /workspace/drtc_major && . ./.server.env && git pull && uv sync --frozen --extra gpu --extra sim --python /usr/bin/python3
 tmux new -s bench                                                  # window 1: the servers
 .venv/bin/lab eval serve bench_sort_one_smoothing                  # wait for "all 4 ready"
 # Ctrl-b c (a second window):

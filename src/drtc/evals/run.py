@@ -243,6 +243,12 @@ def session_run(reg: Registry, name: str, server: str, models: list[str] | None,
         if other and other != psha and not test:
             raise RegistryError(f"lab/evals/{name}.yaml changed since session {s.name} (its plan differs). A plan "
                                 f"with trials is never changed: put the change in a new eval")
+    if sp.robot == "replay":
+        try:
+            import lerobot_robot_replay  # noqa: F401
+        except ImportError:
+            raise RegistryError("the replay robot is not installed here: uv sync --frozen --extra gpu --extra sim "
+                                "(add --python /usr/bin/python3 on the H200)") from None
     if sp.robot == "rig":
         from drtc.cli import check_rig
 

@@ -1,0 +1,7 @@
+# Robot fault condition (Phase 8, sort_one_faults): on top of the real network (WiFi to the server), two server
+# delays early in the trial, while the arm is moving (sorting A takes 6-15 s). Times from the first observation sent.
+description: Latency spikes on the real network, +0.5 s at 2 s and +1 s at 5 s
+model: smolvla_sort_one_v1_full
+spikes:
+  - {start_s: 2.0, delay_ms: 500}
+  - {start_s: 5.0, delay_ms: 1000}
