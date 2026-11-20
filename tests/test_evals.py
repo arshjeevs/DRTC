@@ -1,6 +1,7 @@
 """Eval files, rounds and the results layout (lab/docs/EVALUATION.md, lab/METRICS.md rules 1-3)."""
 
 import json
+from pathlib import Path
 
 import yaml
 
@@ -248,3 +249,44 @@ def test_a_fault_after_the_first_action_counts_and_before_it_does_not():
     rep_setup = store.Trial(None, "s", "c", "m", 4, {"robot": "replay", "outcome": "exit 1", "label": "replay",
                                                       "first_action_s": None})
     assert rig_fault.valid and not rig_setup.valid and rep_fault.valid and not rep_setup.valid
+
+
+def test_pull_finishes_a_pull_that_stopped_part_way(tmp_path, monkeypatch):
+    """A session whose pull stopped holds .pulling and is finished by the next pull; a session here without it is
+    never touched (it may hold a local edit, e.g. a void); a session in the store but not here is pulled."""
+    import huggingface_hub
+
+    from drtc.evals import sync
+
+    store_files = ["bench/b/sessions/s1/trials/t1.json", "bench/b/sessions/s1/trials/t2.json",
+                   "bench/b/sessions/s2/trials/t1.json", "bench/b/sessions/s3/trials/t1.json"]
+
+    class Api:
+        def list_repo_files(self, *a, **k):
+            return store_files
+
+    got = []
+
+    def download(repo_id, filename, repo_type, local_dir):
+        got.append(filename)
+        out = Path(local_dir) / filename
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text("store")
+
+    monkeypatch.setattr(huggingface_hub, "HfApi", Api)
+    monkeypatch.setattr(huggingface_hub, "hf_hub_download", download)
+    monkeypatch.setattr(sync, "repo", lambda reg: "user/results")
+    sessions = tmp_path / "bench" / "b" / "sessions"
+    (sessions / "s1" / "trials").mkdir(parents=True)  # stopped part-way: t1 only
+    (sessions / "s1" / "trials" / "t1.json").write_text("store")
+    (sessions / "s1" / store.PULLING).write_text("")
+    (sessions / "s2" / "trials").mkdir(parents=True)  # here, edited locally (a void removed .pushed)
+    (sessions / "s2" / "trials" / "t1.json").write_text("local edit")
+
+    assert sync.pull(None, "b", kind="bench", root=tmp_path) == ["s1", "s3"]
+    assert (sessions / "s1" / "trials" / "t2.json").is_file() and (sessions / "s3" / "trials" / "t1.json").is_file()
+    assert (sessions / "s2" / "trials" / "t1.json").read_text() == "local edit"
+    assert not any(f.startswith("bench/b/sessions/s2/") for f in got)
+    for s in ("s1", "s3"):
+        assert (sessions / s / store.PUSHED).is_file() and not (sessions / s / store.PULLING).exists()
+

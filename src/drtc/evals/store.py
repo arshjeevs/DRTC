@@ -16,6 +16,7 @@ from pathlib import Path
 
 ROOT = Path("results") / "evals"
 PUSHED = ".pushed"
+PULLING = ".pulling"  # a pull of this session from the results store has not finished (lab.evals.sync.pull)
 MIN_REPLAY_HZ = 27.0  # a replay trial whose control loop ran slower measures the wrong thing (30 Hz robot)
 
 
@@ -84,4 +85,5 @@ def valid_counts(name: str, root: Path | None = None) -> dict[tuple[str, str], i
 
 
 def unpushed(name: str, root: Path | None = None) -> list[Path]:
-    return [s for s in sessions(name, root) if not (s / PUSHED).is_file()]
+    """This machine's sessions that changed since their last push (not those still being pulled)."""
+    return [s for s in sessions(name, root) if not (s / PUSHED).is_file() and not (s / PULLING).is_file()]
