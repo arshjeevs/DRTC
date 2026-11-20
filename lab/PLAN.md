@@ -20,9 +20,30 @@ then improves the motion.
 **Datasets** (as they are, no new recording or edits): `so101_cubebox_v0` (50 = 45 + 5 held out),
 `so101_cubebox_v1` (110 = 100 + 10), `so101_sort_one_v1` (88 = 80 + 8).
 
-**Models.** The 7 shortlisted (SmolVLA, GR00T N1.5, GR00T N1.7, π0.5, MolmoAct 2, ACT, Diffusion), each with its fixed
-original recipe, are trained on the 3 datasets and tested **on the baseline only** (condition 1). **SmolVLA and GR00T
-N1.5** go on to the experiments (conditions 2-4).
+**Models and what each dataset gets** (the 7 shortlisted, each with its fixed original recipe: SmolVLA, GR00T N1.5,
+GR00T N1.7, π0.5, MolmoAct 2, ACT, Diffusion):
+
+| Dataset | Trained | Robot evaluation |
+|---|---|---|
+| `so101_cubebox_v0` (initial, temporary research) | SmolVLA, GR00T N1.5 | baseline (condition 1) only |
+| `so101_cubebox_v1` | all 7 | baseline (condition 1) for all 7; the DRTC experiment only if time remains |
+| `so101_sort_one_v1` | all 7 | baseline (condition 1) for all 7; **the DRTC experiment (conditions 1-4) for SmolVLA and GR00T N1.5** |
+
+**Trainings** (✓ trained and on the Hub, ▶ running, · to do):
+
+| Model | cubebox v0 | cubebox v1 | sort_one |
+|---|---|---|---|
+| SmolVLA | ✓ | ▶ H200 | ✓ |
+| GR00T N1.5 | ▶ H200 | ✓ | ✓ |
+| ACT | (✓, not needed) | ▶ H200 | ✓ |
+| Diffusion | – | ▶ H200 | ✓ |
+| GR00T N1.7 | – | · | · |
+| π0.5 | – | · | · |
+| MolmoAct 2 (LoRA, its original recipe) | – | · | · |
+
+The 4 running ones started 2026-11-20 on the H200 (tmux `train` in the drtc_lab container; logs
+`logs/train_<model>.log`). Still to do: 6 (GR00T N1.7, π0.5, MolmoAct 2 on cubebox v1 and sort_one); π0.5 takes ~27 h
+each.
 
 **Conditions** (per model, per task; the same order and rules everywhere):
 
@@ -45,18 +66,19 @@ repeated. The report shows the fraction of trials ended by a fault. Metrics v2 (
 **Robot computer:** the laptop for every experiment; the Raspberry Pi is set up only after everything is complete. The
 presentation and report say the laptop was the robot computer.
 
-**Order of work** (approved):
+**Order of work** (approved; the user decides when each step starts):
 
-| # | What | Who |
-|---|---|---|
-| 1 | This scope into PLAN.md, the rule changes into METRICS.md (v2) | Claude |
-| 2 | Build the 4 conditions, the fault mix, the new rules and the eval files; test on the bench (H200) | Claude |
-| 3 | Train the 2 missing for the experiments (SmolVLA on cubebox v1, GR00T N1.5 on cubebox v0), then the other 12 (π0.5 last) | Claude, A100 + H200 |
-| 4 | Main experiment: per task SmolVLA + GR00T N1.5 x 4 conditions x 10 trials (80 per task, 240 in all, ~3 h) | the user |
-| 5 | 7-model baseline: per task, condition 1 x 10 trials, as the models finish training | the user |
-| 6 | Bench (each fault type separately) and offline M9/M10 for everything | Claude, H200 |
-| 7 | One report with all results | Claude |
-| 8 | The Raspberry Pi setup | later |
+| # | What | Who | Status |
+|---|---|---|---|
+| 1 | This scope into PLAN.md, the rule changes into METRICS.md (v2); earlier results archived | Claude | ✓ done |
+| 2 | Build the 4 conditions, the fault mix, the new rules (fault = failure, M1f) and the eval files; test on the bench (H200) | Claude | · next |
+| 3 | Trainings (table above) | Claude, A100 + H200 | ▶ 4 running; 6 to do |
+| 4 | **DRTC experiment on sort_one:** SmolVLA + GR00T N1.5 x 4 conditions x 10 trials = 80 trials (~1 h) | the user | · after 2 |
+| 5 | **Baselines:** condition 1 x 10 trials: cubebox v0 (2 models), cubebox v1 (7), sort_one (7), as the models finish | the user | · after 2, and 3 per model |
+| 6 | Bench (each fault type separately, sort_one, SmolVLA + GR00T) and offline M9/M10 for every model | Claude, H200 | · |
+| 7 | One report with all results | Claude | · |
+| 8 | If time: the DRTC experiment on cubebox v1 | the user | · optional |
+| 9 | The Raspberry Pi setup | later | · |
 
 | Phase | What | Done when | Status (2026-11-20) |
 |---|---|---|---|
