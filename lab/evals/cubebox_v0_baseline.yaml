@@ -11,3 +11,8 @@ models:
 conditions:
   baseline: main/baseline
 video: true
+
+# Written by `lab eval freeze`: the Hub commit each model is served at. Do not edit by hand.
+frozen:
+  smolvla_cubebox_v0_full: '8beffbfd55565206d78c0632cf54a12a3b2f830f'
+  groot_cubebox_v0_full: '9b164e1e0f5a7b1d0cc0bf21f05fd86bb7fdfcf8'
