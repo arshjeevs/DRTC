@@ -20,7 +20,9 @@ success.
   \caption{Task success, its 95\% interval, and the trials ended by a fault.}
   \label{tab:success}
   \small
+  \begin{adjustbox}{max width=\textwidth}
   \gentable{tab_main_success}
+  \end{adjustbox}
 \end{table}
 
 \subsection{Network faults break the shipped client}
@@ -29,6 +31,7 @@ Under the fault mix, neither policy completed a single trial: \smolvla's success
 to \R{main/smolvla/faults/M1} (\R{main/smolvla/p/baseline-faults/M1}) and \groot's from \R{main/groot/baseline/M1} to
 \R{main/groot/faults/M1} (\R{main/groot/p/baseline-faults/M1}). The shipped client ended \R{main/smolvla/faults/M1f}
 of \smolvla's and \R{main/groot/faults/M1f} of \groot's trials with a terminal fault; the other trials failed as well.
+
 
 \subsection{\drtc{} recovers task success}
 
