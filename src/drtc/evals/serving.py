@@ -10,7 +10,9 @@ Model server side, `lab eval serve <eval>` (laptop GPU, A100, or the H200 contai
 - logs in logs/serve/<eval>/<model>.log (debugging only: nothing for analysis is stored on a model server).
 
 Robot computer side:
-- laptop: the servers are local (tcp/127.0.0.1:<port>);
+- laptop: the servers are local (tcp/127.0.0.1:<port>); from another robot computer on the laptop's hotspot (the Pi),
+  `lab eval serve <eval> --for-pi` on the laptop listens on its hotspot address (hosts.yaml `laptop.address`) and the
+  Pi connects to it directly, with no tunnel;
 - A100: one SSH connection (key login) forwarding every model's port;
 - H200: one SSH connection (the password is typed once) that finds the container's address and forwards every port
   into it. Local tunnel ports are the server ports + 10000, so a tunnel never clashes with servers on the laptop.
@@ -76,7 +78,19 @@ def in_container() -> bool:
 # --- model server side --------------------------------------------------------------------------------------------
 
 
-def serve(reg: Registry, name: str, models: list[str] | None, device: str, ready_timeout_s: float = 900) -> int:
+def listen_address(reg: Registry, for_pi: bool = False) -> str:
+    """Where the policy servers listen: all interfaces inside the H200's container (reached only through its host),
+    the laptop's hotspot address for a robot computer on that hotspot (--for-pi), else this machine only."""
+    if for_pi:
+        laptop = reg.hosts.get("laptop")
+        if laptop is None or not laptop.address:
+            raise RegistryError("lab/hosts.yaml has no address for the laptop (its hotspot address, e.g. 10.42.0.1)")
+        return laptop.address
+    return "0.0.0.0" if in_container() else "127.0.0.1"
+
+
+def serve(reg: Registry, name: str, models: list[str] | None, device: str, ready_timeout_s: float = 900,
+          for_pi: bool = False) -> int:
     sp = S.load(reg, name)
     if not S.is_frozen(sp):
         raise RegistryError(f"{name} is not frozen: run `lab eval freeze {name}` on the laptop, commit, push, pull here")
@@ -93,7 +107,15 @@ def serve(reg: Registry, name: str, models: list[str] | None, device: str, ready
 
     signal.signal(signal.SIGINT, _stop)
     signal.signal(signal.SIGTERM, _stop)
-    listen_host = "0.0.0.0" if in_container() else "127.0.0.1"
+    listen_host = listen_address(reg, for_pi)
+    if for_pi:
+        import socket
+
+        try:
+            socket.create_server((listen_host, 0)).close()
+        except OSError:
+            raise RegistryError(f"{listen_host} is not an address of this machine: is the laptop's hotspot on (the Pi "
+                                f"connects through it)?") from None
     busy = [f"{m} (port {port(sp, m)})" for m in chosen if not port_free(port(sp, m), listen_host)]
     if busy:
         raise RegistryError(f"ports in use on this machine: {', '.join(busy)}. Is `lab eval serve {name}` already "
@@ -177,8 +199,15 @@ def connect(reg: Registry, spec: S.EvalSpec, server: str, models: list[str] | No
     if server not in SERVERS:
         raise RegistryError(f"server must be one of {', '.join(SERVERS)}")
     chosen = models or spec.models
-    if server in ("laptop", "local"):
+    if server == "local":
         return Connection(server, {m: f"tcp/127.0.0.1:{port(spec, m)}" for m in chosen})
+    if server == "laptop":
+        here = reg.current_host()
+        if here is not None and here.id == "laptop":
+            return Connection(server, {m: f"tcp/127.0.0.1:{port(spec, m)}" for m in chosen})
+        # another robot computer (the Pi): the laptop serves on its hotspot address (`lab eval serve --for-pi`)
+        address = listen_address(reg, for_pi=True)
+        return Connection(server, {m: f"tcp/{address}:{port(spec, m)}" for m in chosen})
     ssh, container = _ssh_target(reg, server)
     sock = Path.home() / ".ssh" / f"lab-{server}.sock"
     if not sock.exists():

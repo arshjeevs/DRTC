@@ -290,3 +290,20 @@ def test_pull_finishes_a_pull_that_stopped_part_way(tmp_path, monkeypatch):
     for s in ("s1", "s3"):
         assert (sessions / s / store.PUSHED).is_file() and not (sessions / s / store.PULLING).exists()
 
+
+def test_laptop_server_reached_from_the_pi(monkeypatch):
+    """--server laptop: local on the laptop itself; from the Pi, the laptop's hotspot address (lab eval serve --for-pi)."""
+    from drtc.evals import serving
+
+    reg = Registry()
+    sp = S.load(reg, "sort_one_drtc_main")
+    laptop, pi = reg.hosts["laptop"], reg.hosts["pi"]
+    monkeypatch.setattr(type(reg), "current_host", lambda self: laptop)
+    assert set(serving.connect(reg, sp, "laptop").endpoints.values()) <= {
+        f"tcp/127.0.0.1:{serving.port(sp, m)}" for m in sp.models}
+    monkeypatch.setattr(type(reg), "current_host", lambda self: pi)
+    eps = serving.connect(reg, sp, "laptop").endpoints
+    assert eps == {m: f"tcp/{laptop.address}:{serving.port(sp, m)}" for m in sp.models}
+    assert serving.listen_address(reg, for_pi=True) == laptop.address
+    assert serving.listen_address(reg) in ("127.0.0.1", "0.0.0.0")
+

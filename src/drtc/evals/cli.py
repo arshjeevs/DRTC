@@ -116,7 +116,7 @@ def _models(arg: str | None) -> list[str] | None:
 def cmd_serve(reg: Registry, a) -> int:
     from drtc.evals import serving
 
-    return serving.serve(reg, a.eval, _models(a.models), a.device)
+    return serving.serve(reg, a.eval, _models(a.models), a.device, for_pi=a.for_pi)
 
 
 def cmd_servers(reg: Registry, a) -> int:
@@ -229,6 +229,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("eval")
     p.add_argument("--models", help="only these models (comma-separated), e.g. when the GPU is too small for all")
     p.add_argument("--device", default="cuda")
+    p.add_argument("--for-pi", action="store_true", help="laptop only: listen on the laptop's hotspot address, so "
+                   "the Pi (--server laptop) can reach the servers; this laptop's own sessions then cannot")
     p.set_defaults(fn=cmd_serve)
     p = sub.add_parser("servers", help="on the robot computer: check that the eval's models answer on a server")
     p.add_argument("eval")

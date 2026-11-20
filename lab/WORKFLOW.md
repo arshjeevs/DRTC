@@ -538,8 +538,15 @@ lab eval servers <eval> --server a100           # every model "ready"?
 lab eval run <eval> --server a100
 ```
 
-Serve on the A100 for Pi sessions: the Pi's own SSH key is authorised on the A100 (2026-11-20), so `--server a100`
-opens its tunnel by itself. The H200 tunnel needs the H200 password, set up on the laptop only.
+**Model servers for Pi sessions** (all three work from the Pi; the eval must be frozen and pulled on both machines):
+
+| Server | On the server | On the Pi |
+|---|---|---|
+| A100 | `lab eval serve <eval>` (in tmux) | `--server a100`: the Pi's own key opens the tunnel (authorised 2026-11-20) |
+| H200 | `lab eval serve <eval>` in the drtc_lab container | `--server h200`: type the H200 password once per session |
+| laptop GPU (small models) | `lab eval serve <eval> --for-pi`: listens on the hotspot address 10.42.0.1 | `--server laptop`: straight to the laptop, no tunnel |
+
+With `--for-pi` the laptop's own sessions cannot reach those servers (they listen on the hotspot address only); serve without it for laptop sessions.
 
 First test (2026-11-20, cubebox v0, `--test`): 29.4-29.9 Hz control, no video frames dropped; the round trip is
 about twice the laptop's (SmolVLA 594 ms, GR00T N1.5 855 ms: WiFi to the laptop's hotspot, then to the A100), so
