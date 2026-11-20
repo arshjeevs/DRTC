@@ -209,6 +209,11 @@ class DRTCInferenceConfig(RemoteInferenceConfig):
     filter_cutoff_hz: float = 3.0
     filter_order: int = 2
     filter_gain: float = 1.4
+    # Smoothing method A (drtc.control.playback): adaptive playback while few actions are queued.
+    playback_mode: Literal["fixed", "adaptive"] = "fixed"
+    playback_min_rate: float = 0.5
+    playback_margin_steps: float = 4.0
+    playback_rate_slew: float = 0.05
 
     def __post_init__(self) -> None:
         super().__post_init__()
@@ -226,7 +231,8 @@ def make_estimator(cfg: DRTCInferenceConfig):
     return None
 
 
-TICK_FIELDS = ["t", "action", "queue", "pending", "latency_est", "accepted", "last_turnaround", "horizon"]
+TICK_FIELDS = ["t", "action", "queue", "pending", "latency_est", "accepted", "last_turnaround", "horizon",
+               "playback_rate"]
 CHUNK_FIELDS = ["t_sent", "t_received", "request_id", "accepted", "turnaround_s", "estimate_at_send_s",
                 "server_preprocessing_s", "server_policy_s", "server_postprocessing_s", "server_total_s", "steps",
                 "overlap_steps", "switch_l2"]
@@ -279,6 +285,11 @@ class DRTCEngine(RemoteInferenceEngine):
 
             self.action_filter = ButterworthFilter(cfg.filter_cutoff_hz, 1.0 / self.runtime.interval,
                                                    cfg.filter_order, cfg.filter_gain)
+        self.playback = None
+        if isinstance(cfg, DRTCInferenceConfig) and cfg.playback_mode == "adaptive":
+            from drtc.control.playback import AdaptivePlayback
+
+            self.playback = AdaptivePlayback(cfg.playback_min_rate, cfg.playback_margin_steps, cfg.playback_rate_slew)
         self.faults = None
         spec = getattr(cfg, "faults_json", None)
         if spec:
@@ -421,8 +432,21 @@ class DRTCEngine(RemoteInferenceEngine):
                 pass
         super().notify_observation(obs)
 
+    def _ticks_until_chunk(self) -> float:
+        rt = self.runtime
+        est = rt.turnaround if rt._completed else None
+        if est is None or not math.isfinite(est):
+            return 0.0
+        pending = rt.pending
+        since = (time.monotonic() - pending.submitted_at) if pending is not None else 0.0
+        return max(est - since, 0.0) / rt.interval
+
     def get_action(self, obs_frame):
-        action = super().get_action(obs_frame)
+        if self.playback is not None:
+            action = self.playback.next(lambda: super(DRTCEngine, self).get_action(obs_frame),
+                                        self.runtime.queue.qsize(), self._ticks_until_chunk())
+        else:
+            action = super().get_action(obs_frame)
         if action is not None and self.action_filter is not None:
             import torch
 
@@ -435,6 +459,7 @@ class DRTCEngine(RemoteInferenceEngine):
             None if est is None or not math.isfinite(est) else round(est, 4), rt._completed,
             None if getattr(rt, "last_turnaround", None) is None else round(rt.last_turnaround, 4),
             getattr(rt, "horizon", None),
+            1.0 if self.playback is None else round(self.playback.rate, 3),
             None if action is None else [round(float(x), 4) for x in action.detach().cpu().flatten().tolist()],
             None if self._measured is None else [round(x, 4) for x in self._measured],
         ])
@@ -443,6 +468,8 @@ class DRTCEngine(RemoteInferenceEngine):
     def _invalidate(self, operation: str) -> None:
         if self.action_filter is not None:
             self.action_filter.reset()  # motion restarts from a held pose: do not smooth across it
+        if self.playback is not None:
+            self.playback.reset()
         super()._invalidate(operation)
 
     def stop(self) -> None:
@@ -453,7 +480,7 @@ class DRTCEngine(RemoteInferenceEngine):
             if self._ticks:  # the end of the run: stalls up to here count (lab/METRICS.md M2, M3)
                 rt = self.runtime
                 self._ticks.append([round(time.monotonic() - self._t0, 4), 0, rt.queue.qsize(), int(rt.pending is not None),
-                                    None, rt._completed, None, getattr(rt, "horizon", None), None, None])
+                                    None, rt._completed, None, getattr(rt, "horizon", None), None, None, None])
             if path and self._ticks:
                 Path(path).parent.mkdir(parents=True, exist_ok=True)
                 n = len(self._joint_names) or max((len(r[-2] or r[-1] or []) for r in self._ticks), default=0)

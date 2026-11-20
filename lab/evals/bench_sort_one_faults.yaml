@@ -1,0 +1,28 @@
+# Phase 8 bench: DRTC under every fault condition (compressed into a 10 s episode), on top of the simulated WiFi link.
+description: Phase 8 bench, network faults on sorting A (replay robot, simulated WiFi)
+success: n/a (replay robot)
+time_limit_s: 10
+trials: 8
+seed: 0
+models:
+  - act_sort_one_v1_full
+  - smolvla_sort_one_v1_full
+  - groot_sort_one_v1_full
+  - diffusion_sort_one_v1_full
+conditions:
+  baseline: bench/butterworth
+  spikes: bench/spikes
+  drops: bench/drops
+  dups: bench/dups
+  reorder: bench/reorder
+  disconnect: bench/disconnect
+  mixture: bench/mixture
+video: false
+robot: replay
+
+# Written by `lab eval freeze`: the Hub commit each model is served at. Do not edit by hand.
+frozen:
+  act_sort_one_v1_full: '449b9c1250ae0fe76b579b444360361a0f1f5249'
+  smolvla_sort_one_v1_full: '246f7e54c3fe33c0f3ef66ded8c4da916995a399'
+  groot_sort_one_v1_full: '6b862e61ce462f063ffa5fda9af803e4143038f2'
+  diffusion_sort_one_v1_full: '6e373e1c728c5affc32c505e4d5784f8b37d40e2'

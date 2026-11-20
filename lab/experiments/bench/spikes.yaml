@@ -1,0 +1,6 @@
+description: Fault - latency spikes (+0.5 s at 3 s, +1 s at 6 s) on the WiFi link
+model: act_sort_one_v1_full
+spikes:
+  - {start_s: 3.0, delay_ms: 500}
+  - {start_s: 6.0, delay_ms: 1000}
+latency: {base_ms: 400, jitter_ms: 200, seed: 0}   # the measured WiFi link to the A100 (_wifi.md)

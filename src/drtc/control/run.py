@@ -30,15 +30,14 @@ RESULTS = Path("results") / "scratch"  # test runs only (lab/EVALUATION.md rule 
 INDEX_FIELDS = ["run_id", "experiment", "model", "trial", "success", "started_at", "duration_s", "git_commit",
                 "git_dirty", "note", "run_dir", "robot", "host", "outcome"]
 # Composed experiment keys this run applies; anything else that is set is reported as not applied yet.
-APPLIED = {"cooldown", "cooldown_cap", "epsilon", "action_filter_mode", "action_filter_butterworth_cutoff", "action_filter_gain", *("drop_obs", "drop_action", "dup_obs", "dup_action", "reorder_obs", "reorder_action", "disconnect",
+APPLIED = {"blend_steps", "blend_weight", "cooldown", "cooldown_cap", "epsilon", "playback_mode", "playback_min_rate", "playback_margin_steps",
+           "playback_rate_slew", "action_filter_mode", "action_filter_butterworth_cutoff", "action_filter_gain", *("drop_obs", "drop_action", "dup_obs", "dup_action", "reorder_obs", "reorder_action", "disconnect",
               "spikes", "latency"), "estimator", "s_min", "latency_k", "latency_alpha", "latency_beta", "duration_s", "fps", "task",
            "policy_type", "pretrained_name_or_path", "finetune", "model", "name", "description", "train",
            "rtc_enabled", "num_flow_matching_steps", "actions_per_chunk"}
 APPLIED_PREFIXES = ("robot_", "camera", "client_host", "server_host", "gpu")
 # Settings that only matter for the features still to come (D5 faults, D6 smoothing) or the old client.
-PENDING = {"smoothness_guidance": "smoothing C (D6)", "playback_mode": "smoothing A (D6)",
-           "playback_min_rate": "smoothing A (D6)", "playback_margin_steps": "smoothing A (D6)",
-           "playback_rate_slew": "smoothing A (D6)", "rtc_sigma_d": "RTC (D6)",
+PENDING = {"smoothness_guidance": "smoothing C (not ported yet)", "rtc_sigma_d": "RTC settings are the server's",
            "rtc_prefix_attention_schedule": "RTC settings are the server's (upstream defaults)", 
             
            "full_diagnostics": "old client diagnostics"}
@@ -128,6 +127,10 @@ def build(reg: Registry, experiment: str, model: str | None, robot: str, episode
         "inference.semantics": sem["joints"],
         "inference.mode": "rtc_guided" if rtc_requested(reg, experiment) else "chunk",
         "inference.chunk_merge": "aligned",
+        # upstream's blending at the chunk switch (a bench baseline): the first blend_steps queued actions are mixed
+        # with the new chunk's, (1 - w) * old + w * new; 0 = off (the default)
+        "inference.blend_steps": int(composed.get("blend_steps", 0)),
+        "inference.blend_weight": float(composed.get("blend_weight", 0.5)),
         "inference.scheduler": "drtc",
         "inference.estimator": composed.get("estimator", "jk"),
         "inference.s_min": int(composed.get("s_min", 20)),
@@ -140,6 +143,10 @@ def build(reg: Registry, experiment: str, model: str | None, robot: str, episode
         "inference.filter_cutoff_hz": float(composed.get("action_filter_butterworth_cutoff", 3.0)),
         "inference.filter_gain": float(composed.get("action_filter_gain", 1.4)),
         "inference.epsilon": int(composed.get("epsilon", 1)),
+        "inference.playback_mode": str(composed.get("playback_mode", "fixed")),
+        "inference.playback_min_rate": float(composed.get("playback_min_rate", 0.5)),
+        "inference.playback_margin_steps": float(composed.get("playback_margin_steps", 4.0)),
+        "inference.playback_rate_slew": float(composed.get("playback_rate_slew", 0.05)),
         "inference.cooldown_cap": str(composed.get("cooldown_cap", "none")),
         # DRTC holds the arm while starved and goes on when actions arrive (stalls are measured: M2, M3); upstream
         # ends the run with a fault after 1 s without actions, which would turn every stall into an aborted trial.

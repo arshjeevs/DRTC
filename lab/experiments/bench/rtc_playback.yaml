@@ -1,0 +1,5 @@
+description: Upstream guided RTC + smoothing A
+model: smolvla_sort_one_v1_full
+rtc_enabled: true
+playback_mode: adaptive
+latency: {base_ms: 400, jitter_ms: 200, seed: 0}   # the measured WiFi link to the A100 (_wifi.md)

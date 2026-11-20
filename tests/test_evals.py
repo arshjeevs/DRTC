@@ -199,3 +199,19 @@ def test_latency_fault_delays_replies_without_blocking():
     assert ch.get(timeout=1.0) == b"a" and _t.monotonic() - t0 >= 0.19
     assert ch.get(timeout=1.0) == b"b"  # order kept
     assert any(e[1] == "latency" for e in inj.events)
+
+
+def test_adaptive_playback_is_fixed_with_a_full_queue_and_slows_when_short():
+    from drtc.control.playback import AdaptivePlayback
+
+    q = [float(i) for i in range(100)]
+    pb = AdaptivePlayback(min_rate=0.5, margin_steps=4, slew=0.05)
+    out = [pb.next(lambda: q.pop(0) if q else None, queued=len(q), ticks_until_chunk=5) for _ in range(5)]
+    assert out == [0.0, 1.0, 2.0, 3.0, 4.0]  # full queue: one action per tick, exactly fixed playback
+
+    q = [float(i) for i in range(6)]
+    pb = AdaptivePlayback(min_rate=0.5, margin_steps=4, slew=0.5)
+    out = [pb.next(lambda: q.pop(0) if q else None, queued=len(q), ticks_until_chunk=20) for _ in range(10)]
+    moved = [x for x in out if x is not None]
+    assert moved == sorted(moved) and any(x != int(x) for x in moved)  # slower, interpolated, never backwards
+    assert len(moved) > 6  # the 6 actions last longer than 6 ticks

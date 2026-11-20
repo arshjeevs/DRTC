@@ -1,0 +1,3 @@
+description: Bench reference - DRTC defaults (Butterworth filter), the robot baseline's settings
+model: act_sort_one_v1_full
+latency: {base_ms: 400, jitter_ms: 200, seed: 0}   # the measured WiFi link to the A100 (_wifi.md)

@@ -1,0 +1,6 @@
+description: Fault - full outage, both directions (2-3 s, 5-7 s) on the WiFi link
+model: act_sort_one_v1_full
+disconnect:
+  - {start_s: 2.0, duration_s: 1.0}
+  - {start_s: 5.0, duration_s: 2.0}
+latency: {base_ms: 400, jitter_ms: 200, seed: 0}   # the measured WiFi link to the A100 (_wifi.md)
