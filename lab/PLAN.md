@@ -1030,7 +1030,7 @@ RTC. The other five can be compared with and without RTC.
 Design: [EVALUATION.md](EVALUATION.md) (roles, storage, rules); metrics: [METRICS.md](METRICS.md). Built step by
 step, each step tested and added to [WORKFLOW.md](WORKFLOW.md) part 2 so the user can run it alone.
 - [x] Old `results/` moved to `results/archive/`; private results store `orangemoon599/drtc-results` created
-- [ ] 1. `lab run` and every non-official run write to `results/scratch/<date>/`
+- [x] 1. `lab run` and every non-official run write to `results/scratch/<date>/` (`lab results` reads only scratch)
 - [ ] 2. Eval files (`lab/evals/`), `lab eval freeze`, `lab eval status`
 - [ ] 3. Serving the same way on the laptop GPU, A100, H200: all models of an eval at once; the robot computer reaches
        them (A100 directly or tunnelled, H200 through an SSH tunnel to the container); servers report model version and

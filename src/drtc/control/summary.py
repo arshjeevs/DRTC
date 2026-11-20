@@ -1,4 +1,6 @@
-"""Summaries of robot runs (results/<experiment>/<model>/<run_id>/): `lab results [--experiment E] [--since DATE]`.
+"""Summaries of test runs (results/scratch/<date>/<experiment>/<model>/<run_id>/): `lab results [--experiment E]`.
+
+Official results are summarised by `lab eval report` (lab/EVALUATION.md).
 
 Per run, from ticks.csv (one row per control tick) and faults.csv:
 - ticks, stalls (ticks without an action), the longest stall in seconds, chunks accepted;
@@ -15,7 +17,7 @@ import json
 from collections import Counter
 from pathlib import Path
 
-RESULTS = Path("results")
+RESULTS = Path("results") / "scratch"
 
 
 def longest_run(flags: list[int]) -> int:

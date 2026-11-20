@@ -2,8 +2,9 @@
 
 The experiment (lab/experiments/<group>/<name>.yaml, composed _defaults < rig < model < experiment exactly as in the
 minor) becomes one lerobot-rollout run with the drtc engine (drtc.control.engine) against a policy server started
-with `lab serve <model>`. Results per trial: results/<experiment>/<model>/<run_id>/ with config.yaml, ticks.csv
-(one row per control tick), run.json; one row per trial in results/index.csv.
+with `lab serve <model>`. These are test runs: results/scratch/<date>/<experiment>/<model>/<run_id>/ with config.yaml,
+ticks.csv (one row per control tick), run.json; one row per run in results/scratch/index.csv. Official trials are
+made only by `lab eval run` (lab/EVALUATION.md); reports never read scratch.
 
 Robot: the current rig (lab/rigs), in the model's dataset joint units, or `--robot replay`: the replay robot
 playing an episode of the model's dataset (no hardware; timing, scheduling and faults, not task success).
@@ -25,7 +26,7 @@ import yaml
 
 from drtc.registry import Registry, RegistryError
 
-RESULTS = Path("results")
+RESULTS = Path("results") / "scratch"  # test runs only (lab/EVALUATION.md rule 6)
 INDEX_FIELDS = ["run_id", "experiment", "model", "trial", "success", "started_at", "duration_s", "git_commit",
                 "git_dirty", "note", "run_dir", "robot", "host", "outcome"]
 # Composed experiment keys this run applies; anything else that is set is reported as not applied yet.
@@ -169,7 +170,7 @@ def main(argv: list[str] | None = None) -> int:
         run_id = f"{datetime.now():%Y%m%d-%H%M%S}-t{trial:02d}"
         try:
             model_id = reg.compose(a.experiment, model_override=a.model)["model"]
-            run_dir = RESULTS / exp_id / model_id / run_id
+            run_dir = RESULTS / f"{datetime.now():%Y%m%d}" / exp_id / model_id / run_id
             cmd, composed, notes = build(reg, a.experiment, a.model, a.robot, a.episode, a.endpoint, a.duration,
                                          run_dir)
         except RegistryError as e:
@@ -241,7 +242,7 @@ def main(argv: list[str] | None = None) -> int:
         (run_dir / "run.json").write_text(json.dumps({**info, "outcome": outcome, "error": error, "command": cmd,
                                                       "not_applied": notes}, indent=2))
         append_index([info])
-        print(f"trial {trial}: {run_dir}", flush=True)
+        print(f"trial {trial}: {run_dir} (test run; official trials: lab eval run)", flush=True)
     return 0
 
 

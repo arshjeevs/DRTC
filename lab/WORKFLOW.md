@@ -252,7 +252,7 @@ lab eval report <eval>   (any machine)
 
 | Step | Ready |
 |---|---|
-| Test runs go to `results/scratch/` (never mixed with official results) | not yet |
+| Test runs go to `results/scratch/<date>/` (never mixed with official results): `lab run`, `lab results` | ready |
 | Writing an eval file, `lab eval freeze`, `lab eval status` | not yet |
 | Serving an eval on the laptop GPU, the A100 or the H200 | not yet |
 | `lab eval run`: trials, keys `s` / `f`, resume, `lab eval void`, video, push | not yet |

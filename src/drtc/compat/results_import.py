@@ -16,8 +16,10 @@ from pathlib import Path
 
 import yaml
 
-from drtc.control.run import INDEX_FIELDS, RESULTS, append_index
+from drtc.control.run import INDEX_FIELDS, append_index
 from drtc.registry import find_lab_dir
+
+RESULTS = Path("results") / "archive"  # imported minor results are not official results (lab/EVALUATION.md)
 
 
 def main(argv: list[str] | None = None) -> int:
