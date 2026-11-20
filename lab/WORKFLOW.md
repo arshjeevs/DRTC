@@ -538,8 +538,12 @@ lab eval servers <eval> --server a100           # every model "ready"?
 lab eval run <eval> --server a100
 ```
 
-Serve on the A100 for Pi sessions: the H200 is reached through an SSH tunnel that needs the H200 password on the
-robot computer, which is set up on the laptop only.
+Serve on the A100 for Pi sessions: the Pi's own SSH key is authorised on the A100 (2026-11-20), so `--server a100`
+opens its tunnel by itself. The H200 tunnel needs the H200 password, set up on the laptop only.
+
+First test (2026-11-20, cubebox v0, `--test`): 29.4-29.9 Hz control, no video frames dropped; the round trip is
+about twice the laptop's (SmolVLA 594 ms, GR00T N1.5 855 ms: WiFi to the laptop's hotspot, then to the A100), so
+the shipped client (1 s give-up) can starve GR00T N1.5 even without faults.
 
 ## The bench: replay robot on the H200 (Phases 7-8)
 

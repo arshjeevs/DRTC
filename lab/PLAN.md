@@ -77,4 +77,4 @@ presentation and report say the laptop was the robot computer.
 | 6 | Bench (each fault type separately, sort_one, SmolVLA + GR00T) and offline M9/M10 for every model | Claude, A100 + H200 | ▶ bench ✓ (A100, pushed); offline M9/M10 running on the H200 for the 8 trained models (more as they finish) |
 | 7 | One report with all results | Claude | · |
 | 8 | If time: the DRTC experiment on cubebox v1 | the user | · optional |
-| 9 | The Raspberry Pi setup | Claude | ▶ set up 2026-11-20 (moved earlier, the user's call): `lab/bin/pi-setup`, CPU PyTorch, calibration from the laptop, clock synced; next: the robot test with the arm on the Pi |
+| 9 | The Raspberry Pi setup | Claude | ✓ set up and tested 2026-11-20 (moved earlier, the user's call): `lab/bin/pi-setup`, calibration from the laptop, the Pi's key on the A100; a test trial ran (29.4-29.9 Hz, round trip ~2x the laptop's). Official trials stay on the laptop unless decided otherwise |
