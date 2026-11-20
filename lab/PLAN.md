@@ -1041,6 +1041,21 @@ step, each step tested and added to [WORKFLOW.md](WORKFLOW.md) part 2 so the use
 - [x] 5. `lab eval run`: rounds, seeded order, keys `s`/`f`, time limit, resume, `lab eval void`, video, session
        folders, pull before / push after
 - [x] 6. `lab eval report`: `trials.csv`, `metrics.csv`, `report.md` (M1-M8, Wilson intervals, Fisher / Mann-Whitney)
+- Findings while building (2026-11-20, replay robot, laptop on WiFi -> A100 through the SSH tunnel):
+  - **Turnaround ~390-720 ms** (ACT 430, Diffusion 570, GR00T 715) against ~40-200 ms of server time; laptop GPU
+    alone: 36 ms. Ping 7 ms and 42 Mbit/s upload, so not bandwidth; a tunnel with a terminal (TCP_NODELAY) gave 389 ms
+    against 450. A direct Zenoh connection opens the session but gets no replies (tunnels stay the standard).
+    **[open]** where the rest goes.
+  - **Fixed: DRTC's cooldown at cold start.** Seeded with s_min + epsilon steps, it gave up every first request on a
+    link slower than that, so no reply was ever measured. It now waits up to the startup timeout until the first reply.
+  - **Fixed, option b (decided with the user): no H/2 cap on the cooldown.** With a latency above half a chunk
+    (GR00T: 16 actions = 0.53 s) DRTC's cap made the cooldown shorter than every reply, so the arm never got actions.
+    The cooldown is now never shorter than the measured latency; `cooldown_cap: half_chunk` keeps the original (Phase 8).
+  - **Stalls hold the arm** (`action_starvation_grace_s` = the trial length) instead of upstream's terminal fault
+    after 1 s, as DRTC does; stalls are measured (M2, M3) from the gaps between executed actions, since the control
+    loop does not ask for actions while it holds.
+  - GR00T over this link: 74% of the trial stalled (replay robot); Diffusion 46%. Their short chunks cannot cover
+    the round trip: the central DRTC problem, now measured.
 - [ ] 7. `lab eval offline <dataset>` (M9) and the benchmark (M10), on a GPU server, pushed to the results store
 - [ ] 8. End-to-end test: replay robot against each server, then one short real trial; WORKFLOW.md part 2 complete
 - [ ] Later: the Raspberry Pi as robot computer (edge eval)

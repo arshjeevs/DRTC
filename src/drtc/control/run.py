@@ -30,7 +30,7 @@ RESULTS = Path("results") / "scratch"  # test runs only (lab/EVALUATION.md rule 
 INDEX_FIELDS = ["run_id", "experiment", "model", "trial", "success", "started_at", "duration_s", "git_commit",
                 "git_dirty", "note", "run_dir", "robot", "host", "outcome"]
 # Composed experiment keys this run applies; anything else that is set is reported as not applied yet.
-APPLIED = {"cooldown", "epsilon", "action_filter_mode", "action_filter_butterworth_cutoff", "action_filter_gain", *("drop_obs", "drop_action", "dup_obs", "dup_action", "reorder_obs", "reorder_action", "disconnect",
+APPLIED = {"cooldown", "cooldown_cap", "epsilon", "action_filter_mode", "action_filter_butterworth_cutoff", "action_filter_gain", *("drop_obs", "drop_action", "dup_obs", "dup_action", "reorder_obs", "reorder_action", "disconnect",
               "spikes"), "estimator", "s_min", "latency_k", "latency_alpha", "latency_beta", "duration_s", "fps", "task",
            "policy_type", "pretrained_name_or_path", "finetune", "model", "name", "description", "train",
            "rtc_enabled", "num_flow_matching_steps", "actions_per_chunk"}
@@ -131,6 +131,7 @@ def build(reg: Registry, experiment: str, model: str | None, robot: str, episode
         "inference.filter_cutoff_hz": float(composed.get("action_filter_butterworth_cutoff", 3.0)),
         "inference.filter_gain": float(composed.get("action_filter_gain", 1.4)),
         "inference.epsilon": int(composed.get("epsilon", 1)),
+        "inference.cooldown_cap": str(composed.get("cooldown_cap", "none")),
         # DRTC holds the arm while starved and goes on when actions arrive (stalls are measured: M2, M3); upstream
         # ends the run with a fault after 1 s without actions, which would turn every stall into an aborted trial.
         "inference.action_starvation_grace_s": float(duration if duration is not None else composed.get("duration_s",

@@ -5,6 +5,7 @@ estimator: jk
 cooldown: true
 latency_k: 1.5
 epsilon: 1
+cooldown_cap: none     # none: never shorter than the measured latency (2026-11-20); half_chunk: DRTC's original H/2 cap
 actions_per_chunk: 50
 s_min: 20
 latency_alpha: 0.125

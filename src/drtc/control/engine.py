@@ -20,7 +20,8 @@ sent (freshest wins). Inside upstream's server rules: a BUSY reply (the old infe
 action interval; a STALE "duplicate" reply for the request in flight (a duplicated message) is ignored. Every
 recovery action is logged (recovery.csv).
 Metrics (lab/METRICS.md v1), written as CSV when the engine stops:
-- ticks.csv, one row per control tick: queue length, whether an action was available, request pending, latency
+- ticks.csv, one row per action request of the control loop (while the arm holds through a stall the loop does not
+  ask, so stalls are the gaps between executed actions; the last row marks the end of the run): queue length, whether an action was available, request pending, latency
   estimate, accepted chunks, last turnaround, chunk length; the commanded joints (cmd.<joint>) and the latest measured
   joints (meas.<joint>), in the model's dataset units;
 - chunks.csv, one row per chunk reply: when its request was sent and its reply arrived, turnaround, the latency
@@ -190,6 +191,7 @@ class DRTCInferenceConfig(RemoteInferenceConfig):
     faults_json: str | None = None  # network faults to inject (drtc.control.faults), JSON
     cooldown: bool = True  # option b: give up an unanswered request after its cooldown and send a fresh one
     epsilon: int = 1  # cooldown margin, action steps
+    cooldown_cap: Literal["none", "half_chunk"] = "none"  # half_chunk: DRTC's original H/2 cap (see cooldown_s)
     # Action filter on every action before it goes to the robot (the minor client's default: butterworth).
     action_filter: Literal["none", "butterworth"] = "none"
     filter_cutoff_hz: float = 3.0
@@ -285,7 +287,14 @@ class DRTCEngine(RemoteInferenceEngine):
             fn(self)
 
     def cooldown_s(self) -> float:
-        """DRTC: latency estimate in steps (capped at H/2) + epsilon steps."""
+        """DRTC: latency estimate in steps + epsilon steps.
+
+        DRTC caps the estimate at H/2 (half the last chunk). With a latency above H/2 (GR00T's 16-action chunk is
+        0.53 s; a remote GPU over WiFi answers in 0.4-0.7 s, measured 2026-11-20) that cooldown is shorter than every
+        reply, so every request is given up and resent and the arm never gets actions. Decided with the user
+        (2026-11-20, option b): the cooldown is never shorter than the measured latency (no cap). The original cap
+        stays available as `cooldown_cap: half_chunk` in an experiment, for Phase 8.
+        """
         rt = self.runtime
         est = rt.turnaround if rt._completed else None
         if est is None or not math.isfinite(est):
@@ -297,7 +306,7 @@ class DRTCEngine(RemoteInferenceEngine):
             return max((self.config.s_min + self.config.epsilon) * rt.interval,
                        float(getattr(self.config, "startup_timeout_s", 10.0)))
         steps = max(1, math.ceil(est / rt.interval))
-        if getattr(rt, "horizon", None):
+        if getattr(rt, "horizon", None) and getattr(self.config, "cooldown_cap", "none") == "half_chunk":
             steps = min(steps, max(1, rt.horizon // 2))
         return max(2, steps + self.config.epsilon) * rt.interval
 
@@ -419,6 +428,10 @@ class DRTCEngine(RemoteInferenceEngine):
             super().stop()
         finally:
             path = getattr(self.config, "metrics_path", None)
+            if self._ticks:  # the end of the run: stalls up to here count (lab/METRICS.md M2, M3)
+                rt = self.runtime
+                self._ticks.append([round(time.monotonic() - self._t0, 4), 0, rt.queue.qsize(), int(rt.pending is not None),
+                                    None, rt._completed, None, getattr(rt, "horizon", None), None, None])
             if path and self._ticks:
                 Path(path).parent.mkdir(parents=True, exist_ok=True)
                 n = len(self._joint_names) or max((len(r[-2] or r[-1] or []) for r in self._ticks), default=0)

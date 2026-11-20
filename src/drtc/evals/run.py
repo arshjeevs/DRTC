@@ -290,7 +290,8 @@ def session_run(reg: Registry, name: str, server: str, models: list[str] | None,
                 print("the eval is complete")
                 break
             if not pairs:
-                print(f"round {rnd} needs models that are not served or were skipped in this session; end here")
+                print("every model of this session is done for now" + (" (the others: another session)" if models or skipped
+                                                                       else ""))
                 break
             print(f"\n=== Round {rnd}: {len(pairs)} trials ===")
             if sp.robot == "rig":

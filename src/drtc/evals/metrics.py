@@ -52,27 +52,35 @@ def trial_metrics(tdir: Path, fps: float = 30.0) -> dict:
     ticks_path = tdir / "ticks.csv"
     if ticks_path.is_file():
         rows = list(csv.DictReader(open(ticks_path)))
-        first = next((i for i, r in enumerate(rows) if r["action"] == "1"), None)
-        run = rows[first:] if first is not None else []
-        stall = [r["action"] != "1" for r in run]
-        out["M2_stall_pct"] = 100.0 * sum(stall) / len(stall) if stall else None
-        out["M3_stall_events"] = runs(stall) if run else None
-        out["M3_longest_stall_s"] = longest_run(stall) / fps if run else None
-        cmd_cols = [k for k in (rows[0].keys() if rows else []) if k.startswith("cmd.")][:ARM_JOINTS]
-        if run and cmd_cols:
-            held, last = [], None
-            for r in run:  # the arm holds its last command through a stall
-                vals = [_f(r[c]) for c in cmd_cols]
-                if all(v is not None for v in vals):
-                    last = vals
-                if last is not None:
-                    held.append(last)
-            a = np.asarray(held, dtype=float)
-            if len(a) >= 4:
-                jerk = np.diff(a, 3, axis=0) * fps ** 3
-                out["M7_jerk_k"] = float(np.sqrt((jerk ** 2).mean())) / 1000.0
-            if len(a) >= 2:
-                out["M8b_largest_step_deg"] = float(np.abs(np.diff(a, axis=0)).max())
+        dt = 1.0 / fps
+        executed = [r for r in rows if r["action"] == "1"]
+        if executed:
+            t_exec = np.array([float(r["t"]) for r in executed])
+            t_end = max(float(rows[-1]["t"]), t_exec[-1] + dt)  # the last row marks the end of the run
+            # A stall is a tick without a new action. While the arm holds, the control loop does not ask for actions,
+            # so stall time is every gap between executed actions (and after the last one) beyond one tick.
+            gaps = np.diff(np.append(t_exec, t_end)) - dt
+            gaps = np.where(gaps > 0.5 * dt, gaps, 0.0)  # timing jitter below half a tick is not a stall
+            span = t_end - t_exec[0]
+            out["M2_stall_pct"] = 100.0 * float(gaps.sum()) / span if span > 0 else None
+            out["M3_stall_events"] = int((gaps > 0).sum())
+            out["M3_longest_stall_s"] = float(gaps.max()) if len(gaps) else 0.0
+            cmd_cols = [k for k in rows[0].keys() if k.startswith("cmd.")][:ARM_JOINTS]
+            if cmd_cols:
+                vals = np.array([[_f(r[c]) if _f(r[c]) is not None else np.nan for c in cmd_cols] for r in executed])
+                ok = ~np.isnan(vals).any(axis=1)
+                t_ok, vals = t_exec[ok], vals[ok]
+                if len(t_ok):
+                    # the commanded position on the tick grid, held through stalls
+                    grid = np.arange(t_ok[0], t_end, dt)
+                    a = vals[np.clip(np.searchsorted(t_ok, grid + 1e-9, side="right") - 1, 0, len(t_ok) - 1)]
+                    if len(a) >= 4:
+                        jerk = np.diff(a, 3, axis=0) * fps ** 3
+                        out["M7_jerk_k"] = float(np.sqrt((jerk ** 2).mean())) / 1000.0
+                    if len(a) >= 2:
+                        out["M8b_largest_step_deg"] = float(np.abs(np.diff(a, axis=0)).max())
+        else:
+            out["M2_stall_pct"], out["M3_stall_events"], out["M3_longest_stall_s"] = None, None, None
     chunks_path = tdir / "chunks.csv"
     if chunks_path.is_file():
         rows = list(csv.DictReader(open(chunks_path)))

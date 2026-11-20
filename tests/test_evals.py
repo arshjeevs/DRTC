@@ -117,3 +117,36 @@ def test_void_marks_the_session_for_a_new_push(tmp_path):
     void_trial(d, "cube off its mark")
     assert json.loads((d / "trial.json").read_text())["void"] == "cube off its mark"
     assert not (sess / store.PUSHED).exists()
+
+
+def test_stalls_count_ticks_that_were_never_logged(tmp_path):
+    """While the arm holds, the control loop does not ask for actions: those ticks have no row (2026-11-20)."""
+    from drtc.evals import metrics as M
+
+    d = tmp_path / "t"
+    _write_trial(d, [], [])
+    names = ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll", "gripper"]
+    rows = [(i / 30, 1) for i in range(10)] + [(40 / 30, 1)] + [(60 / 30, 0)]  # a 1 s hold, then a stall to the end
+    with open(d / "ticks.csv", "w") as f:
+        f.write("t,action," + ",".join(f"cmd.{n}" for n in names) + "\n")
+        for t, a in rows:
+            f.write(f"{t},{a}," + ",".join(["1.0"] * 6 if a else [""] * 6) + "\n")
+    m = M.trial_metrics(d)
+    assert m["M3_stall_events"] == 2
+    assert abs(m["M3_longest_stall_s"] - 30 / 30) < 1e-6  # ticks 10..39 had no action
+    assert abs(m["M2_stall_pct"] - 100 * (30 + 19) / 60) < 1e-6  # and 41..59 up to the end
+
+
+def test_cooldown_is_never_shorter_than_the_latency():
+    from types import SimpleNamespace
+
+    from drtc.control.engine import DRTCEngine
+
+    rt = SimpleNamespace(turnaround=0.7, _completed=3, interval=1 / 30, horizon=16)
+    eng = SimpleNamespace(runtime=rt, config=SimpleNamespace(s_min=8, epsilon=1, cooldown_cap="none",
+                                                             startup_timeout_s=10.0))
+    assert DRTCEngine.cooldown_s(eng) >= 0.7  # option b (2026-11-20)
+    eng.config.cooldown_cap = "half_chunk"
+    assert DRTCEngine.cooldown_s(eng) < 0.7  # DRTC's original cap: shorter than the reply
+    rt._completed = 0
+    assert DRTCEngine.cooldown_s(eng) == 10.0  # before the first reply: the startup timeout
