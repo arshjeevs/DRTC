@@ -35,12 +35,12 @@ GR00T N1.7, π0.5, MolmoAct 2, ACT, Diffusion):
 | GR00T N1.5 | ✓ | ✓ | ✓ |
 | ACT | (✓, not needed) | ✓ | ✓ |
 | Diffusion | – | ✓ | ✓ |
-| GR00T N1.7 | – | ▶ | ▶ |
+| GR00T N1.7 | – | ▶ H200 | ▶ H200 |
 | π0.5 | – | · | · |
 | MolmoAct 2 (LoRA, its original recipe) | – | · | ▶ A100 |
 
 Running:
-- GR00T N1.7 on cubebox v1 and sort_one, started by the user 2026-11-21.
+- GR00T N1.7 on cubebox v1 and sort_one, on the H200, started by the user 2026-11-21 (20,000 steps each; ~2 h left at 13,500).
 - MolmoAct 2 on sort_one, on the A100 (tmux `drtc`, window `molmo`; resumed from step 1000 after it was stopped).
   ~10 s/step; at ~1,760 of 50,000 steps late on 2026-11-20, ~5.5 days left.
 
