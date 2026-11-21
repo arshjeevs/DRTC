@@ -13,6 +13,9 @@ Everything you do in this project, with every command, in order. Each command he
 - **[Part 3: bench, offline evaluation, report and slides](#part-3-bench-offline-evaluation-report-and-slides)**.
 - **[Mistakes and fixes](#mistakes-and-fixes)**, **[latency](#what-to-know-about-latency)**.
 
+**What each stage is and why** (offline vs robot eval vs bench, explained with a new dataset):
+[docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md). This file has the commands.
+
 Related: the plan and its status [PLAN.md](PLAN.md); what every number means [METRICS.md](METRICS.md); every result
 for the report and the slides [REPORT.md](REPORT.md); details on recording [docs/DATA.md](docs/DATA.md), training
 [docs/TRAIN.md](docs/TRAIN.md), how results are stored [docs/EVALUATION.md](docs/EVALUATION.md).

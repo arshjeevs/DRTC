@@ -13,6 +13,9 @@ Our layer on top of LeRobot 0.7 (pinned in `pyproject.toml`). The minor's setup 
 | [REPORT.md](REPORT.md) | every result and fact for the report and the slides, with sources |
 | README.md | this page |
 
+**New here? Start with [docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md)**: the whole path (record, train, the three kinds of
+evaluation, report) explained.
+
 **Details** in [docs/](docs/): [EVALUATION.md](docs/EVALUATION.md) (how results are made and stored),
 [DATA.md](docs/DATA.md) (recording and editing datasets), [TRAIN.md](docs/TRAIN.md) (training),
 [WINDOWS.md](docs/WINDOWS.md) (machine notes; the H200, A100 and Pi are in WORKFLOW's Machines table), [PROPOSAL.md](docs/PROPOSAL.md) (the
