@@ -5,6 +5,8 @@ Everything you do in this project, with every command, in order. Each command he
 
 - **[Machines](#machines)**: what each machine is for, how to log in, how to update its code.
 - **[The whole path at a glance](#the-whole-path-at-a-glance)**: dataset → trained models → evaluated → report.
+- **[The plan, step by step](#the-plan-step-by-step)**: the remaining steps of PLAN.md (offline evaluation, the
+  robot baselines, the optional cubebox v1 DRTC experiment) with their exact commands, and how to change the plan.
 - **[Part 1: from a new dataset to trained models](#part-1-from-a-new-dataset-to-trained-models)**: record, review,
   register, train.
 - **[Part 2: robot evaluation](#part-2-robot-evaluation)**: official trials from the laptop or the Pi, results.
@@ -57,6 +59,221 @@ interleaved in the same sessions. A frozen eval that has trials is never changed
 
 Only `lab eval run` makes official results (`results/evals/`). Anything else you try (`lab run`, `--test`, `--replay`)
 goes to `results/scratch/` and never into the results.
+
+---
+
+# The plan, step by step
+
+The remaining steps of [PLAN.md](PLAN.md) ("Order of work") with the exact commands, written 2026-11-21. Parts 1-3
+below explain each command in general; this part says which ones to run for the current plan, in which order.
+
+| Plan step | What | Status (2026-11-21) | Here |
+|---|---|---|---|
+| 3 | Trainings | you; 3 running, 3 to do | [Part 1](#part-1-from-a-new-dataset-to-trained-models), steps 7-9 |
+| 6 | Offline M9/M10 for every trained model | 8 done; ACT + Diffusion cubebox v1 ready now | [Step 6](#step-6-offline-evaluation-of-each-new-model) |
+| 5 | Robot baselines: 3 evals | `cubebox_v0_baseline` ready; the other two written, frozen once their 7 models are trained | [Step 5](#step-5-the-robot-baselines) |
+| 7 | Report and slides | Claude, after each result | [Part 3](#the-report-and-the-slides) |
+| 8 | Optional: the DRTC experiment on cubebox v1 | if time remains | [Step 8](#step-8-optional-the-drtc-experiment-on-cubebox-v1) |
+
+To change any of it (another model, more trials, a model dropped): [Changing the plan](#changing-the-plan).
+
+## Step 6: offline evaluation of each new model
+
+No robot, a few minutes per model, on the H200 or the A100: the held-out action error (M9) and the inference time
+and GPU memory (M10). Run it for each model once its training has finished and pushed to the Hub. Not on a server
+that is serving a robot session at that moment (it would slow the session's model down).
+
+**Now: ACT and Diffusion on cubebox v1.** On the H200 (from the host shell: `docker exec -it drtc_lab bash`):
+
+```bash
+cd /workspace/drtc_major && . ./.server.env && git pull
+nvidia-smi                                   # shared GPU: a few GB free is enough (M10 peaks: ACT 0.3 GB, Diffusion 1.3 GB)
+tmux new -s offline '.venv/bin/lab eval offline --models act_cubebox_v1_full,diffusion_cubebox_v1_full; bash'
+```
+
+or on the A100:
+
+```bash
+ssh b230968ee@192.168.5.13
+cd ~/drtc_major && . ./.server.env && git pull
+nvidia-smi
+tmux new -s offline '.venv/bin/lab eval offline --models act_cubebox_v1_full,diffusion_cubebox_v1_full; bash'
+```
+
+Each model prints its numbers, then `-> results/offline/<dataset>/<model>.json` and `pushed to the results store`.
+The window stays open at the shell prompt afterwards (`exit` closes it). The dataset must be prepared on that server:
+all three are on the H200; if it stops because the dataset is missing (e.g. cubebox v1 on the A100), run
+`.venv/bin/lab prepare so101_cubebox_v1` there once, then the offline command again.
+
+**Later, as each training finishes** (same commands, other `--models`; several at once with commas):
+
+| Model(s) | When |
+|---|---|
+| `grootn17_cubebox_v1_full,grootn17_sort_one_v1_full` | the two GR00T N1.7 runs have finished (H200) |
+| `molmoact2_sort_one_v1_lora` | the MolmoAct 2 run has finished (A100) |
+| `pi05_cubebox_v1_full`, `pi05_sort_one_v1_full`, `molmoact2_cubebox_v1_lora` | after their trainings |
+
+**On the laptop**, to get the results (for the report):
+
+```bash
+cd ~/Projects/drtc-major && source .venv/bin/activate && git pull
+lab eval report cubebox_v1_baseline --pull    # pulls every offline result of cubebox v1 (works before any trial)
+lab eval report sort_one_baseline --pull      # the same for sort_one
+```
+
+Then tell Claude, who adds them to REPORT.md, the report and the slides.
+
+## Step 5: the robot baselines
+
+Condition 1 (`main/baseline`: upstream LeRobot as it ships, normal network), 10 trials per model, the laptop as
+the robot computer. Three evals, one per dataset:
+
+| Eval | Models | Trials | Ready? |
+|---|---|---|---|
+| `cubebox_v0_baseline` | SmolVLA, GR00T N1.5 | 2 x 10 = 20 | **yes**: frozen 2026-11-20 |
+| `cubebox_v1_baseline` | all 7 (`lab/evals/cubebox_v1_baseline.yaml`) | 7 x 10 = 70 | after all 7 cubebox v1 trainings: freeze (5a) |
+| `sort_one_baseline` | all 7 (`lab/evals/sort_one_baseline.yaml`) | 7 x 10 = 70 | after all 7 sort_one trainings: freeze (5a) |
+
+SmolVLA and GR00T N1.5 run again in `sort_one_baseline`, next to the other five: models are only compared inside one
+eval (METRICS.md rule 5). Their baseline in `sort_one_drtc_main` stays part of the DRTC experiment.
+
+### 5a. Freeze (once per eval, laptop)
+
+When every model of the eval is trained and on the Hub:
+
+```bash
+cd ~/Projects/drtc-major && source .venv/bin/activate && git pull
+lab eval check sort_one_baseline       # "ok (7 models x 1 conditions x 10 trials = 70; not frozen yet)"
+lab eval freeze sort_one_baseline      # pins each model to its Hub commit; lists the 7 commits
+git add lab/evals/sort_one_baseline.yaml && git commit -m "eval sort_one_baseline: frozen" && git push
+```
+
+`freeze` stops with `cannot read orangemoon599/<model> on the Hub ... is it trained and pushed?` while a model is
+missing. If a model will not be ready in time (π0.5 takes ~27 h, MolmoAct 2 ~5 days), take it out of `models:` first
+([Changing the plan](#changing-the-plan)); one eval cannot be frozen part-way.
+
+### 5b. Check the new models once, without counting (before the first official session)
+
+GR00T N1.7, π0.5 and MolmoAct 2 have not been served to the robot yet. Serve the eval (5c, the server part), then
+on the laptop:
+
+```bash
+lab eval servers sort_one_baseline --server h200            # all 7 "ready"
+lab eval run sort_one_baseline --server h200 --replay       # one round on the replay robot: the arm doesn't move
+lab eval run sort_one_baseline --server h200 --test         # real trials on the arm, kept in results/scratch;
+                                                            # one round (7 trials) is enough, then q
+```
+
+If one fails (a traceback in its server log `logs/serve/<eval>/`, or `not served`), paste it to Claude before the
+official session.
+
+### 5c. Each session
+
+**Which server.** The whole eval on one server where possible: every trial records its server, and the report
+splits the timing metrics (M2-M6) per server when there are several.
+
+| Server | Can serve |
+|---|---|
+| H200 (141 GB) | all 7 at once. The first choice for the 7-model evals |
+| A100 (80 GB) | all 7 only if `nvidia-smi` shows room next to the MolmoAct 2 training (~45 GB used by it) |
+| laptop GPU (8 GB) | ACT, Diffusion, SmolVLA only (`--models` on both commands) |
+
+GPU memory per model when serving (M10 peaks so far): ACT 0.3 GB, SmolVLA 1.0 GB, Diffusion 1.3 GB, GR00T N1.5
+5.7 GB; GR00T N1.7, π0.5 and MolmoAct 2: their offline evaluation (step 6) measures it.
+
+If you have to split an eval over two servers (e.g. the small models on the laptop, the rest on the H200), keep each
+model on the same server for all its trials, and run the two groups with `--models` on both `serve` and `run`.
+
+**1. The model server.** On the H200, in the container:
+
+```bash
+cd /workspace/drtc_major && . ./.server.env && git pull
+nvidia-smi
+tmux new -s serve '.venv/bin/lab eval serve sort_one_baseline; bash'
+# wait for "all 7 ready" (each model loads in turn: several minutes), then Ctrl-b d
+```
+
+**2. The robot computer (laptop).**
+
+```bash
+cd ~/Projects/drtc-major && source .venv/bin/activate && git pull
+lab/bin/session record                                   # phone camera + rig check; every line ok
+lab eval servers sort_one_baseline --server h200         # type the H200 password once; all 7 "ready"
+lab eval run sort_one_baseline --server h200             # the official session
+```
+
+During the session (keys and rules: [Part 2, step 4](#4-run-the-session)):
+
+- **Rounds:** one round = 7 trials (one per model, in a random order). 10 rounds = 70 trials, roughly 1.5 h of
+  trials plus resets; split it over several sessions as you like (`q` ends one, the next `lab eval run`
+  continues; `--max-trials N` stops after N).
+- **Layouts:** one layout per round, set before its first trial. cubebox: the cube and the box on their taped marks.
+  sort_one: the 4 combinations of the recording (red or blue cube x the two squares swapped), in a fixed order over
+  the 10 rounds (e.g. 1-2-3-4-1-2-3-4-1-2); write it down and tick off the rounds.
+- `s` = success by the eval's rule (printed at the start), `f` = failure, `v` after a trial = a setup mistake only.
+- The session is pushed to the results store at its end.
+
+**3. After the session.** On the H200: `tmux attach -t serve`, Ctrl-C. On the laptop:
+
+```bash
+lab eval status sort_one_baseline              # trials done per model, the next round
+lab eval report sort_one_baseline --pull       # results/evals/sort_one_baseline/report.md
+```
+
+When an eval has all its trials, tell Claude (REPORT.md, the report and the slides are updated from it).
+
+The same for the other two: `cubebox_v0_baseline` (2 models: the laptop GPU fits SmolVLA only, so serve it from the
+H200 or the A100) and `cubebox_v1_baseline`.
+
+## Step 8 (optional): the DRTC experiment on cubebox v1
+
+Only if time remains (PLAN.md step 8): the four conditions of `sort_one_drtc_main` with SmolVLA and GR00T N1.5 on
+cubebox v1, 2 x 4 x 10 = 80 trials. Make the eval from the sort_one one:
+
+```bash
+cp lab/evals/sort_one_drtc_main.yaml lab/evals/cubebox_v1_drtc_main.yaml
+```
+
+Edit `lab/evals/cubebox_v1_drtc_main.yaml`:
+
+- `description:` `DRTC experiment, cubebox v1 - baseline, baseline + faults, DRTC + faults, DRTC + smoothing + faults`
+- `success:` `The green cube ends inside the box and the gripper is open, before the time limit.`
+- `models:` `smolvla_cubebox_v1_full` and `groot_cubebox_v1_full`
+- **delete the whole `frozen:` block** at the end (and its comment line): those are the sort_one models' commits.
+- keep `conditions:`, `trials: 10`, `time_limit_s: 30` as they are (the same experiment as on sort_one).
+
+Then `lab eval check`, `lab eval freeze`, commit and push (5a), and sessions as in 5c with `cubebox_v1_drtc_main`
+(2 models: the H200 or the A100; one round = 8 trials).
+
+## Changing the plan
+
+The rule: **an eval can be edited freely until its first official trial; after that it is never changed**, and a
+change means a new eval (`<eval>_v2`). `lab eval run` refuses a plan that differs from its earlier sessions, so a
+mistake can't slip in.
+
+| You want to | Do | Allowed |
+|---|---|---|
+| Drop a model (not trained in time) | delete its line under `models:` | before the first trial; if the eval is frozen, also delete its line under `frozen:` |
+| Add a model | add its name under `models:` (it must be in `lab/models/*.yaml`), then `lab eval freeze` again | before the first trial |
+| Retrained a model before any trial | `lab eval freeze <eval>` again (pins the new Hub commit) | before the first trial |
+| More or fewer trials, another time limit or success rule | edit `trials:`, `time_limit_s:`, `success:` | before the first trial |
+| Any of these after trials exist | a new eval: copy the file to `<eval>_v2.yaml`, delete its `frozen:` block, change it, freeze it; include the models to compare with (rule 5) | always |
+| Another condition (other DRTC or fault settings) | ask Claude: it is a new file in `lab/experiments/main/` and a change to the locked scope. Never edit an experiment file an eval with trials uses | – |
+| Another task's baseline | a new eval file like `sort_one_baseline.yaml`, models of that task | – |
+
+After any edit, check, commit and push, then pull on the server and the robot computer before the next session
+(`lab eval run` refuses uncommitted changes):
+
+```bash
+lab eval check sort_one_baseline
+lab eval freeze sort_one_baseline              # only if models were added or retrained, or it was frozen before the edit
+git add lab/evals/sort_one_baseline.yaml
+git commit -m "eval sort_one_baseline: without pi05 (not trained in time)"
+git push
+```
+
+If the change is to the plan itself (a model left out of the study, a step dropped), also change the tables in
+[PLAN.md](PLAN.md) and commit them the same way (`git add lab/PLAN.md`), so the report says the same.
 
 ---
 
@@ -597,10 +814,12 @@ On a GPU server, no robot: each model predicts from the held-out episodes (M9, t
 200 requests (M10, inference time and GPU memory). A few minutes per model. Run it for every newly trained model:
 
 ```bash
-# A100 (or the H200 container)
+# A100 (in the H200 container: cd /workspace/drtc_major instead)
 cd ~/drtc_major && . ./.server.env && git pull
 tmux new -s offline '.venv/bin/lab eval offline --models act_cubebox_v1_full,diffusion_cubebox_v1_full; bash'
 ```
+
+Which models are left and when: [Step 6](#step-6-offline-evaluation-of-each-new-model).
 
 - `--models` scores the models at their current Hub commits; `lab eval offline <eval>` scores an eval's models at its
   frozen commits.
