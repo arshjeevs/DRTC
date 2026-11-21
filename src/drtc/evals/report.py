@@ -148,21 +148,24 @@ def render(reg, name, sp, trials, mrows) -> str:
         f = Path("results") / "offline" / reg.resolve(m).dataset.id / f"{m}.json"
         if f.is_file():
             d = json.loads(f.read_text())
-            if d.get("revision") == sp.frozen.get(m):
+            if offline_matches(reg.resolve(m).hub, d.get("revision"), sp.frozen.get(m), m):
                 offline_rows.append((m, d))
     if offline_rows:
         L += ["## Without the robot (M9, M10)", "",
               "M9: mean absolute error of the first 15 predicted actions on the held-out episodes, in the dataset's "
               "units (`root` is the served checkpoint). M10: inference time and peak GPU memory of the served "
-              "checkpoint.", "",
+              "checkpoint. A result made at another Hub commit than the frozen one counts when the served files "
+              "(everything outside `checkpoints/`) are identical at both commits; its commit is shown.", "",
               "| Model | Checkpoint | M9 arm | M9 gripper | M10 median (ms) | M10 p95 (ms) | GPU (GB) | Units | Measured on |",
               "|---|---|---|---|---|---|---|---|---|"]
         for m, d in offline_rows:
+            other = "" if d.get("revision") == sp.frozen.get(m) else \
+                f" (commit {d['revision'][:8]}: same served files as the frozen {sp.frozen[m][:8]})"
             for ck, e in d["checkpoints"].items():
                 b = e.get("M10") or {}
                 L.append(f"| {m} | {ck} | {_fmt(e.get('M9_arm_mae'), 2)} | {_fmt(e.get('M9_gripper_mae'), 2)} | "
                          f"{_fmt(b.get('server_ms_median'), 0)} | {_fmt(b.get('server_ms_p95'), 0)} | "
-                         f"{_fmt(b.get('peak_gpu_gb'), 1)} | {d.get('units')} | {d.get('gpu')} |")
+                         f"{_fmt(b.get('peak_gpu_gb'), 1)} | {d.get('units')} | {d.get('gpu')}{other} |")
         L.append("")
     voids = [t for t in trials if t.void]
     bad = [t for t in trials if not t.void and not t.valid]
@@ -179,6 +182,44 @@ def render(reg, name, sp, trials, mrows) -> str:
                  f"| {len(ts)} |")
     L.append("")
     return "\n".join(L)
+
+
+_SERVED: dict[tuple[str, str], dict[str, str] | None] = {}
+
+
+def served_files(hub: str, revision: str) -> dict[str, str] | None:
+    """What `lab serve` downloads from `hub` at `revision` (every file outside checkpoints/, as SERVE_IGNORE):
+    path -> git blob id (for LFS files the pointer, so it changes with the content). None if the Hub can't be read."""
+    if (hub, revision) not in _SERVED:
+        from huggingface_hub import HfApi
+        from huggingface_hub.hf_api import RepoFile
+
+        try:
+            tree = HfApi().list_repo_tree(hub, revision=revision, recursive=True)
+            _SERVED[(hub, revision)] = {e.path: e.blob_id for e in tree
+                                        if isinstance(e, RepoFile) and not e.path.startswith("checkpoints/")}
+        except Exception:  # noqa: BLE001 - offline, or the commit is gone: treated as "can't tell"
+            _SERVED[(hub, revision)] = None
+    return _SERVED[(hub, revision)]
+
+
+def offline_matches(hub: str, measured: str | None, frozen: str | None, model: str) -> bool:
+    """An offline result belongs to the eval when it was made at the frozen commit, or at a commit of the same repo
+    whose served files are identical (e.g. only an earlier checkpoints/<step>/ was uploaded in between)."""
+    if not measured or not frozen:
+        return False
+    if measured == frozen:
+        return True
+    a, b = served_files(hub, measured), served_files(hub, frozen)
+    if a is None or b is None:
+        print(f"  note: offline result of {model} (commit {measured[:8]}) left out: could not compare its files with "
+              f"the frozen commit {frozen[:8]} on the Hub (no network?); run the report again online")
+        return False
+    if a != b:
+        print(f"  note: offline result of {model} left out: made at commit {measured[:8]}, whose served files differ "
+              f"from the frozen {frozen[:8]}; run `lab eval offline <eval>` for the frozen version")
+        return False
+    return True
 
 
 def main(reg: Registry, name: str) -> int:
