@@ -1,4 +1,6 @@
-# H200 GPU server
+# H200 GPU server: the minor's setup (~/drtc_lab, branch drtc), kept for reference
+
+*Replaced on 2026-11-20 by [../H200.md](../H200.md) for the major setup. The commands on this page (lab/bin/train, lab/bin/server, lab/bin/tunnel) belong to the old setup.*
 
 > **New setup (branch `major`, LeRobot 0.7)** lives in `~/drtc_major`, next to the old `~/drtc_lab`, and runs inside
 > the same `drtc_lab` container. It shares only the Hugging Face model cache with the old setup. The server itself

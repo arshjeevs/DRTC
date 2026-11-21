@@ -39,10 +39,16 @@ GR00T N1.7, π0.5, MolmoAct 2, ACT, Diffusion):
 | π0.5 | – | · | · |
 | MolmoAct 2 (LoRA, its original recipe) | – | · | ▶ A100 |
 
-Running (2026-11-20): ACT and Diffusion on cubebox v1 on the H200 (tmux `train` in the drtc_lab container; logs
-`logs/train_<model>.log`); MolmoAct 2 on sort_one on the A100 (tmux `drtc`, window `molmo`; resumed from step 1000
-after it was stopped; ~9 s/step, ~5 days for 50,000 steps). Still to do: 5 (GR00T N1.7 on cubebox v1 and sort_one,
-π0.5 on cubebox v1 and sort_one, MolmoAct 2 on cubebox v1); π0.5 takes ~27 h and ~77 GB each.
+Running:
+- ACT and Diffusion on cubebox v1, on the H200 (tmux `train` in the drtc_lab container; logs `logs/train_<model>.log`).
+  Last checked 2026-11-20 22:20: ACT 72% (~1.3 h left), Diffusion 30% (~7.5 h left); the H200 did not answer later
+  that night, so check again.
+- MolmoAct 2 on sort_one, on the A100 (tmux `drtc`, window `molmo`; resumed from step 1000 after it was stopped).
+  ~10 s/step; at ~1,760 of 50,000 steps late on 2026-11-20, ~5.5 days left.
+
+Still to do: 5 (GR00T N1.7 on cubebox v1 and sort_one, π0.5 on cubebox v1 and sort_one, MolmoAct 2 on cubebox v1).
+π0.5 takes ~27 h and ~77 GB each; the A100 has ~35 GB free next to MolmoAct, so π0.5 needs the H200. Where and when:
+the user decides. After each training: the offline evaluation (WORKFLOW.md, Part 3), then its baseline.
 
 **Conditions** (per model, per task; the same order and rules everywhere):
 
@@ -71,10 +77,10 @@ presentation and report say the laptop was the robot computer.
 |---|---|---|---|
 | 1 | This scope into PLAN.md, the rule changes into METRICS.md (v2); earlier results archived | Claude | ✓ done |
 | 2 | Build the 4 conditions, the fault mix, the new rules (fault = failure, M1f) and the eval files; test on the replay robot | Claude | ✓ done (A100 check 2026-11-20: upstream gave up under the faults, DRTC got through, smoothing cut jerk 3-4x) |
-| 3 | Trainings (table above) | Claude, A100 + H200 | ▶ 3 running; 5 to do |
+| 3 | Trainings (table above) | Claude, A100 + H200 | ▶ 3 running; 5 to do (where and when: the user decides) |
 | 4 | **DRTC experiment on sort_one:** SmolVLA + GR00T N1.5 x 4 conditions x 10 trials = 80 trials (~1 h): eval `sort_one_drtc_main`, served on the A100 | the user | ✓ done (80/80 trials, 2026-11-20) |
-| 5 | **Baselines:** condition 1 x 10 trials: cubebox v0 (2 models), cubebox v1 (7), sort_one (7), as the models finish | the user | · after 2, and 3 per model |
-| 6 | Bench (each fault type separately, sort_one, SmolVLA + GR00T) and offline M9/M10 for every model | Claude, A100 + H200 | ▶ bench ✓ (A100, pushed); offline M9/M10 running on the H200 for the 8 trained models (more as they finish) |
-| 7 | One report with all results | Claude | · |
+| 5 | **Baselines:** condition 1 x 10 trials: cubebox v0 (2 models), cubebox v1 (7), sort_one (7), as the models finish | the user | ▶ cubebox v0: eval `cubebox_v0_baseline` frozen 2026-11-20, ready for its 20 trials (laptop); cubebox v1 and sort_one: when all 7 are trained |
+| 6 | Bench (each fault type separately, sort_one, SmolVLA + GR00T) and offline M9/M10 for every model | Claude, A100 + H200 | ▶ bench ✓ (4 benches x 64 runs, A100, 2026-11-20); offline M9/M10 ✓ for the 8 trained models (H200, 2026-11-20); the others as their trainings finish |
+| 7 | One report with all results | Claude | ▶ started 2026-11-20: the LaTeX report `report/` (built from the results, `make`) and the slides (REPORT.md section 12); extended as results come in |
 | 8 | If time: the DRTC experiment on cubebox v1 | the user | · optional |
 | 9 | The Raspberry Pi setup | Claude | ✓ set up and tested 2026-11-20 (moved earlier, the user's call): `lab/bin/pi-setup`, calibration from the laptop, the Pi's key on the A100; a test trial ran (29.4-29.9 Hz, round trip ~2x the laptop's). Official trials stay on the laptop unless decided otherwise |

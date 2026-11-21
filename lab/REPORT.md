@@ -275,8 +275,25 @@ network simulated as measured on the robot (250 +- 20 ms on every reply), for ea
 drops, outage) and the whole mix. 2 models x 4 conditions x 8 trials per fault type. Replay: M2-M8 only (no task
 success). Run on the A100, 2026-11-20; source: `results/bench/bench_main_{spike,drops,outage,mix}/report.md`.
 
-**pending: the numbers are being copied from the results store.** (A first check on 2026-11-20: upstream gave up
-under the faults, DRTC got through, smoothing cut the jerk 3-4x.)
+Conditions as in 8.1 (1 baseline, 2 baseline + fault, 3 DRTC + fault, 4 DRTC + smoothing + fault); medians over
+8 runs; jerk in 10^3 deg/s^3:
+
+| Fault alone | Model | Ended by a fault (2 / 3 / 4) | Stall % (1 / 2 / 3 / 4) | Jerk (1 / 2 / 3 / 4) |
+|---|---|---|---|---|
+| Latency spike | SmolVLA | 8/8 / 0/8 / 0/8 | 0.0 / 26.9 / 7.1 / 7.5 | 54.1 / 30.1 / 78.7 / 11.5 |
+| Latency spike | GR00T N1.5 | 8/8 / 0/8 / 0/8 | 52.2 / 60.3 / 54.9 / 15.8 | 158.2 / 97.3 / 113.6 / 19.2 |
+| Dropped replies | SmolVLA | 8/8 / 0/8 / 0/8 | 0.0 / 20.8 / 4.5 / 4.3 | 53.3 / 35.8 / 66.3 / 14.9 |
+| Dropped replies | GR00T N1.5 | 7/8 / 0/8 / 0/8 | 52.0 / 56.3 / 55.5 / 22.7 | 154.5 / 111.7 / 97.4 / 19.6 |
+| Outage | SmolVLA | 8/8 / 0/8 / 0/8 | 0.0 / 14.2 / 9.1 / 8.7 | 55.3 / 53.1 / 79.1 / 12.6 |
+| Outage | GR00T N1.5 | 8/8 / 0/8 / 0/8 | 51.6 / 54.7 / 55.1 / 22.5 | 132.6 / 119.3 / 191.7 / 22.2 |
+| The whole mix | SmolVLA | 8/8 / 0/8 / 0/8 | 0.0 / 26.7 / 20.6 / 19.5 | 54.6 / 36.0 / 47.7 / 17.5 |
+| The whole mix | GR00T N1.5 | 8/8 / 0/8 / 0/8 | 52.0 / 63.0 / 66.0 / 46.4 | 158.3 / 74.4 / 188.8 / 16.1 |
+
+**What it shows:** each fault alone, even one 1-second latency spike, is enough for the shipped client to end the run
+(7-8 of 8); under DRTC no run is ended by any fault type; smoothing gives the lowest jerk under every fault type, for
+both models. GR00T N1.5 stalls about half the time even with no fault (its short chunk), as on the robot. The bench
+jerk is higher than the robot's (replayed observations, not the arm's own), so compare bench numbers only with each
+other. Figure: `report/generated/fig_bench.pdf`.
 
 ### 9.3 Offline: held-out error (M9) and inference cost (M10)
 
@@ -284,19 +301,22 @@ Measured on the H200 (shared with two running trainings; counted as a realistic 
 served checkpoint and on the last one; sort_one in degrees, cubebox in -100..100 units, so compare within a dataset
 only. Source: `results/offline/<dataset>/<model>.json` (results store `offline/`).
 
-**pending: being copied from the results store**, then this table gets the 95th percentiles and the last checkpoints.
-Medians from the run's log:
+| Dataset | Model | M9 arm (served) | M9 arm (last checkpoint) | M9 gripper | M10 median | M10 p95 | GPU memory |
+|---|---|---|---|---|---|---|---|
+| sort_one | SmolVLA | 2.13 deg | 2.13 | 2.32 | 97 ms | 125 ms | 1.0 GB |
+| sort_one | GR00T N1.5 | 3.03 deg | 3.03 | 2.86 | 167 ms | 235 ms | 5.7 GB |
+| sort_one | ACT | 3.20 deg | 3.20 | 2.50 | 42 ms | 68 ms | 0.3 GB |
+| sort_one | Diffusion | 2.43 deg | 2.43 | 2.88 | 179 ms | 209 ms | 1.3 GB |
+| cubebox v0 | SmolVLA | 2.78 | 2.45 | 3.52 | 99 ms | 122 ms | 1.0 GB |
+| cubebox v0 | GR00T N1.5 | 3.37 | 3.37 | 4.32 | 183 ms | 268 ms | 5.7 GB |
+| cubebox v1 | SmolVLA | 2.98 | 2.98 | 2.90 | 96 ms | 118 ms | 1.0 GB |
+| cubebox v1 | GR00T N1.5 | 4.28 | 3.72 | 3.20 | 180 ms | 233 ms | 5.7 GB |
 
-| Dataset | Model | M9 arm error | M9 gripper error | M10 inference (median) | GPU memory |
-|---|---|---|---|---|---|
-| sort_one | SmolVLA | 2.13 deg | 2.32 | 97 ms | 1.0 GB |
-| sort_one | GR00T N1.5 | 3.03 deg | 2.86 | 167 ms | 5.7 GB |
-| sort_one | ACT | 3.20 deg | 2.50 | 42 ms | 0.3 GB |
-| sort_one | Diffusion | 2.43 deg | 2.88 | 179 ms | 1.3 GB |
-| cubebox v0 | SmolVLA | 2.78 | 3.52 | 99 ms | 1.0 GB |
-| cubebox v0 | GR00T N1.5 | 3.37 | 4.32 | 183 ms | 5.7 GB |
-| cubebox v1 | SmolVLA | 2.98 | 2.90 | 96 ms | 1.0 GB |
-| cubebox v1 | GR00T N1.5 | 4.28 | 3.20 | 180 ms | 5.7 GB |
+Held out: sort_one 8 episodes (180 predictions), cubebox v0 5 (124), cubebox v1 10 (212). On sort_one SmolVLA has the
+lowest error, ACT is the fastest and smallest; for two models (SmolVLA cubebox v0, GR00T N1.5 cubebox v1) the last
+checkpoint has a lower error than the one served (the lowest held-out loss), so the two criteria don't always agree.
+M10 on the busy H200 is higher than M6 on the A100 during the robot runs (SmolVLA 97 vs 53 ms). Figure:
+`report/generated/fig_offline.pdf`.
 
 The other models are added when they are trained (GR00T N1.7, π0.5, MolmoAct 2 on both tasks; ACT and Diffusion on
 cubebox v1).
@@ -307,7 +327,7 @@ cubebox v1).
 
 | Dataset | Models | Trials | Status |
 |---|---|---|---|
-| `so101_cubebox_v0` | SmolVLA, GR00T N1.5 | 20 | both trained; the eval file is ready to freeze |
+| `so101_cubebox_v0` | SmolVLA, GR00T N1.5 | 20 | both trained; eval `cubebox_v0_baseline` frozen 2026-11-20, ready for trials (laptop) |
 | `so101_cubebox_v1` | all 7 | 70 | 2 trained, 2 training, 3 to do |
 | `so101_sort_one_v1` | all 7 | 70 (SmolVLA and GR00T N1.5 already have 10 each from 9.1) | 4 trained, 1 training, 2 to do |
 
@@ -337,8 +357,11 @@ trials):
 
 ## 11. Future work
 
-- **The Raspberry Pi 5 as the robot computer** (edge setup): set up 2026-11-20 (CPU PyTorch, the same `lab`
-  commands); robot test pending.
+- **The Raspberry Pi 5 as the robot computer** (edge setup): set up and tested 2026-11-20 (CPU PyTorch, the same
+  `lab` commands; it can use the A100, the H200 or the laptop's GPU as server). First test (`cubebox_v0_baseline
+  --test`): 29.4-29.9 Hz control, no video frames dropped, but the round trip about doubles (SmolVLA 594 ms, GR00T
+  N1.5 855 ms, over WiFi to the laptop's hotspot and on to the A100), so the shipped client starved GR00T N1.5 even
+  without faults: the edge case DRTC and image compression are for. Official edge trials: not run yet.
 - The DRTC experiment on the cube-in-box task (`so101_cubebox_v1`), if time remains.
 - Compressed images (JPEG) to cut the round trip.
 - RTC in-painting (Black et al. 2025) for the flow-matching models on top of DRTC.

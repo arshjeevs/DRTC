@@ -1,96 +1,81 @@
 # Workflow
 
-- **[The whole path at a glance](#the-whole-path-at-a-glance)** (below): new dataset → trained models → evaluated
-  against the current baseline, on one page.
+Everything you do in this project, with every command, in order. Each command here was checked against the code
+(2026-11-20). If one fails, the error message usually says what to do; otherwise paste it to Claude.
+
+- **[Machines](#machines)**: what each machine is for, how to log in, how to update its code.
+- **[The whole path at a glance](#the-whole-path-at-a-glance)**: dataset → trained models → evaluated → report.
 - **[Part 1: from a new dataset to trained models](#part-1-from-a-new-dataset-to-trained-models)**: record, review,
-  register, train, with every command.
-- **[Part 2: evaluation](#part-2-evaluation)**: official robot trials, results, reports, with every command.
+  register, train.
+- **[Part 2: robot evaluation](#part-2-robot-evaluation)**: official trials from the laptop or the Pi, results.
+- **[Part 3: bench, offline evaluation, report and slides](#part-3-bench-offline-evaluation-report-and-slides)**.
+- **[Mistakes and fixes](#mistakes-and-fixes)**, **[latency](#what-to-know-about-latency)**.
+
+Related: the plan and its status [PLAN.md](PLAN.md); what every number means [METRICS.md](METRICS.md); every result
+for the report and the slides [REPORT.md](REPORT.md); details on recording [docs/DATA.md](docs/DATA.md), training
+[docs/TRAIN.md](docs/TRAIN.md), how results are stored [docs/EVALUATION.md](docs/EVALUATION.md).
+
+# Machines
+
+| Machine | Used for | Log in | Repo | Update the code |
+|---|---|---|---|---|
+| **Laptop** (RTX 4060, 8 GB) | recording; the robot computer for every official experiment; serving small models | (you are on it) | `~/Projects/drtc-major` | `git pull` |
+| **A100** (80 GB, shared) | training; serving models for robot sessions; bench; offline evaluation | `ssh b230968ee@192.168.5.13` | `~/drtc_major` | `git pull`; after a change of `uv.lock`: `lab/bin/a100-setup`. **Never a plain `uv sync`** there: it installs CUDA 13 builds the driver can't run |
+| **H200** (141 GB, shared, professor's account) | training; serving; bench; offline evaluation | Jupyter terminal, or `ssh jayaraj@192.168.41.118` then `docker exec -it drtc_lab bash` | `/workspace/drtc_major` inside the `drtc_lab` container | **inside the container**: `cd /workspace/drtc_major && . ./.server.env && git pull`, then after a change of `uv.lock`: `uv sync --frozen --extra gpu --extra sim --python /usr/bin/python3`. A `git pull` on the host fails (files there are root-owned) |
+| **Raspberry Pi 5** (8 GB, no GPU) | the edge robot computer (tested; not used for official results yet) | `ssh rasp@raspberrypi.local` (from the laptop, on its hotspot) | `~/drtc_major` | `git pull`; after a change of `uv.lock`: `lab/bin/pi-setup` |
+
+Rules on the servers: work only in the repo folder; never delete anything outside it; on the H200 only inside
+`drtc_major` (nothing outside, no system changes); on the A100 stop only your own processes. Long jobs run in tmux:
+`tmux attach -t <name>` to look, Ctrl-b d to leave it running, `tmux ls` to list.
+
+The environment on every machine: `source .venv/bin/activate` once per terminal, then `lab ...`; or write
+`.venv/bin/lab ...` (as in the server commands below). On the A100 and H200, `lab` reads `.server.env` by itself.
 
 # The whole path at a glance
 
 ```
- A. RECORD (laptop)              B. TRAIN (H200)                 C. EVALUATE (server + laptop)
- ─────────────────────           ─────────────────────           ─────────────────────────────────────
- plan the dataset                lab/models/<task>_v1.yaml       lab/evals/<eval>.yaml
- lab record <name> ...           lab check, --dry-run            lab eval check / freeze
- lab data show / edit            commit + push                   commit + push
- commit recorded.yaml            H200: pull, prepare, train      server: lab eval serve <eval>
-                                 → models on the Hub             laptop: lab eval run <eval> --server ...
-                                                                 lab eval report <eval> --pull
+ A. RECORD (laptop)            B. TRAIN (H200 / A100)          C. EVALUATE (server + robot computer)     D. REPORT
+ ───────────────────           ──────────────────────          ─────────────────────────────────────     ──────────
+ plan the dataset              lab/models/<task>.yaml          lab/evals/<eval>.yaml                     lab eval report --pull
+ lab/bin/session record        lab check, --dry-run            lab eval check / freeze                   cd report && make
+ lab record <name> ...         commit + push                   commit + push                             (Claude updates
+ lab data show / edit          server: pull, prepare, train    server: lab eval serve <eval>              REPORT.md and slides)
+ commit recorded.yaml          → models on the Hub             robot: lab eval run <eval> --server ...
 ```
 
-Each step ends with a **commit and push**. That's how the next machine learns about it: the GPU server learns about
-the new dataset from `recorded.yaml`, and every machine learns about the eval from `lab/evals/<eval>.yaml`.
+Each step ends with a **commit and push**: that is how the other machines learn about it (a server learns about a new
+dataset from `lab/datasets/recorded.yaml`, every machine learns about an eval from `lab/evals/<eval>.yaml`).
 
-### A. Record a new dataset (laptop) → Part 1, steps 1-5
+**Models are only compared inside one eval** (METRICS.md rule 5): trials of all its models and conditions run
+interleaved in the same sessions. A frozen eval that has trials is never changed. So:
 
-1. **Plan:**
-   - the name `so101_<task>_v<N>`;
-   - one fixed instruction;
-   - N training + K held-out episodes, about 10% held out (`--episodes 100 --held-out 10` records 110);
-   - the layout rotation, on paper.
-2. **Record:** `lab/bin/session record`, then `lab record <name> --task "..." --episodes N --held-out K ...`.
-   Continue later with the same command plus `--resume`.
-3. **Review:** `lab data show <name>`; fix with `lab data delete/trim/undo`, then `lab data push`. Edit only
-   **before** training.
-4. **Commit `lab/datasets/recorded.yaml`** and push.
-
-### B. Train (H200) → Part 1, steps 6-9
-
-1. **Laptop:** write `lab/models/<task>_v1.yaml`, one line per model, e.g. `act_<task>_v1_full` with recipe
-   `act_original`. Run `lab check` and `lab train <model> --dry-run`, then commit and push.
-2. **H200 container:** `git pull && uv sync ...`, then `lab prepare <name>`, then one tmux window per model with
-   `lab train <model>`, ACT first.
-3. **Watch** in wandb (`drtc-lab`). At the end each model pushes itself to `orangemoon599/<model>`. Set
-   `status: trained` in the model file, commit and push.
-
-### C. Evaluate against the current baseline → Part 2
-
-**The one rule to remember:** models are only compared **inside one eval**, run alternately in the same sessions
-(METRICS.md rule 5). A frozen eval that has trials is never changed. So a new model gets compared by **making a
-new eval that contains both the new models and the ones to beat.**
-
-| Situation | Make this eval | Models in it |
+| Situation | Make this eval | In it |
 |---|---|---|
-| **New task** (e.g. sorting B, `so101_sort_two_v1`) | `sort_two_baseline` | the new models (ACT, SmolVLA, GR00T, Diffusion on sort_two). This *is* the task's baseline |
-| **Same task, new model or more data** (e.g. a better SmolVLA on sorting A) | `sort_one_baseline_v2` | the new model(s) **plus** the current best from `sort_one_baseline`, re-run side by side |
-| **Same models, a new method** (Phases 7-8: smoothing, faults) | `sort_one_smoothing`, `sort_one_faults` | the chosen models; the conditions are `baseline` + the methods. Each method is compared with `baseline` in the same eval |
+| A task's baseline (e.g. `so101_cubebox_v1`) | `cubebox_v1_baseline` | every trained model of the task; the one condition `baseline: main/baseline` |
+| A new model or more data for a task | `<task>_baseline_v2` | the new model(s) **plus** the ones to beat, run again side by side |
+| A method compared with the baseline | like `sort_one_drtc_main` | the chosen models; conditions `baseline` + the methods (`main/...`) |
 
-Steps:
-1. **Laptop:** copy an existing eval, e.g. `cp lab/evals/sort_one_baseline.yaml lab/evals/sort_two_baseline.yaml`.
-   Edit `description`, `success` (the rule you'll apply when pressing `s`), `time_limit_s` and `models`. Then run
-   `lab eval check <eval>` and `lab eval freeze <eval>`, commit and push.
-2. **Model server**, the A100 or H200, whichever is free: `git pull`, then
-   `tmux new -s serve '.venv/bin/lab eval serve <eval>; bash'`. Wait for `all N ready`.
-3. **Laptop with the robot:**
-   - `git pull` and `lab/bin/session record`;
-   - `lab eval servers <eval> --server <a100|h200>`: all `ready`?
-   - one `--test` trial to check the keys;
-   - `lab eval run <eval> --server <a100|h200>`: 20 trials per model, in rounds. Set one layout per round. During a
-     trial press `s` for success or `f` for failure; `q` stops, and the next run continues where it stopped.
-4. **Results:** `lab eval report <eval> --pull` gives `results/evals/<eval>/report.md`. Then stop the servers
-   (Ctrl-C in their tmux window) and tell Claude the eval is done.
+Only `lab eval run` makes official results (`results/evals/`). Anything else you try (`lab run`, `--test`, `--replay`)
+goes to `results/scratch/` and never into the results.
 
-What never changes: the recipes (`lab/recipes/`), the metrics (`lab/METRICS.md`), 20 trials per model, and the rule
-that only `lab eval run` makes official results. Anything you try by hand is a test (`results/scratch/`).
-
+---
 
 # Part 1: from a new dataset to trained models
 
-The whole path, in order, with every command. Details on each part: [DATA.md](docs/DATA.md) (recording and editing),
-[TRAIN.md](docs/TRAIN.md) (training). The example throughout is sorting B, `so101_sort_two_v1`.
+The example in this part is a new dataset, sorting B (`so101_sort_two_v1`). It is only an example: the datasets of
+the locked scope are recorded already ([PLAN.md](PLAN.md)). Details: [docs/DATA.md](docs/DATA.md),
+[docs/TRAIN.md](docs/TRAIN.md).
 
 ```
-laptop:  plan → set up the scene → record → review / edit → commit recorded.yaml
-         → add the models → check → commit + push
-H200:    pull → prepare → train (tmux) → watch in wandb → models on the Hub
+laptop:  plan → set up the scene → record → review / edit → commit recorded.yaml → add the models → check → push
+server:  pull → prepare → train (tmux) → watch in wandb → models on the Hub
 ```
 
 ## Cheat sheet
 
 ```bash
 # --- laptop ---
-cd ~/Projects/drtc-major && source .venv/bin/activate
+cd ~/Projects/drtc-major && source .venv/bin/activate && git pull
 lab/bin/session record                          # phone camera + checks, in tmux "robot"
 lab record so101_sort_two_v1 --task "Put the red cube in the red square and the blue cube in the blue square." \
     --episodes 100 --held-out 10 --episode-time 45 --reset-time 15
@@ -106,7 +91,6 @@ cd /workspace/drtc_major && . ./.server.env && git pull && uv sync --frozen --ex
 nvidia-smi
 tmux new -d -s sort2 -n act '.venv/bin/lab train act_sort_two_v1_full; bash'
 sleep 60
-tmux new-window -t sort2 -n groot   '.venv/bin/lab train groot_sort_two_v1_full; bash'
 tmux new-window -t sort2 -n smolvla '.venv/bin/lab train smolvla_sort_two_v1_full; bash'
 ```
 
@@ -114,7 +98,7 @@ tmux new-window -t sort2 -n smolvla '.venv/bin/lab train smolvla_sort_two_v1_ful
 
 ## 1. Plan the dataset
 
-Decide these before the session and write them down (the plan for each task is in [PLAN.md](PLAN.md), Phase 4):
+Decide these before the session and write them down:
 
 | What | Rule | Sorting B |
 |---|---|---|
@@ -125,12 +109,12 @@ Decide these before the session and write them down (the plan for each task is i
 | Rotation | every layout combination equally often over **all N + K** episodes, in a fixed order | 4 combinations x 27-28 |
 
 The rotation is kept by hand (nothing records the layout). Write it on paper and tick off the episodes. With 110
-episodes and 4 combinations, it can't be perfectly even (27, 28, 27, 28): that's fine, keep the order fixed.
+episodes and 4 combinations it can't be perfectly even (27, 28, 27, 28): that's fine, keep the order fixed.
 
 ## 2. Set up the scene and the rig (laptop)
 
-1. Squares, cubes and spots on their taped marks; the scene camera (phone) and the wrist camera in place; both arms
-   powered and connected over USB; the phone connected over USB with DroidCam open.
+1. Objects on their taped marks; the scene camera (phone) and the wrist camera in place; both arms powered and
+   connected over USB; the phone connected over USB with DroidCam open.
 2. Start the session:
 
    ```bash
@@ -138,15 +122,16 @@ episodes and 4 combinations, it can't be perfectly even (27, 28, 27, 28): that's
    lab/bin/session record
    ```
 
-   This opens tmux `robot` with the phone camera bridge in one window and the checks in the other. Re-running it
-   re-attaches. Without the session, start the bridge yourself with `lab/bin/phonecam` in its own terminal.
-3. Check the arms, ports, calibration and cameras (the session already does this; `lab record` checks again):
+   This opens tmux `robot`: the phone camera bridge in one window, the checks in the other. Re-running it
+   re-attaches. Without it, start the bridge yourself with `lab/bin/phonecam` in its own terminal.
+3. Check the arms, ports, calibration and cameras (the session does this; `lab record` checks again):
 
    ```bash
    lab check --rig
    ```
 
-   Every line should say `ok`. Never recalibrate for a new dataset: the calibration stays the same for all of them.
+   Every line should say `ok`. Never recalibrate for a new dataset: the calibration stays the same for all of them
+   (if you ever do, copy it to the Pi too: [the Pi section](#the-raspberry-pi-as-the-robot-computer)).
 
 ## 3. Record
 
@@ -166,14 +151,8 @@ During the session:
 
 - The spoken prompts say which episode is next ("Recording episode 3") and when to reset.
 - A bad episode: press ← straight away rather than fixing it later. The rotation stays in step that way.
-- Tired? Press Esc, and continue another time with the **same command plus `--resume`**:
-
-  ```bash
-  lab record so101_sort_two_v1 --task "Put the red cube in the red square and the blue cube in the blue square." \
-      --episodes 100 --held-out 10 --episode-time 45 --reset-time 15 --resume
-  ```
-
-  It prints how many episodes are recorded and how many are left. Go on in the rotation from the next episode number.
+- Tired? Press Esc, and continue another time with the **same command plus `--resume`**. It prints how many
+  episodes are recorded and how many are left; go on in the rotation from the next episode number.
 
 At the end `lab record` checks the recording, builds the trimmed copy, pushes both to the Hub and writes their
 entries in `lab/datasets/recorded.yaml`.
@@ -199,7 +178,7 @@ which episodes are held out, so models trained before and after aren't comparabl
 
 ## 5. Commit the dataset entry
 
-The GPU servers learn about the dataset (its exact Hub revision and its held-out split) from `recorded.yaml`:
+The servers learn about the dataset (its exact Hub revision and its held-out split) from `recorded.yaml`:
 
 ```bash
 git status                                   # only lab/datasets/recorded.yaml should be changed
@@ -215,19 +194,27 @@ Do this after every `lab record` and every `lab data push`.
 Create `lab/models/sort_two_v1.yaml` (copy `lab/models/sort_one_v1.yaml` and change the names):
 
 ```yaml
-# Sorting B (so101_sort_two_v1): original recipes, full fine-tunes.
+# Sorting B (so101_sort_two_v1): original recipes.
 act_sort_two_v1_full: {recipe: act_original, dataset: so101_sort_two_v1, status: planned,
   notes: 'ACT on so101_sort_two_v1; original recipe'}
 smolvla_sort_two_v1_full: {recipe: smolvla_authors, dataset: so101_sort_two_v1, status: planned,
   notes: 'SmolVLA on so101_sort_two_v1; original recipe (action expert only)'}
-groot_sort_two_v1_full: {recipe: groot_n15_nvidia, dataset: so101_sort_two_v1, status: planned,
-  notes: 'GR00T N1.5 on so101_sort_two_v1; original recipe'}
 ```
 
-- Name: `<policy>_<task>_<version>_full`; the dataset is the **trimmed** name (no `_raw`).
-- Recipes: `act_original`, `smolvla_authors`, `groot_n15_nvidia` (the three in use). Never edit a recipe in
-  `lab/recipes/`: they're fixed so every dataset is trained the same way. A new recipe or model is a question for
-  Claude.
+- Name: `<policy>_<task>_<version>_<full|lora>`; the dataset is the **trimmed** name (no `_raw`). GR00T N1.7 models
+  are named `grootn17_...`, π0.5 `pi05_...`, MolmoAct 2 `molmoact2_..._lora`.
+- The seven recipes (fixed; never edit them; a new recipe or model is a question for Claude):
+
+  | Policy | Recipe | Steps x batch | Time alone on the H200 (measured) |
+  |---|---|---|---|
+  | ACT | `act_original` | 100k x 8 | ~3 h (~5 h with other runs) |
+  | SmolVLA | `smolvla_authors` | 20k x 64 | ~1.1 h (~4 h with other runs) |
+  | GR00T N1.5 | `groot_n15_nvidia` | 10k x 32 | ~1.4 h (~3.6 h with other runs) |
+  | Diffusion Policy | `diffusion_original` | 600 epochs x 64 | ~11 h for 110 episodes, with other runs |
+  | GR00T N1.7 | `groot_n17_nvidia` | 20k x 64 | not measured yet |
+  | π0.5 | `pi05_openpi` | 20k x 64 | ~27 h, ~77 GB of GPU memory |
+  | MolmoAct 2 | `molmoact2_lora` | 50k x 16 | ~5 days on the A100 (~9-10 s per step) |
+
 - `status` is a note only (`planned` → `trained` once it's on the Hub); nothing depends on it.
 
 Check, then commit and push:
@@ -235,44 +222,43 @@ Check, then commit and push:
 ```bash
 lab check                                        # the registry is consistent
 lab train act_sort_two_v1_full --dry-run         # dataset revision, held-out episodes, full command; downloads nothing
-lab train groot_sort_two_v1_full --dry-run
 lab train smolvla_sort_two_v1_full --dry-run
 git add lab/models/sort_two_v1.yaml
-git commit -m "models: ACT, SmolVLA, GR00T N1.5 on so101_sort_two_v1"
+git commit -m "models: ACT, SmolVLA on so101_sort_two_v1"
 git push
 ```
 
 The dry run should show the held-out count you recorded (`held out: [...]`, 10 episodes) and
 `episodes: 100 for training`.
 
-## 7. Train on the H200
+## 7. Train
 
-In the `drtc_lab` container (Jupyter terminal, or `docker exec -it drtc_lab bash`; first-time setup is in
-[H200.md](docs/H200.md)):
+**On the H200**, in the `drtc_lab` container (login and update: [Machines](#machines)):
 
 ```bash
 cd /workspace/drtc_major && . ./.server.env && git pull && uv sync --frozen --extra gpu --extra sim --python /usr/bin/python3
 .venv/bin/lab check --logging                  # wandb and HF keys present (once per setup is enough)
 .venv/bin/lab prepare so101_sort_two_v1        # download + prepare, once per new dataset revision
 nvidia-smi                                     # the GPU is shared: check there is room
-```
-
-Start the three runs, ACT first (the CPU limits in `lab/hosts.yaml` apply to runs started while another one
-is training, and ACT needs the least):
-
-```bash
+df -h /workspace                               # and the disk (each GR00T checkpoint is ~5.5 GB)
 tmux new -d -s sort2 -n act     '.venv/bin/lab train act_sort_two_v1_full; bash'
 sleep 60
-tmux new-window -t sort2 -n groot   '.venv/bin/lab train groot_sort_two_v1_full; bash'
 tmux new-window -t sort2 -n smolvla '.venv/bin/lab train smolvla_sort_two_v1_full; bash'
 tmux attach -t sort2          # Ctrl-b n: next window; Ctrl-b d: detach (the runs go on)
 ```
 
-Use a new tmux session name per dataset (`sort2`, `stack`, ...) so it doesn't clash with a running one. Closing the
-browser or logging out doesn't stop the runs.
+Start ACT first: the CPU limits in `lab/hosts.yaml` apply to runs started while another one is training, and ACT
+needs the least. Use a new tmux session name per dataset (`sort2`, `stack`, ...) so it doesn't clash with a running
+one (`tmux ls`). Closing the browser or logging out doesn't stop the runs.
 
-Approximate lengths, one run alone on the H200: ACT ~3 h, SmolVLA ~1.1 h, GR00T N1.5 ~1.4 h. Three at once take
-longer each.
+**On the A100** (the same commands, on the host, no container):
+
+```bash
+ssh b230968ee@192.168.5.13
+cd ~/drtc_major && . ./.server.env && git pull          # . ./.server.env BEFORE starting: video decoding needs it
+nvidia-smi && df -h ~                                    # shared GPU; /home is nearly full
+tmux new -d -s train -n act '.venv/bin/lab train act_sort_two_v1_full; bash'
+```
 
 ## 8. Watch
 
@@ -286,107 +272,113 @@ Stopping and continuing:
 
 ```bash
 .venv/bin/lab stop act_sort_two_v1_full        # clean stop: checkpoint, push, exit (or Ctrl-C in its window)
-.venv/bin/lab train act_sort_two_v1_full --resume
+.venv/bin/lab train act_sort_two_v1_full --resume   # continues from the last saved checkpoint
 ```
+
+A window closed by accident (the process killed) loses only the steps since the last checkpoint (`save_freq` in the
+recipe): continue with `--resume` the same way.
 
 ## 9. Done
 
 Each run pushes to `orangemoon599/<model>` at its end: the repo root is the best checkpoint by held-out loss (what
-`lab serve` uses), `checkpoints/<step>/` the last one with its training state. On the laptop, set `status: trained`
-in the model file, commit and push. Then tell Claude: the offline evaluation and robot trials come next (Phase 5-6
-in [PLAN.md](PLAN.md)).
+`lab eval serve` uses), `checkpoints/<step>/` the last one with its training state. On the laptop, set
+`status: trained` in the model file, commit and push. Then: the offline evaluation
+([Part 3](#offline-evaluation-m9-m10)) and the robot baseline ([Part 2](#part-2-robot-evaluation)), PLAN.md steps 5-6.
 
 ## When to ask Claude
 
 - Anything that deletes or replaces: `outputs/train/<model>` already exists, a stale dataset copy on a server,
   `lab data remove --hub`.
 - A traceback, out-of-memory that persists after `nvidia-smi` shows the GPU free, a dry run that looks wrong.
-- A new task with per-episode instructions (sorting C), a new recipe or model, a new server.
+- A new task with per-episode instructions, a new recipe or model, a new server.
 
 Paste the last lines of the window (or the dry run's output) with the question.
 
 ---
 
-# Part 2: evaluation
+# Part 2: robot evaluation
 
-Official robot trials, from the plan to the report. Why it works this way: [EVALUATION.md](docs/EVALUATION.md). What
-every number means: [METRICS.md](METRICS.md). The example throughout is `sort_one_baseline` (Phase 6: ACT,
-SmolVLA, GR00T N1.5 and Diffusion on sorting A, 20 trials each).
+Official robot trials, from the plan to the report. Why it works this way: [docs/EVALUATION.md](docs/EVALUATION.md).
+What every number means: [METRICS.md](METRICS.md). The example throughout is **`cubebox_v0_baseline`**: SmolVLA and
+GR00T N1.5 on the cube-in-box v0 task, condition `baseline`, 10 trials each (frozen 2026-11-20).
 
 ```
 once per eval    laptop: write lab/evals/<eval>.yaml → lab eval check → lab eval freeze → commit + push
-each session     model server (A100 / H200 / laptop GPU): lab eval serve <eval>        (leave it running)
-                 laptop (robot):  lab eval servers → lab eval run <eval> --server <host>  (s / f per trial)
+each session     model server (A100 / H200 / laptop GPU): lab eval serve <eval>               (leave it running)
+                 robot computer (laptop, or the Pi): lab eval servers → lab eval run <eval> --server <host>
 any time         lab eval status <eval>   ·   lab eval report <eval> --pull
 ```
 
-Only `lab eval run` makes official results. Anything else you try (`lab run`, `--test`, `--replay`) goes to
-`results/scratch/` and never into the results.
+**The robot computer for official results is the laptop** (the locked scope, PLAN.md; the report says so). The Pi
+works the same way ([its section](#the-raspberry-pi-as-the-robot-computer)) and is for the edge tests.
 
 ## Cheat sheet
 
 ```bash
 # --- once per eval (laptop) ---
 cd ~/Projects/drtc-major && source .venv/bin/activate && git pull
-lab eval check sort_one_baseline
-lab eval freeze sort_one_baseline
-git add lab/evals/sort_one_baseline.yaml && git commit -m "eval sort_one_baseline: frozen" && git push
+lab eval check cubebox_v0_baseline
+lab eval freeze cubebox_v0_baseline
+git add lab/evals/cubebox_v0_baseline.yaml && git commit -m "eval cubebox_v0_baseline: frozen" && git push
 
 # --- each session: 1. the model server (pick one) ---
 # A100:   ssh b230968ee@192.168.5.13, then
-cd ~/drtc_major && git pull && tmux new -s serve '.venv/bin/lab eval serve sort_one_baseline; bash'
+cd ~/drtc_major && git pull && tmux new -s serve '.venv/bin/lab eval serve cubebox_v0_baseline; bash'
 # H200:   in the drtc_lab container
-cd /workspace/drtc_major && . ./.server.env && git pull && uv sync --frozen --extra gpu --extra sim --python /usr/bin/python3
-tmux new -s serve '.venv/bin/lab eval serve sort_one_baseline; bash'
-# laptop GPU (8 GB: the small models only)
-lab eval serve sort_one_baseline --models act_sort_one_v1_full,diffusion_sort_one_v1_full
+cd /workspace/drtc_major && . ./.server.env && git pull
+tmux new -s serve '.venv/bin/lab eval serve cubebox_v0_baseline; bash'
+# laptop GPU (8 GB: small models only; add --for-pi when the Pi is the robot computer)
+lab eval serve cubebox_v0_baseline --models smolvla_cubebox_v0_full
 
-# --- each session: 2. the laptop with the robot ---
+# --- each session: 2. the robot computer (laptop) ---
 cd ~/Projects/drtc-major && source .venv/bin/activate && git pull
-lab/bin/session record                                   # phone camera + rig check (tmux "robot")
-lab eval servers sort_one_baseline --server a100         # every model "ready"?
-lab eval run sort_one_baseline --server a100 --replay    # optional: 1 round on the replay robot, no arm moves
-lab eval run sort_one_baseline --server a100             # the official session
+lab/bin/session record                                      # phone camera + rig check (tmux "robot")
+lab eval servers cubebox_v0_baseline --server a100          # every model "ready"?
+lab eval run cubebox_v0_baseline --server a100 --test       # optional: one test trial (scratch)
+lab eval run cubebox_v0_baseline --server a100              # the official session
 
 # --- afterwards (any machine) ---
-lab eval status sort_one_baseline
-lab eval report sort_one_baseline --pull                 # → results/evals/sort_one_baseline/report.md
+lab eval status cubebox_v0_baseline
+lab eval report cubebox_v0_baseline --pull                  # → results/evals/cubebox_v0_baseline/report.md
 ```
 
 ---
 
 ## 1. Write the eval (once per study)
 
-One file per study in `lab/evals/`. Copy `lab/evals/sort_one_baseline.yaml` and change it:
+One file per study in `lab/evals/`. `cubebox_v0_baseline.yaml` before freezing:
 
 ```yaml
-description: Phase 6 baseline, sorting A (every trained model, as trained)
-success: The cube is fully inside the square of its colour and the gripper has let go of it, before the time limit.
+description: Baseline, cubebox v0 - SmolVLA and GR00T N1.5, upstream LeRobot as it ships, normal network
+success: The green cube ends inside the box and the gripper is open, before the time limit.
 time_limit_s: 30          # a trial that runs out is a failure
-trials: 20                # per model per condition (the standard)
+trials: 10                # valid trials per model per condition (METRICS.md rule 1)
 seed: 0                   # the order inside each round
-models: [act_sort_one_v1_full, smolvla_sort_one_v1_full, groot_sort_one_v1_full, diffusion_sort_one_v1_full]
+models:
+  - smolvla_cubebox_v0_full
+  - groot_cubebox_v0_full
 conditions:
-  baseline: replication/baseline      # settings from lab/experiments
+  baseline: main/baseline   # the condition's settings: lab/experiments/main/baseline.yaml
 video: true
 ```
 
-- **Decide everything before the first trial.** Once trials exist, the plan can't change. A change means a new eval
-  (e.g. `sort_one_baseline_v2`), and `lab eval run` refuses a plan that differs from earlier sessions.
+- **Decide everything before the first trial.** Once trials exist the plan can't change: a change means a new eval
+  (e.g. `cubebox_v0_baseline_v2`), and `lab eval run` refuses a plan that differs from earlier sessions.
 - **`success`** is the rule you apply when you press `s`. Write it so that close calls are rare.
-- **`conditions`** are what you compare: just `baseline` in Phase 6. In Phases 7–8, e.g. `baseline`, `smoothing_a` and
-  `spikes`, each pointing at an experiment file in `lab/experiments/`.
+- **`conditions`**: the four conditions of the locked scope are `main/baseline`, `main/baseline_faults`,
+  `main/drtc_faults` and `main/drtc_smooth_faults` ([experiments/main/_README.md](experiments/main/_README.md));
+  `sort_one_drtc_main.yaml` uses all four.
 
 Then:
 
 ```bash
-lab eval check sort_one_baseline      # names exist, conditions point at real experiments, task found
-lab eval freeze sort_one_baseline     # pins every model to its current Hub commit, written into the file
-git add lab/evals/sort_one_baseline.yaml && git commit -m "eval sort_one_baseline: frozen" && git push
+lab eval check cubebox_v0_baseline      # names exist, conditions point at real experiments, task found
+lab eval freeze cubebox_v0_baseline     # pins every model to its current Hub commit, written into the file
+git add lab/evals/cubebox_v0_baseline.yaml && git commit -m "eval cubebox_v0_baseline: frozen" && git push
 ```
 
-Freezing is what makes "the same model" exact: the laptop, the Pi and every server use that commit, and a server
-serving any other version simply can't be reached by the session.
+Freezing makes "the same model" exact: the laptop, the Pi and every server use that commit, and a server serving any
+other version simply can't be reached by the session. Freeze once every model in it is trained and on the Hub.
 
 ## 2. Start the model server
 
@@ -394,69 +386,77 @@ Pick whichever server is free that day. **The whole session uses one server**, a
 
 | Server | Where to type | Command |
 |---|---|---|
-| A100 | `ssh b230968ee@192.168.5.13` | `cd ~/drtc_major && git pull && tmux new -s serve '.venv/bin/lab eval serve sort_one_baseline; bash'` |
-| (A100 after a lock change) | `ssh b230968ee@192.168.5.13` | `cd ~/drtc_major && git pull && lab/bin/a100-setup` (**never a plain `uv sync` on the A100**: it installs CUDA 13 builds its driver cannot run) |
-| H200 | the `drtc_lab` container ([H200.md](docs/H200.md)) | `cd /workspace/drtc_major && . ./.server.env && git pull && uv sync --frozen --extra gpu --extra sim --python /usr/bin/python3`, then `tmux new -s serve '.venv/bin/lab eval serve sort_one_baseline; bash'` |
-| laptop GPU | a laptop terminal | `lab eval serve sort_one_baseline --models act_sort_one_v1_full,diffusion_sort_one_v1_full` |
+| A100 | `ssh b230968ee@192.168.5.13` | `cd ~/drtc_major && git pull && tmux new -s serve '.venv/bin/lab eval serve cubebox_v0_baseline; bash'` |
+| H200 | the `drtc_lab` container | `cd /workspace/drtc_major && . ./.server.env && git pull`, then `tmux new -s serve '.venv/bin/lab eval serve cubebox_v0_baseline; bash'` |
+| laptop GPU | a laptop terminal | `lab eval serve cubebox_v0_baseline --models smolvla_cubebox_v0_full` (add `--for-pi` when the Pi is the robot computer) |
 
 It starts the models one after the other and prints each one's status:
 
 ```
-  act_sort_one_v1_full             port 8840  starting (loading the model) ... ready in 30 s
-  smolvla_sort_one_v1_full         port 8841  starting (loading the model) ... ready in 547 s
-  groot_sort_one_v1_full           port 8842  starting (loading the model) ... ready in 159 s
-  diffusion_sort_one_v1_full       port 8843  starting (loading the model) ... ready in 34 s
-all 4 ready. Leave this running during the session; Ctrl-C stops every server.
+serving cubebox_v0_baseline (2 models) on 127.0.0.1; logs in logs/serve/cubebox_v0_baseline/
+  smolvla_cubebox_v0_full          port 9720  starting (loading the model) ... ready in 540 s
+  groot_cubebox_v0_full            port 9721  starting (loading the model) ... ready in 160 s
+all 2 ready. Leave this running during the session; Ctrl-C stops every server.
 ```
 
 - Wait for **`all N ready`**. SmolVLA compiles its model when it starts (about 9 minutes the first time on the A100).
 - Detach with Ctrl-b d. At the end of the session, attach (`tmux attach -t serve`) and press Ctrl-C.
-- The laptop's 8 GB fits ACT and Diffusion, not GR00T. Then run the session with the same `--models`.
+- The laptop's 8 GB fits the small models (ACT, Diffusion, SmolVLA); not GR00T or the large VLAs. Then run the
+  session with the same `--models`.
 - Each eval has its own ports, so two evals can be served on one machine at once if the GPU has room. If
   `lab eval serve` says `ports in use`, that eval is already being served there: `tmux ls`, attach, Ctrl-C.
-- On the H200, the laptop connects through an SSH tunnel into the container: type the server password when
-  `lab eval servers` or `lab eval run` asks for it (once per session). **Not tested on the H200 yet:** if it fails the
-  first time, paste the message to Claude.
+- The A100 and H200 are shared: check `nvidia-smi` for room first. Training jobs may run alongside; the trial records
+  the inference time, so that is visible in the results.
 
 ## 3. Prepare the robot (laptop)
 
 ```bash
 cd ~/Projects/drtc-major && source .venv/bin/activate && git pull
 lab/bin/session record          # phone camera bridge + rig check; every line ok
-lab eval servers sort_one_baseline --server a100
+lab eval servers cubebox_v0_baseline --server a100
 ```
 
-`lab eval servers` connects (A100: by key; H200: asks the password) and asks each model to describe itself:
+`lab eval servers` opens the way to the servers and asks each model to describe itself:
+
+| `--server` | How it connects |
+|---|---|
+| `a100` | an SSH tunnel by key (no password) |
+| `h200` | an SSH tunnel into the container: type the H200 password once per session |
+| `laptop` | on the laptop: directly; on the Pi: to the laptop's hotspot address (the laptop serves with `--for-pi`) |
+| `local` | servers on this same machine (the bench) |
 
 ```
-  act_sort_one_v1_full             ready   commit 449b9c12  checkpoint sha256:5af906278031  tcp/127.0.0.1:18840
-  ...
+cubebox_v0_baseline on a100:
+  smolvla_cubebox_v0_full          ready   commit 8beffbfd  checkpoint sha256:...  tcp/127.0.0.1:19720
+  groot_cubebox_v0_full            ready   commit 9b164e1e  checkpoint sha256:...  tcp/127.0.0.1:19721
 ```
 
-Every model must say `ready`. Optional setup check without moving the arm: one round on the replay robot against the
-same servers (a test, in scratch):
+Every model must say `ready` (through a tunnel the local port is the server's + 10000). Optional checks without
+counting anything:
 
 ```bash
-lab eval run sort_one_baseline --server a100 --replay
+lab eval run cubebox_v0_baseline --server a100 --test     # one real trial on the arm, kept in results/scratch
+lab eval run cubebox_v0_baseline --server a100 --replay   # one round on the replay robot: the arm doesn't move
 ```
 
 ## 4. Run the session
 
 ```bash
-lab eval run sort_one_baseline --server a100
+lab eval run cubebox_v0_baseline --server a100
 ```
 
-It checks everything first and refuses to start when something is off: uncommitted changes, a changed plan, a
-failed rig check, or a model that isn't served. Then it pulls the sessions other machines pushed, so the counts
-include them.
+It checks everything first and refuses to start when something is off: uncommitted changes in the repo, a changed
+plan, a failed rig check, or a model that isn't served. Then it pulls the sessions other machines pushed, so the
+counts include them.
 
-It works in **rounds**. A round is one trial of every model, in a random order (the same order on every machine).
+It works in **rounds**. A round is one trial of every model under every condition, in a random order (the same on
+every machine).
 
 ```
-=== Round 1: 4 trials ===
+=== Round 1: 2 trials ===
 Set this round's layout (the same for every trial of the round).
 
-Round 1, trial 1/4: groot_sort_one_v1_full, t01. Put the cube(s) on the marks, press Enter to start ...
+Round 1, trial 1/2: groot_cubebox_v0_full, t01. Put the cube(s) on the marks, press Enter to start ...
   [success] ending the trial
   t01: SUCCESS in 9.4 s (s; completed)
   Enter = next trial, v = void this trial (setup mistake), q = end the session:
@@ -464,61 +464,64 @@ Round 1, trial 1/4: groot_sort_one_v1_full, t01. Put the cube(s) on the marks, p
 
 | When | Key | Means |
 |---|---|---|
-| before a trial | Enter | start (cube on its mark) |
+| before a trial | Enter | start (objects on their marks) |
 | before a trial | `q` | end the session |
 | during a trial | `s` | **success**, right now: the task is done by the success rule. Ends the trial; the time is the time to success |
 | during a trial | `f` | **failure**: it won't succeed. Ends the trial early |
 | during a trial | (nothing) | the time limit ends it: failure |
 | after a trial | Enter | next trial |
-| after a trial | `v` | **void**: a setup mistake (cube not on its mark, wrong layout, cable caught), with a reason. Kept, not counted, run again in a later round. **Never for a model's failure** |
+| after a trial | `v` | **void**: a setup mistake (object not on its mark, wrong layout, cable caught), with a reason. Kept, not counted, run again in a later round. **Never for a model's failure** |
 | after a trial | `q` | end the session |
 
-- **Layouts are yours:** set one layout per round, all trials of the round use it, and rotate the layouts over the
-  rounds as in the recording (sorting A: the 4 combinations, 5 rounds each over 20 rounds).
-- A trial that ends by itself with a fault (the server stopped, the network dropped) is **not counted** and comes back
-  in a later round. It's listed in the report.
+- **Layouts are yours:** one layout per round, all trials of the round use it; rotate the layouts over the rounds as
+  in the recording (10 rounds for 10 trials).
+- **A fault ends a trial** when the system stops the arm (the server stopped, the network dropped, the shipped client
+  gave up): after the arm has started moving it is a **failure** (label `fault`, counted in M1f); before the first
+  action it is a setup problem and the trial is run again in a later round (METRICS.md, v2).
 - Stop whenever you like (`q`). The next `lab eval run` continues where the eval stands, on any machine.
-- At the end, the session is **pushed** to the results store automatically. Without internet, use `--offline`, then
-  `lab eval push sort_one_baseline` later.
+- `--max-trials N` ends the session after N trials.
+- At the end the session is **pushed** to the results store automatically. Without internet use `--offline`, then
+  `lab eval push cubebox_v0_baseline` later.
 
 ## 5. Results
 
 ```bash
-lab eval status sort_one_baseline           # trials done per model, the next round, unpushed sessions
-lab eval report sort_one_baseline --pull    # rebuild the report from every session (all machines)
+lab eval status cubebox_v0_baseline           # trials done per model, the next round, unpushed sessions
+lab eval report cubebox_v0_baseline --pull    # rebuild the report from every session (all machines)
 ```
 
-`results/evals/sort_one_baseline/`:
+`results/evals/cubebox_v0_baseline/`:
 
 | File | What |
 |---|---|
-| `report.md` | the tables: success rate with its 95% interval and time to success; stalls, latency, server time, jerk, chunk jumps (median and spread); comparisons with the baseline condition; trials not counted; sessions |
+| `report.md` | success with its 95% interval, trials ended by a fault, time to success; stalls, latency, server time, jerk, chunk jumps (median and spread); comparisons between conditions; trials not counted; sessions |
 | `trials.csv` | one row per trial (also voided ones), with its folder |
 | `metrics.csv` | one row per counted trial, every metric |
-| `sessions/<date>-<machine>/trials/<condition>/<model>/tNN/` | the raw files of one trial, including `video/scene.mp4` and `video/wrist.mp4` |
+| `sessions/<date>-<machine>/trials/<condition>/<model>/tNN/` | the raw files of one trial: `ticks.csv`, `chunks.csv`, `faults.csv`, `recovery.csv`, `config.yaml`, `trial.json`, `rollout.log`, `video/scene.mp4`, `video/wrist.mp4` |
 
-The report is rebuilt every time, so never edit it. Tell Claude when an eval is done: the next step reads the report.
+The report is rebuilt every time, so never edit it. Tell Claude when an eval is done: REPORT.md, the report and the
+slides are updated from it.
 
 ## The Raspberry Pi as the robot computer
 
 The Pi (Raspberry Pi 5, 8 GB, no GPU, hostname `raspberrypi`, on the laptop's hotspot) does exactly the laptop's
-robot-side job: the arm, the cameras, `lab eval run`. The models are served on the A100 as always; only the robot
-computer changes, and every session records which one it was (`results/evals/<eval>/sessions/<date>-pi/`).
+robot-side job: the arm, the cameras, `lab eval run`. Every session records which robot computer it was
+(`results/evals/<eval>/sessions/<date>-pi/`), and reports never mix robot computers.
 
-**Once** (and again after a lock change), from a laptop terminal:
+**Once** (and again after a change of `uv.lock`), from a laptop terminal:
 
 ```bash
-ssh rasp@raspberrypi.local                                               # the laptop's SSH key is authorized
+ssh rasp@raspberrypi.local                                               # the laptop's SSH key is authorised
 git clone -b major https://github.com/arshjeevs/DRTC.git ~/drtc_major    # first time only
 cd ~/drtc_major && git pull && lab/bin/pi-setup
 ```
 
 `pi-setup` installs Python 3.12 and the robot side with the **CPU build** of PyTorch (the Pi has no GPU), and checks
-the system parts (phone camera device `/dev/video10`, the clock synced to the laptop). It asks for the sudo password
-only when one of those is missing.
+the system parts (the phone camera device `/dev/video10`, the clock synced to the laptop). It asks for the sudo
+password only when one of those is missing. It ends with `pi-setup: done`.
 
-**The arm's calibration is the laptop's** (one file per arm: with another file the joint angles would not match the
-recordings). Copy it after every new calibration on the laptop:
+**The arm's calibration is the laptop's** (with another file the joint angles would not match the recordings). Copy
+it after every new calibration on the laptop:
 
 ```bash
 # laptop
@@ -528,17 +531,18 @@ scp ~/$C/robots/so101_follower/follower.json rasp@raspberrypi.local:$C/robots/so
 scp ~/$C/teleoperators/so101_leader/leader.json rasp@raspberrypi.local:$C/teleoperators/so101_leader/
 ```
 
-**Each session:** plug the arm (follower), the wrist camera and the phone into the Pi (the leader arm is not needed),
-then on the Pi the same commands as on the laptop:
+**Each session:** plug the follower arm (with its power supply), the wrist camera and the phone into the Pi (the
+leader arm is not needed; the Pi needs its 5 V / 5 A supply). The first time, the phone asks to allow USB debugging
+for the Pi: tap Allow (and "always allow"). Then on the Pi:
 
 ```bash
 cd ~/drtc_major && source .venv/bin/activate && git pull
 lab/bin/session record                          # phone camera + rig check (tmux "robot"); every line ok
 lab eval servers <eval> --server a100           # every model "ready"?
-lab eval run <eval> --server a100
+lab eval run <eval> --server a100 --test        # a test trial; drop --test for official trials
 ```
 
-**Model servers for Pi sessions** (all three work from the Pi; the eval must be frozen and pulled on both machines):
+**Model servers for Pi sessions** (the eval must be frozen and pulled on both machines):
 
 | Server | On the server | On the Pi |
 |---|---|---|
@@ -546,60 +550,108 @@ lab eval run <eval> --server a100
 | H200 | `lab eval serve <eval>` in the drtc_lab container | `--server h200`: type the H200 password once per session |
 | laptop GPU (small models) | `lab eval serve <eval> --for-pi`: listens on the hotspot address 10.42.0.1 | `--server laptop`: straight to the laptop, no tunnel |
 
-With `--for-pi` the laptop's own sessions cannot reach those servers (they listen on the hotspot address only); serve without it for laptop sessions.
+With `--for-pi` the laptop's own sessions cannot reach those servers (they listen on the hotspot address only); serve
+without it for laptop sessions.
 
-First test (2026-11-20, cubebox v0, `--test`): 29.4-29.9 Hz control, no video frames dropped; the round trip is
-about twice the laptop's (SmolVLA 594 ms, GR00T N1.5 855 ms: WiFi to the laptop's hotspot, then to the A100), so
-the shipped client (1 s give-up) can starve GR00T N1.5 even without faults.
+First test (2026-11-20, `cubebox_v0_baseline --test`, A100): 29.4-29.9 Hz control, no video frames dropped; the round
+trip is about twice the laptop's (SmolVLA 594 ms, GR00T N1.5 855 ms: WiFi to the laptop's hotspot, then to the A100),
+so the shipped client (1 s give-up) can starve GR00T N1.5 even without faults.
 
-## The bench: replay robot on the H200 (Phases 7-8)
+---
 
-A bench eval (`robot: replay`) needs no robot and no laptop. The model server and the replay robot run in the same
-H200 container, and the WiFi link to the A100 is simulated on every reply (0.4 s + up to 0.2 s jitter; see
-`lab/experiments/bench/`). The replay robot plays each of the 8 held-out episodes once per model and condition (10 s
-each) and records M2-M8 (no success: the cube doesn't move). Results go to `results/bench/<eval>/`, pushed to the
-results store like robot sessions.
+# Part 3: bench, offline evaluation, report and slides
+
+## The bench: replay robot
+
+A bench eval (`robot: replay` in the eval file) needs no robot and no laptop: the model servers and the replay robot
+run on the same GPU server, and the replay robot plays the held-out episodes as the camera input. It records M2-M8
+(no task success: nothing moves). The network to the robot is simulated on every reply as measured on the robot,
+**250 ± 20 ms** ([experiments/bench_main/](experiments/bench_main/)).
 
 | Bench eval | Compares | Trials |
 |---|---|---|
-| `bench_sort_one_smoothing` | `baseline` (Butterworth, the robot baseline's settings), `none`, `blend` (upstream), `playback` (method A) | 4 models x 4 x 8 = 128 |
-| `bench_sort_one_rtc` | `baseline`, `rtc` (upstream guided RTC), `rtc_playback` (RTC + A); SmolVLA and GR00T only | 2 x 3 x 8 = 48 |
-| `bench_sort_one_faults` | `baseline` + spikes, drops, dups, reorder, disconnect, mixture | 4 x 7 x 8 = 224 |
+| `bench_main_spike` | the four conditions, the latency spike alone | 2 models x 4 x 8 = 64 |
+| `bench_main_drops` | the four conditions, the dropped replies alone | 64 |
+| `bench_main_outage` | the four conditions, the outage alone | 64 |
+| `bench_main_mix` | the four conditions, the whole fault mix (checks the bench against the robot) | 64 |
 
-In the `drtc_lab` container, one bench at a time:
+On the A100 (or in the H200 container), one bench at a time, about 20 minutes each:
 
 ```bash
-cd /workspace/drtc_major && . ./.server.env && git pull && uv sync --frozen --extra gpu --extra sim --python /usr/bin/python3
-tmux new -s bench                                                  # window 1: the servers
-.venv/bin/lab eval serve bench_sort_one_smoothing                  # wait for "all 4 ready"
+cd ~/drtc_major && git pull
+tmux new -s bench                                          # window 1: the servers
+.venv/bin/lab eval serve bench_main_spike                  # wait for "all 2 ready"
 # Ctrl-b c (a second window):
-.venv/bin/lab eval run bench_sort_one_smoothing --server local     # runs every trial by itself (~45 min)
-.venv/bin/lab eval report bench_sort_one_smoothing                 # → results/bench/bench_sort_one_smoothing/report.md
+.venv/bin/lab eval run bench_main_spike --server local     # runs every trial by itself; pushes at the end
 # back in window 1 (Ctrl-b p): Ctrl-C stops the servers; then the next bench
 ```
 
-`--server local` means the servers on this same machine. Detach with Ctrl-b d; the bench keeps running. On the laptop,
-`lab eval report bench_sort_one_smoothing --pull` fetches the results from the store.
+`--server local` means the servers on this same machine. Detach with Ctrl-b d; the bench keeps running. The script
+`~/drtc_major/logs/run_bench_main.sh` on the A100 runs all four in a row. On the laptop:
+`lab eval report bench_main_spike --pull` → `results/bench/bench_main_spike/report.md`. The bench evals are done
+(2026-11-20); run them again only after a change to the scheduler or the smoothing.
+
+## Offline evaluation (M9, M10)
+
+On a GPU server, no robot: each model predicts from the held-out episodes (M9, the action error) and is timed over
+200 requests (M10, inference time and GPU memory). A few minutes per model. Run it for every newly trained model:
+
+```bash
+# A100 (or the H200 container)
+cd ~/drtc_major && . ./.server.env && git pull
+tmux new -s offline '.venv/bin/lab eval offline --models act_cubebox_v1_full,diffusion_cubebox_v1_full; bash'
+```
+
+- `--models` scores the models at their current Hub commits; `lab eval offline <eval>` scores an eval's models at its
+  frozen commits.
+- The results go to `results/offline/<dataset>/<model>.json` and are pushed to the results store; on the laptop they
+  come with `lab eval report <any eval of that dataset> --pull`.
+- Not during a robot session on the same server (it would slow the session's model down).
+
+## The report and the slides
+
+- **Report (LaTeX)**, in `report/` on the laptop: every number, table and graph is made from the results.
+
+  ```bash
+  cd ~/Projects/drtc-major/report
+  make          # results -> report/generated/ -> report/report.pdf
+  make pdf      # only the PDF, after editing a chapter
+  ```
+
+  Pull the results first (`lab eval report <eval> --pull`). Title-page details: `report/config.tex`; photos:
+  `report/assets/` (list in `report/assets/README.md`). How to add things: [report/README.md](../report/README.md).
+- **Slides**: the deck https://claude.ai/artifact/JsUD9Vp56hRnTS5qU7VGcJ (its slide list and placeholders:
+  [REPORT.md](REPORT.md), section 12). Claude updates it from the same figures.
+
+---
 
 ## Mistakes and fixes
 
 | Situation | Do |
 |---|---|
-| Realised after a trial that the cube wasn't on its mark | `lab eval void sort_one_baseline <model> t05 --reason "cube off its mark"`, then `lab eval push sort_one_baseline` |
+| Realised after a trial that an object wasn't on its mark | `lab eval void cubebox_v0_baseline <model> t05 --reason "cube off its mark"` (add `--condition <name>` when the eval has several), then `lab eval push cubebox_v0_baseline` |
 | Want to try something without it counting | `--test` (a real session, kept in `results/scratch/`) or `--replay` (no arm movement) |
 | `the git tree has uncommitted changes` | commit and push first (official trials record the exact code), or ask Claude what changed |
 | `... changed since session ...` | the eval file was edited after trials started: undo the edit, or make a new eval |
+| `... is not frozen` | `lab eval freeze <eval>` on the laptop, commit, push, then `git pull` on the server and the robot computer |
 | `not served on a100: ...` | the server isn't running or is still loading: check its tmux window |
+| `ports in use` | that eval is already being served there: `tmux ls`, attach, Ctrl-C |
 | `cannot connect to a100` | the A100 isn't reachable from this network: use the H200 or the laptop GPU |
-| `rig check failed` | arms or cameras not found: `lab check --rig`, check USB and the phone camera |
-| `WARNING: push failed` | the session stays on this machine: `lab eval push sort_one_baseline` when online |
+| `rig check failed` | arms or cameras not found: `lab check --rig`, check USB, power and the phone camera (DroidCam open, USB debugging allowed) |
+| `WARNING: push failed` | the session stays on this machine: `lab eval push <eval>` when online |
+| A download from the results store stopped (network error) | run the same `--pull` again: it finishes the interrupted sessions |
+| H200: `git pull` says `Permission denied` | you ran it on the host: run it inside the container (`docker exec -it drtc_lab bash`) |
+| A100: `NVIDIA driver too old` | someone ran a plain `uv sync`: run `lab/bin/a100-setup`, then start the job again |
+| A training window closed by accident | `lab train <model> --resume` (it continues from the last checkpoint) |
 
-## What to know about latency (2026-11-20)
+## What to know about latency
 
-Measured from the laptop over WiFi to the A100, through the SSH tunnel: about **390-450 ms** turnaround for ACT, of
-which the model takes about 40 ms. Ping is 7 ms and the upload speed 42 Mbit/s, so it isn't simply bandwidth; the
-cause is still being looked into (lab/PLAN.md). On the laptop's own GPU it is about 36 ms. It's recorded in every
-trial (M4, M6), and reports never mix servers. Every model served from the same server gets the same network delay,
-but models with short chunks have the least room for it: on the replay robot over this link GR00T (16 actions =
-0.5 s) stalled 74% of the time, Diffusion 46%, while ACT (100) and SmolVLA (50) hardly stall. Expect GR00T to pause
-often when served from the A100 or H200 from this laptop.
+Measured 2026-11-20 (robot runs, `sort_one_drtc_main`): the round trip from the laptop to the A100 is **311 ms** for
+SmolVLA (53 ms of it on the GPU) and **452 ms** for GR00T N1.5 (194 ms). About **260 ms is the network**, mostly the two
+camera images sent uncompressed (2 x 800 x 600 x 3 bytes = 2.9 MB per request); on the laptop's own GPU the round
+trip is tens of ms. From the Pi the round trip roughly doubles (it goes over WiFi to the laptop's hotspot first). It's
+recorded in every trial (M4, M6), and reports never mix servers or robot computers.
+
+Models with short chunks have the least room for the delay: GR00T N1.5 (16 actions = 0.53 s) stalled 59% of the time
+on the normal network with the shipped client, while SmolVLA (50 actions) did not stall. Expect GR00T to pause often
+when served from the A100 or H200; the adaptive playback of condition 4 is what fixes that (24% stalls).
