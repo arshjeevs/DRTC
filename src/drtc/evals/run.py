@@ -194,19 +194,21 @@ def run_trial(reg: Registry, sp: S.EvalSpec, condition: str, model: str, number:
     faulted = outcome != "completed"
     if robot == "replay":
         success, label = None, ("fault" if faulted and first is not None else "replay")
+    elif faulted and first is not None:
+        # The system ended the run: `fault`, whatever key was pressed while the stopped arm returned home (2026-11-22;
+        # before, an `f` pressed then replaced it). The key is kept in `key`.
+        success, label = 0, "fault"
     elif keys.key == "s":
         success, label = 1, "s"
     elif keys.key == "f":
         success, label = 0, "f"
-    elif faulted and first is not None:
-        success, label = 0, "fault"
     elif outcome == "completed" and took >= sp.time_limit_s - 1.0:
         success, label = 0, "time_limit"
     else:
         success, label = None, "aborted"  # before the first action, or stopped by the operator: run again later
     info = {
         "eval": ctx["eval"], "session": session.name, "condition": condition, "model": model, "trial": number,
-        "round": rnd, "success": success, "label": label, "key_time_s": key_t,
+        "round": rnd, "success": success, "label": label, "key": keys.key, "key_time_s": key_t,
         "first_action_s": first, "time_to_success_s": (round(key_t - first, 3) if success == 1 and key_t is not None
                                                         and first is not None else None),
         "time_limit_s": sp.time_limit_s, "outcome": outcome, "error": error, "cadence_hz": cadence,

@@ -229,3 +229,18 @@ def test_patient_systems_never_end_a_run_on_a_lost_reply_and_shipped_keeps_lerob
                       Path("/tmp/x"), "d")
     assert not any(x.startswith("--inference.action_timeout_s") for x in cmd)
     assert "--inference.action_starvation_grace_s=1.0" in cmd
+
+
+def test_a_run_the_system_ended_is_a_fault_whatever_key_was_pressed():
+    from drtc.evals import store
+    from drtc.evals.metrics import trial_metrics
+
+    ended = {"outcome": "exit 1", "first_action_s": 0.4, "label": "f", "success": 0, "robot": "rig"}
+    assert store.ended_by_system(ended) and store.label_of(ended) == "fault"
+    assert not store.ended_by_system({"outcome": "exit 1", "first_action_s": None})  # before the first action: setup
+    assert store.label_of({"outcome": "completed", "first_action_s": 0.4, "label": "f"}) == "f"
+    import json, tempfile
+    d = Path(tempfile.mkdtemp())
+    (d / "trial.json").write_text(json.dumps(ended))
+    m = trial_metrics(d)
+    assert m["M1f_fault"] == 1 and m["M1_success"] == 0

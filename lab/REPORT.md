@@ -218,7 +218,7 @@ One more trial was not counted: the arm's motor bus was not found at the start (
 | Condition | SmolVLA | GR00T N1.5 |
 |---|---|---|
 | 1 baseline | 90% (60-98%), 0/10 | 70% (40-89%), 0/10 |
-| 2 baseline + faults | 0% (0-28%), 4/10 | 0% (0-28%), 9/10 |
+| 2 baseline + faults | 0% (0-28%), 10/10 | 0% (0-28%), 10/10 |
 | 3 DRTC + faults | 60% (31-83%), 0/10 | 80% (49-94%), 0/10 |
 | 4 DRTC + smoothing + faults | 80% (49-94%), 0/10 | 100% (72-100%), 0/10 |
 

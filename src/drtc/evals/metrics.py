@@ -48,8 +48,12 @@ def trial_metrics(tdir: Path, fps: float = 30.0) -> dict:
     """One value per metric for one trial (METRICS.md rule 4)."""
     tdir = Path(tdir)
     info = json.loads((tdir / "trial.json").read_text())
-    out: dict = {"M1_success": info.get("success"), "M1t_time_to_success_s": info.get("time_to_success_s"),
-                 "M1f_fault": 1 if info.get("label") == "fault" else 0}
+    from drtc.evals.store import ended_by_system
+
+    fault = ended_by_system(info)  # from the run's record, whatever key was pressed (2026-11-22)
+    out: dict = {"M1_success": 0 if fault and info.get("success") is not None else info.get("success"),
+                 "M1t_time_to_success_s": None if fault else info.get("time_to_success_s"),
+                 "M1f_fault": 1 if fault else 0}
     ticks_path = tdir / "ticks.csv"
     if ticks_path.is_file():
         rows = list(csv.DictReader(open(ticks_path)))

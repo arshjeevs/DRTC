@@ -37,7 +37,7 @@ def build(reg: Registry, name: str) -> Path:
         rows.append({"session": t.session, "machine": i.get("machine"), "server": i.get("server"),
                      "server_gpu": i.get("server_gpu"), "condition": t.condition, "model": t.model, "trial": t.number,
                      "round": i.get("round"), "valid": int(t.valid), "success": i.get("success"),
-                     "label": i.get("label"), "time_to_success_s": i.get("time_to_success_s"), "void": i.get("void"),
+                     "label": store.label_of(i), "time_to_success_s": i.get("time_to_success_s"), "void": i.get("void"),
                      "outcome": i.get("outcome"), "started_at": i.get("started_at"), "revision": i.get("revision"),
                      "git_commit": i.get("git_commit"), "path": str(t.path)})
         if t.valid:

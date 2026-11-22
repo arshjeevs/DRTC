@@ -20,6 +20,20 @@ PULLING = ".pulling"  # a pull of this session from the results store has not fi
 MIN_REPLAY_HZ = 27.0  # a replay trial whose control loop ran slower measures the wrong thing (30 Hz robot)
 
 
+def ended_by_system(info: dict) -> bool:
+    """The control system ended the run after the arm had started moving (a terminal fault: metrics v2, label `fault`).
+
+    Read from the run's own record (its outcome and first action), not from the operator's key: before 2026-11-22 a
+    key pressed while the stopped arm returned home (`f`) replaced the `fault` label (sort_one_drtc_main: 7 of the 20
+    trials that upstream ended were stored as `f`). The stored label is never rewritten; the reports use this."""
+    return info.get("outcome") not in (None, "completed") and info.get("first_action_s") is not None
+
+
+def label_of(info: dict) -> str | None:
+    """The trial's label as the reports count it: `fault` whenever the system ended the run (ended_by_system)."""
+    return "fault" if ended_by_system(info) else info.get("label")
+
+
 def eval_root(name: str, root: Path | None = None) -> Path:
     return (root or ROOT) / name
 
@@ -53,7 +67,7 @@ class Trial:
             return False
         if self.info.get("robot") == "replay":  # the model drove the arm (to the end, or until a fault: metrics v2),
             hz = self.info.get("cadence_hz")      # and the loop ran at ~30 Hz
-            ended = self.info.get("outcome") == "completed" or self.info.get("label") == "fault"
+            ended = self.info.get("outcome") == "completed" or ended_by_system(self.info)
             return ended and self.info.get("first_action_s") is not None and (hz is None or hz >= MIN_REPLAY_HZ)
         return self.info.get("success") in (0, 1)
 
