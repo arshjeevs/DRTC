@@ -154,7 +154,7 @@ Claim 1 = 2 against 1 (faults hurt) and 3 against 2 (DRTC recovers); claim 2 = 4
 
 **Rules.** 10 trials per condition, per model, per task (rounds, as before). A terminal fault after the arm has started
 moving counts as a failure (M1 = 0, label `fault`); a fault before the first action is a setup problem and is
-repeated. The report shows the fraction of trials ended by a fault. Metrics v2 ([METRICS.md](METRICS.md)).
+repeated. The report shows the fraction of trials ended by a fault. Metrics v2 then, v3 since 2026-11-22 ([METRICS.md](METRICS.md)).
 
 **Robot computer:** the laptop for every experiment; the Raspberry Pi is set up only after everything is complete. The
 presentation and report say the laptop was the robot computer.
@@ -171,5 +171,5 @@ presentation and report say the laptop was the robot computer.
 | 6 | Bench (each fault type separately, sort_one, SmolVLA + GR00T; **replaced by setup v2, E1-E3**) and offline M9/M10 for every model | bench: Claude; offline: the user (WORKFLOW.md, "The plan, step by step", step 6) | ▶ bench ✓ (4 benches x 64 runs, A100, 2026-11-20); offline M9/M10 ✓ for the 8 trained models (H200, 2026-11-20); the others as their trainings finish |
 | 7 | One report with all results | Claude | ▶ started 2026-11-20: the LaTeX report `report/` (built from the results, `make`) and the slides (REPORT.md section 12); extended as results come in |
 | 8 | If time: the DRTC experiment on cubebox v1 (on the robot; its bench is in setup v2) | the user | · optional |
-| 10 | **Setup v2** (top of this file): build, then E1 + E2, E3a, E3b on the bench (sort_one + cubebox v1, 5 models), then E4 on the robot | build: Claude; bench: where and when the user decides; E4: the user | ▶ locked 2026-11-22; build next |
+| 10 | **Setup v2** (top of this file): build, then E1 + E2, E3a, E3b on the bench (sort_one + cubebox v1, 5 models), then E4 on the robot | build: Claude; bench: where and when the user decides; E4: the user | ▶ locked and built 2026-11-22, with the eval setup (metrics v3: the fault label from the run, jerk while moving, M11 recovery, M12 deviation from the plan, primary comparisons with Holm, the stack rule `python -m drtc.evals.stack`); next: freeze and run the bench (where and when: the user) |
 | 9 | The Raspberry Pi setup | Claude | ✓ set up and tested 2026-11-20 (moved earlier, the user's call): `lab/bin/pi-setup`, calibration from the laptop, the Pi's key on the A100; a test trial ran (29.4-29.9 Hz, round trip ~2x the laptop's). Official trials stay on the laptop unless decided otherwise |

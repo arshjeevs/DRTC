@@ -28,7 +28,7 @@ current as results come in. The plan and its status: [PLAN.md](PLAN.md).*
   | + faults, with DRTC | **60%** (p = 0.011 against faults) | **80%** (p = 0.001) |
   | + faults, DRTC + smoothing | 80% | 100% |
 
-  Smoothing cut the jerk of the motion about 5x (SmolVLA, 41.7 to 8.5) and 7.5x (GR00T, 43.2 to 5.8), p < 0.001,
+  Smoothing cut the jerk of the motion about 5x (SmolVLA, 43.9 to 9.2) and 11x (GR00T, 67.9 to 6.3), p < 0.001 (metrics v3),
   and GR00T's time without new actions from 65% to 24% of the trial.
 
 ## 2. Problem and motivation
@@ -190,7 +190,7 @@ Current status of every training: [PLAN.md](PLAN.md), "Trainings".
   them). A fault before the first action is a setup problem and the trial is repeated.
 - A trial is voided only for a setup mistake, never for a model's failure; voided trials are listed in the report.
 
-### 8.4 Metrics (full definitions: [METRICS.md](METRICS.md), v2)
+### 8.4 Metrics (full definitions: [METRICS.md](METRICS.md), v3 since 2026-11-22)
 
 | # | Metric | In one line |
 |---|---|---|
@@ -200,16 +200,19 @@ Current status of every training: [PLAN.md](PLAN.md), "Trainings".
 | M4 | turnaround | time from sending an observation to receiving its chunk (median, 95th percentile) |
 | M5 | latency estimate error | the scheduler's estimate minus the measured turnaround |
 | M6 | server inference time | the server's own time per chunk; M4 - M6 = network + queueing |
-| M7 | jerk | RMS of the third derivative of the commanded arm joints (lower = smoother) |
+| M7 | jerk | RMS of the third derivative of the commanded arm joints while the arm moves (lower = smoother) |
 | M8a, M8b | chunk switch disagreement; largest step | the jump between chunks; the largest change between two ticks |
 | M9 | held-out action error | offline: mean absolute error of the first 15 predicted actions on held-out episodes |
 | M10 | inference time, GPU memory | offline: 200 requests per model, per GPU |
+| M11 | recovery time (v3) | per fault: from its end until the arm moves again; or "not recovered" |
+| M12 | deviation from the plan (v3) | how far smoothing moves the arm off the model's own actions (from 2026-11-22 trials on) |
 
 ## 9. Results
 
 ### 9.1 The DRTC experiment (main result)
 
-`sort_one_drtc_main`, 2026-11-20: 2 models x 4 conditions x 10 trials = 80 valid trials, laptop -> A100, metrics v2.
+`sort_one_drtc_main`, 2026-11-20: 2 models x 4 conditions x 10 trials = 80 valid trials, laptop -> A100, metrics v2 at the time; every number
+below is recomputed with v3 (2026-11-22) from the raw files.
 One more trial was not counted: the arm's motor bus was not found at the start (a setup problem). Source:
 `results/evals/sort_one_drtc_main/report.md`.
 
@@ -235,26 +238,42 @@ One more trial was not counted: the arm's motor bus was not found at the start (
 
 | Condition | Model | M2 stall | M3 longest stall | M4 turnaround (median / p95) | M6 inference | M7 jerk | M8b largest step | M1t time to success |
 |---|---|---|---|---|---|---|---|---|
-| 1 baseline | SmolVLA | 0.0% | 0.00 s | 311 / 315 ms | 53 ms | 66.8 | 15.1 deg | 5.8 s |
-| 2 + faults | SmolVLA | 28.2% | 1.11 s | 313 / 315 ms | 53 ms | 29.1 | 4.2 deg | - |
-| 3 DRTC + faults | SmolVLA | 11.4% | 0.64 s | 311 / 314 ms | 53 ms | 41.7 | 7.0 deg | 6.8 s |
-| 4 DRTC + smoothing + faults | SmolVLA | 14.6% | 0.74 s | 311 / 317 ms | 53 ms | **8.5** | 4.4 deg | 7.5 s |
-| 1 baseline | GR00T N1.5 | 58.7% | 0.89 s | 452 / 469 ms | 194 ms | 52.4 | 15.1 deg | 14.6 s |
-| 2 + faults | GR00T N1.5 | 65.7% | 1.34 s | 452 / 457 ms | 193 ms | 39.5 | 8.8 deg | - |
-| 3 DRTC + faults | GR00T N1.5 | 64.7% | 2.78 s | 454 / 736 ms | 195 ms | 43.2 | 14.0 deg | 16.3 s |
-| 4 DRTC + smoothing + faults | GR00T N1.5 | **23.8%** | 1.64 s | 455 / 475 ms | 196 ms | **5.8** | 6.2 deg | 17.4 s |
+| 1 baseline | SmolVLA | 0.0% | 0.00 s | 311 / 315 ms | 53 ms | 66.9 | 15.1 deg | 5.8 s |
+| 2 + faults | SmolVLA | 28.2% | 1.11 s | 313 / 315 ms | 53 ms | 34.1 | 4.2 deg | - |
+| 3 DRTC + faults | SmolVLA | 11.4% | 0.64 s | 311 / 314 ms | 53 ms | 43.9 | 7.0 deg | 6.8 s |
+| 4 DRTC + smoothing + faults | SmolVLA | 14.6% | 0.74 s | 311 / 317 ms | 53 ms | **9.2** | 4.4 deg | 7.5 s |
+| 1 baseline | GR00T N1.5 | 58.7% | 0.89 s | 452 / 469 ms | 194 ms | 75.8 | 15.1 deg | 14.6 s |
+| 2 + faults | GR00T N1.5 | 65.7% | 1.34 s | 452 / 457 ms | 193 ms | 65.0 | 8.8 deg | - |
+| 3 DRTC + faults | GR00T N1.5 | 64.7% | 2.78 s | 454 / 736 ms | 195 ms | 67.9 | 14.0 deg | 16.3 s |
+| 4 DRTC + smoothing + faults | GR00T N1.5 | **23.8%** | 1.64 s | 455 / 475 ms | 196 ms | **6.3** | 6.2 deg | 17.4 s |
 
-**Smoothing (4 against 3, Mann-Whitney):** jerk SmolVLA 41.7 -> 8.5 (p < 0.001), GR00T 43.2 -> 5.8 (p < 0.001);
+**Smoothing (4 against 3, Mann-Whitney):** jerk SmolVLA 43.9 -> 9.2 (p < 0.001), GR00T 67.9 -> 6.3 (p < 0.001);
 largest step SmolVLA 7.0 -> 4.4 deg (p = 0.002), GR00T 14.0 -> 6.2 deg (p = 0.001); GR00T stall 64.7% -> 23.8%
 (p < 0.001), longest stall 2.78 -> 1.64 s (p = 0.005). Against the fault-free baseline, condition 4 is smoother
-too: jerk SmolVLA 66.8 -> 8.5, GR00T 52.4 -> 5.8 (both p < 0.001).
+too: jerk SmolVLA 66.9 -> 9.2, GR00T 75.8 -> 6.3 (both p < 0.001). Jerk is metrics v3 (only while the arm moves,
+2026-11-22); under v2 GR00T's long holds had lowered its jerk (e.g. condition 3: 43.2 in v2, 67.9 in v3).
+
+**Recovery (M11, v3), from the end of each fault until the arm moves again** (recovered / counted; median of the
+recovered; a run that success ended before a fault ended is not counted for it):
+
+| Condition | Model | spike | drops | outage |
+|---|---|---|---|---|
+| 2 + faults | SmolVLA | 0/10 | 0/10 | 0/10 |
+| 2 + faults | GR00T N1.5 | 0/10 | 0/10 | 0/10 |
+| 3 DRTC + faults | SmolVLA | 10/10, 0.95 s | 8/8, 0 s | 2/2, 0.50 s |
+| 3 DRTC + faults | GR00T N1.5 | 10/10, 0.42 s | 10/10, 0.66 s | 9/9, 1.45 s |
+| 4 DRTC + smoothing + faults | SmolVLA | 10/10, 0.95 s | 10/10, 0 s | 6/6, 0.62 s |
+| 4 DRTC + smoothing + faults | GR00T N1.5 | 10/10, 0.69 s | 10/10, 0.49 s | 10/10, 0.65 s |
+
+Upstream as shipped never recovered: its first fault ended every run. DRTC recovered from every fault in every
+counted run; with smoothing, GR00T's outage recovery fell from 1.45 to 0.65 s.
 
 **What the numbers say (for the discussion):**
 - GR00T stalls 59% of the time **even without faults**: its chunk (16 actions, 0.53 s) is barely longer than a round
   trip (0.45 s), so the queue empties before the next chunk is ready. Adaptive playback slows down instead of
   stopping, which is why it helps GR00T most (65% -> 24%).
-- The low jerk of condition 2 is not smoothness: in those runs the arm stood still for long stretches or the run
-  ended early (the system gave up), so there was less motion to measure.
+- The lower jerk of condition 2 is not smoothness: those runs ended early (the system gave up), so there was less
+  motion to measure. (v3 already leaves out the time the arm stood still.)
 - Under faults with DRTC, GR00T's slow replies show in the 95th percentile turnaround (736 ms) and in a latency
   overestimate (M5 +132 ms); with smoothing both return to normal (475 ms, +18 ms).
 - The turnaround is ~260 ms longer than the inference for both models: the network share, mostly the 2.9 MB of
@@ -276,18 +295,18 @@ drops, outage) and the whole mix. 2 models x 4 conditions x 8 trials per fault t
 success). Run on the A100, 2026-11-20; source: `results/bench/bench_main_{spike,drops,outage,mix}/report.md`.
 
 Conditions as in 8.1 (1 baseline, 2 baseline + fault, 3 DRTC + fault, 4 DRTC + smoothing + fault); medians over
-8 runs; jerk in 10^3 deg/s^3:
+8 runs; jerk in 10^3 deg/s^3 (metrics v3: only while the arm moves):
 
 | Fault alone | Model | Ended by a fault (2 / 3 / 4) | Stall % (1 / 2 / 3 / 4) | Jerk (1 / 2 / 3 / 4) |
 |---|---|---|---|---|
-| Latency spike | SmolVLA | 8/8 / 0/8 / 0/8 | 0.0 / 26.9 / 7.1 / 7.5 | 54.1 / 30.1 / 78.7 / 11.5 |
-| Latency spike | GR00T N1.5 | 8/8 / 0/8 / 0/8 | 52.2 / 60.3 / 54.9 / 15.8 | 158.2 / 97.3 / 113.6 / 19.2 |
-| Dropped replies | SmolVLA | 8/8 / 0/8 / 0/8 | 0.0 / 20.8 / 4.5 / 4.3 | 53.3 / 35.8 / 66.3 / 14.9 |
-| Dropped replies | GR00T N1.5 | 7/8 / 0/8 / 0/8 | 52.0 / 56.3 / 55.5 / 22.7 | 154.5 / 111.7 / 97.4 / 19.6 |
-| Outage | SmolVLA | 8/8 / 0/8 / 0/8 | 0.0 / 14.2 / 9.1 / 8.7 | 55.3 / 53.1 / 79.1 / 12.6 |
-| Outage | GR00T N1.5 | 8/8 / 0/8 / 0/8 | 51.6 / 54.7 / 55.1 / 22.5 | 132.6 / 119.3 / 191.7 / 22.2 |
-| The whole mix | SmolVLA | 8/8 / 0/8 / 0/8 | 0.0 / 26.7 / 20.6 / 19.5 | 54.6 / 36.0 / 47.7 / 17.5 |
-| The whole mix | GR00T N1.5 | 8/8 / 0/8 / 0/8 | 52.0 / 63.0 / 66.0 / 46.4 | 158.3 / 74.4 / 188.8 / 16.1 |
+| Latency spike | SmolVLA | 8/8 / 0/8 / 0/8 | 0.0 / 26.9 / 7.1 / 7.5 | 54.1 / 35.0 / 81.3 / 12.0 |
+| Latency spike | GR00T N1.5 | 8/8 / 0/8 / 0/8 | 52.2 / 60.3 / 54.9 / 15.8 | 212.1 / 149.8 / 156.8 / 20.9 |
+| Dropped replies | SmolVLA | 8/8 / 0/8 / 0/8 | 0.0 / 20.8 / 4.5 / 4.3 | 53.3 / 39.9 / 67.5 / 15.1 |
+| Dropped replies | GR00T N1.5 | 7/8 / 0/8 / 0/8 | 52.0 / 56.3 / 55.5 / 22.7 | 202.7 / 157.1 / 127.8 / 21.0 |
+| Outage | SmolVLA | 8/8 / 0/8 / 0/8 | 0.0 / 14.2 / 9.1 / 8.7 | 55.3 / 57.1 / 82.6 / 13.1 |
+| Outage | GR00T N1.5 | 8/8 / 0/8 / 0/8 | 51.6 / 54.7 / 55.1 / 22.5 | 173.5 / 163.7 / 270.6 / 24.7 |
+| The whole mix | SmolVLA | 8/8 / 0/8 / 0/8 | 0.0 / 26.7 / 20.6 / 19.5 | 54.6 / 41.8 / 52.5 / 19.5 |
+| The whole mix | GR00T N1.5 | 8/8 / 0/8 / 0/8 | 52.0 / 63.0 / 66.0 / 46.4 | 210.0 / 109.0 / 315.6 / 23.0 |
 
 **What it shows:** each fault alone, even one 1-second latency spike, is enough for the shipped client to end the run
 (7-8 of 8); under DRTC no run is ended by any fault type; smoothing gives the lowest jerk under every fault type, for
@@ -390,7 +409,7 @@ ones and points the slides at them.
 | 9 | design | the four conditions in the figures' colours; 80 trials | |
 | 10 | success | figure: success per condition; 0% -> 60% / 80% | |
 | 11 | videos | the same faults, three ways | videos: conditions 2, 3, 4 |
-| 12 | motion | figure: jerk; 5-7.5x smoother; GR00T stalls 65% -> 24% | |
+| 12 | motion | figure: jerk; 5-11x smoother; GR00T stalls 65% -> 24% | |
 | 13 | timeline | figure: one trial per condition over time | |
 | 14 | bench | figure: each fault alone; 8 of 8 vs 0 of 8 | |
 | 15 | offline | figure: M9/M10; baselines in progress | (the baselines, when run) |

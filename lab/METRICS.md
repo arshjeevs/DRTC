@@ -1,7 +1,8 @@
-# Metrics v2
+# Metrics v3
 
-**Fixed on 2026-11-20 with the user (v1), revised the same day for the locked scope (v2, see Changes).** Every
-official result and the final presentation use these definitions. A change makes a new version (v2): the definitions here stay as they are, the change and its date are
+**Fixed on 2026-11-20 with the user (v1), revised the same day for the locked scope (v2), and on 2026-11-22 for setup
+v2 (v3, see Changes).** Every official result and the final presentation use these definitions. A change makes a new
+version: the definitions here stay as they are, the change and its date are
 added below, and `lab eval report` recomputes every trial from its raw files, so old and new results stay comparable.
 
 Where the data comes from: [EVALUATION.md](docs/EVALUATION.md) (one folder per trial; raw files never edited).
@@ -25,7 +26,7 @@ Where the data comes from: [EVALUATION.md](docs/EVALUATION.md) (one folder per t
 | # | Metric | Definition | Per trial | Across trials |
 |---|---|---|---|---|
 | M1 | **Success rate** | The operator presses the success key before the time limit, and the result meets the task's written success rule (in the eval file, fixed before the first trial). A failure key, the time limit, or a **terminal fault after the first action** (the system stopped the arm; label `fault`) is a failure. A fault before the first action is a setup problem: the trial is not counted and is run again. | 1 or 0 | successes / valid trials, with a Wilson 95% interval |
-| M1f | **Ended by a fault** | Trials that a terminal fault ended after the first action (they count as failures in M1). | 1 or 0 | fraction of valid trials |
+| M1f | **Ended by a fault** | Trials that a terminal fault ended after the first action (they count as failures in M1). Read from the run's own record (its outcome and first action), whatever key the operator pressed (v3). | 1 or 0 | fraction of valid trials |
 | M1t | **Time to success** | Seconds from the first action to the success key press. | seconds (successful trials only) | median and interquartile range |
 
 ## Network and timing (headline for Phase 8)
@@ -42,9 +43,16 @@ Where the data comes from: [EVALUATION.md](docs/EVALUATION.md) (one folder per t
 
 | # | Metric | Definition | Per trial | Across trials |
 |---|---|---|---|---|
-| M7 | **Jerk** | The commanded arm-joint positions on the 30 Hz tick grid (held through stalls), third finite difference x 30^3, root mean square over the five arm joints and all ticks after the first action. Lower is smoother. | 10^3 deg/s^3 | median, IQR |
+| M7 | **Jerk** | The commanded arm-joint positions on the 30 Hz tick grid (held through stalls), third finite difference x 30^3, root mean square over the five arm joints and **the samples while the arm moves** (v3: a sample spans 4 ticks and counts when at least one of them executed a new action, so stops and restarts count and a long hold does not). Lower is smoother. | 10^3 deg/s^3 | median, IQR |
 | M8a | **Chunk switch disagreement** | At every switch to a new chunk: over the steps both the old and the new chunk cover (the overlap), the mean Euclidean distance between their arm-joint actions (DRTC's `chunk_mean_l2`). | median over switches, deg | median, IQR |
 | M8b | **Largest step** | The largest change of any arm joint between two consecutive commanded positions. | deg | median, IQR |
+| M12 | **Deviation from the plan** (v3) | On every executed tick: the mean over the five arm joints of \|commanded position - the model's own action for that step\| (the newest accepted chunk's raw action, before ensembling, zero-lag smoothing, the ramp or a filter; `plan.*` in `ticks.csv`). How far smoothing moves the arm off what the model asked for; 0 without smoothing. | deg | median, IQR |
+
+## Recovery (v3)
+
+| # | Metric | Definition | Per trial | Reported |
+|---|---|---|---|---|
+| M11 | **Recovery time** | For each timed fault (spike: until its delayed reply is released; drops, outage, rise: until the window ends; times include the trial's shift): seconds from the fault's end until the arm moves again, i.e. the end of the first stall still going at that moment or starting up to 1 s after it (0 when there is none). **Not recovered** when the arm never moves again, or the system ended the run before the fault ended. Not counted for that fault when the operator's key or success ended the run first. `loss` has no end and no M11. | seconds, or not recovered, per fault | recovered / counted; median [IQR] of the recovered |
 
 ## Without the robot
 
@@ -65,13 +73,34 @@ Where the data comes from: [EVALUATION.md](docs/EVALUATION.md) (one folder per t
 4. **One value per trial first:** every metric is reduced to one value per trial (column "Per trial"), then
    summarised over trials, so a long trial does not weigh more than a short one.
 5. **Comparisons:** an improvement is always the same model on the same task, inside the same eval (sessions
-   interleaved), against that eval's baseline condition. Differences are tested with Fisher's exact test (M1) and the
+   interleaved). Each eval names its comparisons (`comparisons:`, "<condition> vs <reference>"; older evals: every
+   condition against the first and each against the one before). Differences use Fisher's exact test (M1) and the
    Mann-Whitney U test (the others); p-values are reported, and the intervals shown.
 6. **Grouping:** a report never averages over different robot computers (laptop, Pi) or servers (laptop GPU, A100,
    H200): when an eval has several, the timing metrics (M2-M6) are shown per robot computer and server.
-7. **Replay robot (bench):** M2-M8 only. M1 needs the real robot.
+7. **Primary comparisons (v3):** each eval names the few comparisons it tests (`primary:`), before its runs. Their
+   metrics: M1 on the robot; on the bench M2 and the M11 of the condition's own faults (a run that never moved again
+   ranks last). Their p-values are Holm-corrected over all primary tests of the eval, and the report counts in how
+   many models the condition is better. Every other comparison is exploratory: effect and uncorrected p-value, marked
+   as such. Setup v2: the bench's primary comparisons are DRTC against upstream (patient) per fault; E4's are its
+   three claims (faults hurt, DRTC recovers, smoothing).
+8. **Replay robot (bench):** M2-M8, M11, M12. M1 needs the real robot.
+9. **The smoothing stack (setup v2):** chosen from the E3a bench by `python -m drtc.evals.stack` (rule in its
+   docstring and lab/PLAN.md): per pair, candidates are ruled out if they add > 1 deg of M12 or raise M2 or any M11
+   by > 10% (floors 0.5 percentage points, 0.05 s) against DRTC alone in their own eval; of the rest, the lower jerk
+   relative to that reference wins; the candidate winning more pairs is chosen.
 
 ## Changes
+
+**v3 (2026-11-22, setup v2, lab/PLAN.md; each item decided with the user):**
+- M1f and the `fault` label: from the run's own record, whatever key was pressed. Before, an `f` pressed while the
+  stopped arm returned home replaced `fault` (sort_one_drtc_main: 7 of 20 such trials; M1f was 4/10 and 9/10, is
+  10/10 and 10/10). New trials store the key separately (`key`); no trial file was rewritten.
+- M7: only while the arm moves. A long hold has zero jerk, so a system that stalled more looked smoother.
+- New M11 (recovery time per fault) and M12 (deviation from the model's plan; needs `plan.*` in `ticks.csv`, logged
+  from 2026-11-22, so older trials have no M12).
+- Rules 5, 7, 9: declared comparisons, primary comparisons with Holm, the stack rule.
+- Every report is rebuilt with v3 from the raw files (`lab eval report`), including the evals made under v2.
 
 **v2 (2026-11-20, the locked scope, lab/PLAN.md):**
 - M1: a terminal fault after the first action is a failure (v1: such trials were not counted and run again). Under

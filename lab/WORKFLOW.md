@@ -156,14 +156,31 @@ lab eval status bench_v2_drtc_sort_one                     # runs done per condi
 lab eval report bench_v2_drtc_sort_one --pull              # results/bench/bench_v2_drtc_sort_one/report.md
 ```
 
+What the report holds (metrics v3, [METRICS.md](METRICS.md)): success and timing tables, **Recovery (M11)** per
+fault, **Primary comparisons** (DRTC against upstream (patient) per fault: tested, Holm-corrected, and how many models
+DRTC is better in), then every other comparison of the eval, marked exploratory.
+
 Tell Claude when an eval is done: the results go into REPORT.md and the report.
 
 ### V3. The final smoothing stack (after V2)
 
-Claude applies the selection rule (fixed in the eval setup, before V2 runs) to the V2 results, then writes the
-stack's conditions with `.venv/bin/python lab/experiments/v2/_make.py --stack <methods>` and the evals
-`bench_v2_stack_<dataset>` (E3b) and `sort_one_drtc_v2` (E4). Then V0 (check, freeze, commit) for them, V4 on a GPU
-server, and V5 on the robot.
+The rule was fixed before V2 ran (METRICS.md v3, rule 9; `src/drtc/evals/stack.py`). On the laptop, once the four
+V2 evals are done and pulled:
+
+```bash
+for e in bench_v2_smooth_sort_one bench_v2_smooth_cubebox_v1 bench_v2_smooth_rtc_sort_one bench_v2_smooth_rtc_cubebox_v1; do
+  lab eval report $e --pull
+done
+.venv/bin/python -m drtc.evals.stack
+```
+
+It prints, per model and dataset, each candidate's jerk relative to DRTC alone (or why a guard ruled it out), the
+pairs each one won, and the final stack with the next command, e.g.
+`.venv/bin/python lab/experiments/v2/_make.py --stack adaptive,rtc,zero_lag,ramp`. Run that command **with
+`--evals`** added: it writes the stack's conditions, the E3b evals (`bench_v2_stack_<dataset>`, and
+`bench_v2_stack_nortc_<dataset>` for ACT, Diffusion and GR00T N1.7 when the stack has RTC) and E4
+(`sort_one_drtc_v2`). Then `lab eval check` each, commit, and V0 (freeze), V4 (bench) and V5 (robot). Claude can do
+V3 for you: send it the output of the stack command.
 
 ### V5. The robot run (E4) and the baselines
 

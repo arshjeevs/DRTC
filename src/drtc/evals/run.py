@@ -35,7 +35,7 @@ from drtc.evals import serving, store, sync
 from drtc.evals import spec as S
 from drtc.registry import Registry, RegistryError
 
-METRICS_VERSION = "v2"
+METRICS_VERSION = "v3"
 
 
 # --- keys during a trial ----------------------------------------------------------------------------------------------
