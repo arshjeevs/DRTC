@@ -52,6 +52,15 @@ faults; 2 upstream patient + mix; 3 DRTC + mix; 4 DRTC + the final stack + mix. 
 (faults hurt even when waiting), 3 against 2 (DRTC's scheduling beats waiting), 4 against 3 (smoothing). The DRTC
 robot run on cubebox v1 stays optional.
 
+**Build (2026-11-22, commit 779d5b95 and after)**: conditions generated in `lab/experiments/v2/` and `v2_robot/`
+(`_make.py`); bench evals `bench_v2_drtc_<dataset>` (E1 + E2 in one eval, 52 conditions), `bench_v2_smooth_<dataset>`
+(E3a), `bench_v2_smooth_rtc_<dataset>` (E3a's RTC cell: SmolVLA + GR00T N1.5); E3b and E4 are written once the stack
+is chosen. Bench runs are 14 s (the latest fault ends at 11.5 s with the shift). Local check on the laptop's replay
+robot (ACT, SmolVLA): every fault, the shift, the ablations and the smoothing methods work. Found: GR00T N1.7 gets no
+RTC cell (relative actions: LeRobot turns its RTC prefix off); upstream (patient) still ends a run when a reply is
+lost, after its 5 s request deadline, because it never re-sends (what DRTC's cooldown adds); the first RTC request
+after a server start compiles for > 5 s, so RTC evals get one test round first (WORKFLOW).
+
 **Robot evals: core and how they grow** (locked 2026-11-22). Core, 10 trials per condition (~1 min per trial with
 the reset, ~3 h): E4 above (80 trials; waits for the final stack); the baselines `sort_one_baseline` and
 `cubebox_v1_baseline` for SmolVLA, GR00T N1.5, GR00T N1.7, ACT, Diffusion (50 + 50 trials; condition: upstream

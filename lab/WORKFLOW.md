@@ -179,6 +179,11 @@ sort_one_drtc_v2`), then on the laptop `lab eval servers sort_one_drtc_v2 --serv
   the bench: replacing a lost reply is what DRTC's cooldown adds (ablation A1 shows it).
 - GR00T N1.7 has no RTC cell: our N1.7 models are trained with relative actions, and LeRobot turns the RTC prefix
   off for those.
+- **RTC evals: warm up first.** The first real RTC request after a server starts compiles the RTC path and took
+  over 5 s on the laptop; the server then drops the session (`Policy operation deadline exceeded`) and that trial
+  ends as a fault. The next ones ran normally (0.23 s per chunk). So for `bench_v2_smooth_rtc_<dataset>` (and any
+  eval with an RTC condition), right after `lab eval serve`, run one test round first, then the official session:
+  `.venv/bin/lab eval run bench_v2_smooth_rtc_sort_one --server local --test --max-trials 4`.
 
 ## Step 6: offline evaluation of each new model
 
