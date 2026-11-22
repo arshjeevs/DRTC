@@ -1,17 +1,21 @@
 \chapter{Results}\label{ch:results}
 
-\section{The \drtc{} experiment}\label{sec:main}
+This chapter gives every result so far. The first robot run and its benches are complete; the setup~v2 experiments
+and the baselines are being run, and their sections fill in as their results arrive (until then they read
+\pending). Every number is computed with metrics version~3 from the raw files of the trials.
 
-The main experiment ran \smolvla{} and \groot{} on the sorting task under the four conditions: \R{main/n} valid trials
-in \R{main/sessions} sessions. One further trial was not counted, because the arm's motor bus was not found when it
+\section{The first run}\label{sec:main}
+
+The first run (Section~\ref{sec:firstrun}) ran \smolvla{} and \groot{} on the sorting task under four conditions:
+\R{main/n} valid trials in \R{main/sessions} sessions. One further trial was not counted, because the arm's motor bus was not found when it
 started (a setup fault before the first action). Figure~\ref{fig:success} and Table~\ref{tab:success} give the task
 success.
 
 \begin{figure}[htbp]
   \centering
   \genfigure{fig_main_success}
-  \caption{Task success per condition, with Wilson 95\% intervals (10 trials per bar). Conditions: 1~baseline,
-           2~baseline with faults, 3~\drtc{} with faults, 4~\drtc{} with smoothing and faults.}
+  \caption{The first run: task success per condition, with Wilson 95\% intervals (10 trials per bar). Conditions:
+           1~baseline, 2~baseline with faults, 3~\drtc{} with faults, 4~\drtc{} with smoothing and faults.}
   \label{fig:success}
 \end{figure}
 
@@ -29,8 +33,11 @@ success.
 
 Under the fault mix, neither policy completed a single trial: \smolvla's success fell from \R{main/smolvla/baseline/M1}
 to \R{main/smolvla/faults/M1} (\R{main/smolvla/p/baseline-faults/M1}) and \groot's from \R{main/groot/baseline/M1} to
-\R{main/groot/faults/M1} (\R{main/groot/p/baseline-faults/M1}). The shipped client ended \R{main/smolvla/faults/M1f}
-of \smolvla's and \R{main/groot/faults/M1f} of \groot's trials with a terminal fault; the other trials failed as well.
+\R{main/groot/faults/M1} (\R{main/groot/p/baseline-faults/M1}). The shipped client itself ended
+\R{main/smolvla/faults/M1f} of \smolvla's and \R{main/groot/faults/M1f} of \groot's trials, every one of them at the
+first fault, the latency spike: the queue ran dry, the late reply was discarded, and one second later the starvation
+grace ended the run. The dropped replies and the outage were never reached. This is what led to the redesign
+(Section~\ref{sec:redesign}).
 
 
 \subsection{\drtc{} recovers task success}
@@ -38,7 +45,8 @@ of \smolvla's and \R{main/groot/faults/M1f} of \groot's trials with a terminal f
 With \drtc{} under the same faults, success was \R{main/smolvla/drtc/M1} for \smolvla{}
 (\R{main/smolvla/p/faults-drtc/M1} against the faulted baseline) and \R{main/groot/drtc/M1} for \groot{}
 (\R{main/groot/p/faults-drtc/M1}), and no trial was ended by a fault (\R{main/smolvla/drtc/M1f} and
-\R{main/groot/drtc/M1f}). Against the fault-free baseline the difference is not significant at this sample size
+\R{main/groot/drtc/M1f}). This recovery is measured against a client that gave up by design; setup~v2 compares \drtc{}
+with a client that waits instead (Section~\ref{sec:v2robot}). Against the fault-free baseline the difference is not significant at this sample size
 (\smolvla: \R{main/smolvla/drtc/M1} against \R{main/smolvla/baseline/M1}, \R{main/smolvla/p/baseline-drtc/M1};
 \groot: \R{main/groot/drtc/M1} against \R{main/groot/baseline/M1}, \R{main/groot/p/baseline-drtc/M1}).
 
@@ -80,6 +88,26 @@ Table~\ref{tab:tests} collects these comparisons.
   \end{adjustbox}
 \end{table}
 
+\subsection{Recovery after each fault}
+
+Table~\ref{tab:mainrecovery} gives the recovery time (M11) after each fault of the mix. The shipped client never
+recovered: its first fault ended every run. \drtc{} recovered from every fault in every counted run, typically within
+half a second to a second and a half; for \smolvla{} the dropped replies did not even stop the arm (0~s), because its
+earlier trigger left enough actions in the queue. With smoothing, \groot's recovery from the outage fell from
+\R{main/groot/drtc/M11/outage} to \R{main/groot/smooth/M11/outage}. Fewer runs are counted for the outage, because
+\smolvla{} often completed the task before the outage ended.
+
+\begin{table}[htbp]
+  \centering
+  \caption{The first run: recovery after each fault of the mix (recovered runs out of the counted ones, and the median
+           time from the end of the fault until the arm moved again).}
+  \label{tab:mainrecovery}
+  \small
+  \begin{adjustbox}{max width=\textwidth}
+  \gentable{tab_main_recovery}
+  \end{adjustbox}
+\end{table}
+
 \subsection{Behaviour over time}
 
 Figure~\ref{fig:timeline} follows one \smolvla{} trial per condition, chosen as the trial with the median jerk of its
@@ -108,7 +136,7 @@ turnaround by \R{main/groot/drtc/M5}; with smoothing they were \R{main/groot/smo
 
 \begin{table}[htbp]
   \centering
-  \caption{Timing and smoothness, medians over trials. Condition numbers as in Table~\ref{tab:conditions}.}
+  \caption{Timing and smoothness, medians over trials. Condition numbers as in Table~\ref{tab:conditions1}.}
   \label{tab:motion}
   \small
   \begin{adjustbox}{max width=\textwidth}
@@ -116,7 +144,7 @@ turnaround by \R{main/groot/drtc/M5}; with smoothing they were \R{main/groot/smo
   \end{adjustbox}
 \end{table}
 
-\section{Each fault on its own: the bench}\label{sec:bench}
+\section{The first benches: each fault on its own}\label{sec:bench}
 
 On the replay robot, each fault of the mix was applied alone and together, with the network latency simulated as
 measured on the robot (250~ms $\pm$ 20~ms on every reply), for both policies and all four conditions (8 runs each;
@@ -127,7 +155,8 @@ a fault in any fault type (for example \R{bench/mix/smolvla/drtc/M1f} and \R{ben
 mix). Smoothing lowered the jerk under every fault type, for example under the mix from \R{bench/mix/smolvla/drtc/M7}
 to \R{bench/mix/smolvla/smooth/M7} for \smolvla{} and from \R{bench/mix/groot/drtc/M7} to
 \R{bench/mix/groot/smooth/M7} for \groot. The bench reproduces the robot's pattern, which supports reading the robot
-results as an effect of the scheduling rather than of the particular sessions.
+results as an effect of the scheduling rather than of the particular sessions. These benches compared the same four
+conditions as the first run, so they share its limitation: the faulted baseline gave up by design.
 
 \begin{figure}[htbp]
   \centering
@@ -150,13 +179,14 @@ results as an effect of the scheduling rather than of the particular sessions.
 \section{Offline evaluation of the policies}\label{sec:offline}
 
 Table~\ref{tab:offline} and Figure~\ref{fig:offline} give the held-out action error (M9) and the inference cost (M10)
-of the trained policies, measured on the \R{offline/gpu} while two training jobs shared it, which is how a shared
-server is used in practice. On sorting, \smolvla{} had the lowest arm error (\R{offline/sortone/smolvla/M9arm}\degree),
+of the trained policies, measured on the \R{offline/gpu} while training jobs shared it, which is how a shared server
+is used in practice. On sorting, \smolvla{} had the lowest arm error (\R{offline/sortone/smolvla/M9arm}\degree),
 followed by Diffusion Policy (\R{offline/sortone/diffusion/M9arm}\degree), \groot{} (\R{offline/sortone/groot/M9arm}\degree)
 and ACT (\R{offline/sortone/act/M9arm}\degree). ACT was the fastest (\R{offline/sortone/act/M10} per chunk,
 \R{offline/sortone/act/M10gb}), \groot{} the largest (\R{offline/sortone/groot/M10gb}). For two policies the last
 checkpoint had a lower held-out error than the one selected by held-out loss (Table~\ref{tab:offline}), so the two
-criteria do not always agree. The remaining policies are added as their training finishes.
+criteria do not always agree. On cube in box v1 the order of speed is the same, ACT being the fastest. GR00T~N1.7 is
+trained and its offline evaluation is next; \pizerofive{} and MolmoAct~2 are added as their trainings finish.
 
 \begin{table}[htbp]
   \centering
@@ -177,15 +207,110 @@ criteria do not always agree. The remaining policies are added as their training
   \label{fig:offline}
 \end{figure}
 
+\section{Setup v2 on the bench}\label{sec:v2bench}
+
+\subsection{\drtc{} against upstream, and the ablations (E1, E2)}
+
+Tables~\ref{tab:v2e1sort} and~\ref{tab:v2e1cube} compare \drtc{} with patient upstream under every fault type: the
+stall fraction, how many recoveries succeeded, and how long they took, with the runs that upstream as shipped ended.
+Tables~\ref{tab:v2e2sort} and~\ref{tab:v2e2cube} give the ablations: for each part of \drtc{} removed, in how many
+policies the stalls rose and by how much. The primary comparisons (\drtc{} against patient upstream, each fault type)
+are tested in the plans' reports.
+
+\begin{table}[htbp]
+  \centering
+  \caption{E1 on sorting: \drtc{} against patient upstream (medians over 8 runs; recovered: runs that moved again
+           after each timed fault, summed over the faults of the type).}
+  \label{tab:v2e1sort}
+  \small
+  \begin{adjustbox}{max width=\textwidth}
+  \gentable{tab_v2_e1_sort_one}
+  \end{adjustbox}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \caption{E1 on cube in box v1, as Table~\ref{tab:v2e1sort}.}
+  \label{tab:v2e1cube}
+  \small
+  \begin{adjustbox}{max width=\textwidth}
+  \gentable{tab_v2_e1_cubebox_v1}
+  \end{adjustbox}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \caption{E2 on sorting: each ablation against \drtc{} (policies whose median stall fraction rose, and the median
+           change in percentage points).}
+  \label{tab:v2e2sort}
+  \small
+  \gentable{tab_v2_e2_sort_one}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \caption{E2 on cube in box v1, as Table~\ref{tab:v2e2sort}.}
+  \label{tab:v2e2cube}
+  \small
+  \gentable{tab_v2_e2_cubebox_v1}
+\end{table}
+
+\subsection{The smoothing methods and the stack (E3a, E3b)}
+
+Tables~\ref{tab:v2e3asort} and~\ref{tab:v2e3acube} give each smoothing method alone on \drtc{} under the mix: the jerk
+relative to \drtc{} alone, the largest step, the deviation from the policy's plan and the stall fraction. By the rule
+of Section~\ref{sec:stackrule}, the stack is \R{v2/stack}.
+
+\begin{table}[htbp]
+  \centering
+  \caption{E3a on sorting: each smoothing method alone on \drtc{} under the fault mix (medians over 8 runs).}
+  \label{tab:v2e3asort}
+  \small
+  \begin{adjustbox}{max width=\textwidth}
+  \gentable{tab_v2_e3a_sort_one}
+  \end{adjustbox}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \caption{E3a on cube in box v1, as Table~\ref{tab:v2e3asort}.}
+  \label{tab:v2e3acube}
+  \small
+  \begin{adjustbox}{max width=\textwidth}
+  \gentable{tab_v2_e3a_cubebox_v1}
+  \end{adjustbox}
+\end{table}
+
+\section{Setup v2 on the robot (E4)}\label{sec:v2robot}
+
+Table~\ref{tab:e4} gives E4: \smolvla{} and \groot{} on sorting, upstream patient without faults and under the mix,
+\drtc{} under the mix and \drtc{} with the stack under the mix.
+
+\begin{table}[htbp]
+  \centering
+  \caption{E4: task success on the robot with Wilson 95\% intervals.}
+  \label{tab:e4}
+  \small
+  \gentable{tab_e4}
+\end{table}
+
 \section{Baselines of all policies}\label{sec:baselines}
 
-The baseline of every policy on every task (condition~1, ten trials each) is run as the trainings finish
-(Table~\ref{tab:training}). \pending{} Results will appear here.
+Tables~\ref{tab:basesort} and~\ref{tab:basecube} give the baseline of every trained policy on the robot (patient
+upstream, normal network, ten trials each). The plans grow as \pizerofive{} and MolmoAct~2 finish training.
 
-\section{Earlier results}
+\begin{table}[htbp]
+  \centering
+  \caption{Baselines on sorting: task success with Wilson 95\% intervals.}
+  \label{tab:basesort}
+  \small
+  \gentable{tab_base_sort_one}
+\end{table}
 
-Before the scope of this study was fixed, two evaluations ran on the sorting task with \drtc{} and its filter on the
-normal network and under faults, with 20 trials per cell and an earlier version of the metrics, in which a trial ended
-by a fault was repeated rather than counted. On the normal network \smolvla{} and Diffusion Policy reached 80\%, ACT
-75\% and \groot{} 20\%. These results are valid but were made under different settings (\drtc{} with its filter, an
-earlier version of the metrics and of the scheduler), so they are not combined with the results above.
+\begin{table}[htbp]
+  \centering
+  \caption{Baselines on cube in box v1, as Table~\ref{tab:basesort}.}
+  \label{tab:basecube}
+  \small
+  \gentable{tab_base_cubebox_v1}
+\end{table}
