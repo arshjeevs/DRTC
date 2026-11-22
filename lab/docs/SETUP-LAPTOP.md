@@ -266,6 +266,8 @@ a100`, or `--server local` for this laptop's own GPU.
 - **The phone:** the first laptop owner's phone is the scene camera for every official trial and every recording. A
   different phone gives the models a different picture (field of view, colours) than the one they were trained on;
   any other phone is for practice and `--test` sessions only. Same for the arms and the wrist camera.
+- **Official robot sessions run from one laptop** (the user's decision, 2026-11-22); this laptop is for recording,
+  practice and `--test` sessions, or takes over that role.
 - **One session at a time per eval.** Before each session `lab eval run` pulls every trial on the results store, from
   both laptops, and continues with the next round. Run sessions of one eval one after the other, never at the same
   time, and don't use `--offline` for official sessions (an unpushed session would not be seen by the other laptop).

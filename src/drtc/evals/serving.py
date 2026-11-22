@@ -226,7 +226,7 @@ def connect(reg: Registry, spec: S.EvalSpec, server: str, models: list[str] | No
                            capture_output=True, text=True)
         target = r.stdout.strip()
         if r.returncode != 0 or not target:
-            raise RegistryError(f"the {container} container is not running on {server}: start it (lab/docs/H200.md)")
+            raise RegistryError(f"the {container} container is not running on {server}: start it (lab/docs/SERVERS.md)")
     endpoints = {}
     for m in chosen:
         local = port(spec, m) + TUNNEL_OFFSET

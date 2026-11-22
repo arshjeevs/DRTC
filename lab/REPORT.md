@@ -19,7 +19,10 @@ current as results come in. The plan and its status: [PLAN.md](PLAN.md).*
   server and every action depends on the network. When the network fails, the robot stops.
 - **Claim.** Network faults lower the task scores of client-server robot inference; **DRTC recovers them**;
   **smoothing** then improves the motion.
-- **Main result** (sorting task, SO-101 arm, 10 trials per cell, the laptop as the robot computer, models on an A100):
+- **Main result so far: the first DRTC run** (2026-11-20; sorting task, SO-101 arm, 10 trials per cell, the laptop as
+  the robot computer, models on an A100). Its fault-free and faulted baselines were LeRobot as shipped, which ends a
+  run 1 s after the queue runs dry; the redesigned experiment (setup v2, section 8.5) compares DRTC with a patient
+  upstream instead and is pending:
 
   | | SmolVLA | GR00T N1.5 |
   |---|---|---|
@@ -47,11 +50,14 @@ current as results come in. The plan and its status: [PLAN.md](PLAN.md).*
 
 ## 3. The claim
 
-Locked with the user on 2026-11-20 ([PLAN.md](PLAN.md)):
+Locked with the user on 2026-11-20 and sharpened with setup v2 on 2026-11-22 ([PLAN.md](PLAN.md)):
 
-1. Network faults lower the task score of LeRobot's remote inference (condition 2 against 1).
-2. DRTC recovers it (condition 3 against 2).
-3. Smoothing then improves the motion (condition 4 against 3).
+1. Network faults lower the task score of client-server inference, even when the client waits instead of giving up
+   (setup v2: upstream patient + faults against upstream patient; first run: condition 2 against 1).
+2. DRTC recovers it, **more than just waiting does** (setup v2: DRTC against upstream patient; first run: condition 3
+   against 2, against a client that gave up).
+3. Smoothing then improves the motion without lowering success (setup v2: the stack against DRTC; first run:
+   condition 4 against 3).
 
 ## 4. Setup
 
@@ -99,7 +105,10 @@ DRTC's scheduling inside LeRobot's own runtime, so every upstream safety check s
 | the robot never started on a slow link | before the first reply DRTC waits only s_min + epsilon steps | until the first reply, wait up to the start-up timeout |
 | "Invalid RTC delay" errors | the requested delay could exceed the server's chunk | the delay is capped at the server's prediction steps |
 
-### 5.3 Smoothing (condition 4)
+### 5.3 Smoothing
+
+The first run's condition 4 used the first two; setup v2 adds four more and picks a stack from them on the bench
+([smoothing.py](../src/drtc/control/smoothing.py)):
 
 - **Butterworth filter** ([action_filter.py](../src/drtc/control/action_filter.py)): a causal low-pass per joint
   (order 2, 3 Hz cutoff at 30 Hz) and a gain of 1.4 on each step to make up the filter's amplitude loss. It keeps its
@@ -108,6 +117,16 @@ DRTC's scheduling inside LeRobot's own runtime, so every upstream safety check s
   before the next chunk arrives, play the actions slower instead of stopping:
   rate = clip(queued / (ticks until the next chunk + margin), min_rate, 1), changing by at most a slew per tick and
   interpolating between actions. With a full queue the rate is 1 (normal playback).
+- **RTC** (Black et al. 2025): the server is told which actions run while it thinks and generates the new chunk to
+  continue them, so the seam is smooth at the source. SmolVLA and GR00T N1.5 (flow matching, absolute actions).
+- **Temporal ensembling** (ACT's): each queued step becomes the weighted average of every chunk that predicted it.
+- **Zero-lag queue smoothing**: the recent executed actions plus the queued future are smoothed forward and backward
+  (zero-phase Butterworth), so jitter goes without the causal filter's lag; redone at every accepted chunk.
+- **Resume ramp**: after a stall, a minimum-jerk blend from the held pose into the stream instead of a jump. (Its
+  soft stop before the stall was dropped after the local check.)
+- **The stack** (setup v2): adaptive playback + the resume ramp + RTC or ensembling + zero-lag or Butterworth, chosen
+  from the bench by a rule fixed before the bench ran (lowest jerk, unless a method adds > 1 deg of deviation from the
+  model's plan or makes stalls or recovery > 10% worse; METRICS.md rule 9).
 
 ### 5.4 Network fault injection ([faults.py](../src/drtc/control/faults.py))
 
@@ -116,7 +135,9 @@ reacts: observation drop, duplicate and reorder; reply drop, duplicate and reord
 (both directions); and, on the bench, a constant latency with jitter. Every injected fault is logged (`faults.csv`).
 
 **The fault mix** (conditions 2-4, times from the trial start): a latency spike of +1 s at 2 s; every reply dropped
-from 4 to 5 s; a full outage from 6 to 7.5 s.
+from 4 to 5 s; a full outage from 6 to 7.5 s. Setup v2 adds a lasting latency rise (+400 ms for 5 s) and random reply
+loss (10%), and moves the timed faults by a seeded random 0-4 s per trial number (the same for trial k in every
+condition), so faults also hit the grasp.
 
 ### 5.5 The evaluation system ([docs/EVALUATION.md](docs/EVALUATION.md))
 
@@ -128,7 +149,10 @@ from 4 to 5 s; a full outage from 6 to 7.5 s.
 - Every trial is stored with its raw files (ticks, chunks, faults, recoveries, video) and pushed to a private
   results store; the report is rebuilt from the raw files (`lab eval report`).
 - Statistics: Wilson 95% intervals for success rates; Fisher's exact test (success) and the Mann-Whitney U test
-  (everything else) for comparisons.
+  (everything else) for comparisons. Since metrics v3 each eval names its comparisons; only its primary ones are
+  tested (Holm-corrected), the rest are exploratory.
+- A run the system ends after the first action is labelled `fault` from the run's own record, whatever key the
+  operator presses. Evals grow: more trials or added models, never other changes.
 
 ## 6. Datasets
 
@@ -162,7 +186,7 @@ Current status of every training: [PLAN.md](PLAN.md), "Trainings".
 
 ## 8. Method
 
-### 8.1 Conditions (the same on every task)
+### 8.1 The first run's conditions (2026-11-20; setup v2 replaces them, section 8.5)
 
 | # | Condition | Network | Robot side |
 |---|---|---|---|
@@ -189,6 +213,25 @@ Current status of every training: [PLAN.md](PLAN.md), "Trainings".
 - **A fault that ends a trial after the arm has started moving is a failure** (M1 = 0, label `fault`; M1f counts
   them). A fault before the first action is a setup problem and the trial is repeated.
 - A trial is voided only for a setup mistake, never for a model's failure; voided trials are listed in the report.
+
+### 8.5 Setup v2: the redesigned experiment (locked 2026-11-22, pending)
+
+Why: in the first run every faulted baseline trial was ended by LeRobot's own 1 s give-up at the first fault, so
+DRTC was compared with a client that gave up by design, and DRTC differed from it in two things at once (its
+scheduling and its patience). Details: [PLAN.md](PLAN.md).
+
+| Part | What |
+|---|---|
+| Baseline | **upstream patient**: LeRobot's scheduler with both give-up limits (1 s starvation grace, 5 s request deadline) raised to the whole trial |
+| Bench E1 + E2 | sort_one and cubebox v1, 5 models, 8 runs per cell: upstream patient, as shipped and DRTC under none, spike, drops, outage, mix, rise, loss; DRTC without each of its parts (cooldown, estimator, trigger, our H/2 fix, `s_min` x0.5 / x1.5) |
+| Bench E3a, E3b | each smoothing method alone on DRTC + mix; then the chosen stack and the stack without each part |
+| Robot E4 | sort_one, SmolVLA + GR00T N1.5, 10 trials: upstream patient (none, mix), DRTC + mix, DRTC + stack + mix |
+| Primary comparisons | bench: DRTC against upstream patient per fault (stalls, recovery); robot: the three claims (success) |
+
+Found while building it (local replay checks, ACT and SmolVLA): upstream never re-sends a request, so a lost reply
+left patient upstream waiting to the end of the run (55% stalled, longest stall 7.5 s under the mix): replacing a
+lost reply is what DRTC's cooldown adds. GR00T N1.7 gets no RTC (relative actions). The first RTC request after a
+server start compiles for over 5 s.
 
 ### 8.4 Metrics (full definitions: [METRICS.md](METRICS.md), v3 since 2026-11-22)
 
@@ -316,7 +359,7 @@ other. Figure: `report/generated/fig_bench.pdf`.
 
 ### 9.3 Offline: held-out error (M9) and inference cost (M10)
 
-Measured on the H200 (shared with two running trainings; counted as a realistic server), 2026-11-20. M9 on the
+Measured on the H200 (shared with running trainings; counted as a realistic server), 2026-11-20 and 21. M9 on the
 served checkpoint and on the last one; sort_one in degrees, cubebox in -100..100 units, so compare within a dataset
 only. Source: `results/offline/<dataset>/<model>.json` (results store `offline/`).
 
@@ -330,6 +373,8 @@ only. Source: `results/offline/<dataset>/<model>.json` (results store `offline/`
 | cubebox v0 | GR00T N1.5 | 3.37 | 3.37 | 4.32 | 183 ms | 268 ms | 5.7 GB |
 | cubebox v1 | SmolVLA | 2.98 | 2.98 | 2.90 | 96 ms | 118 ms | 1.0 GB |
 | cubebox v1 | GR00T N1.5 | 4.28 | 3.72 | 3.20 | 180 ms | 233 ms | 5.7 GB |
+| cubebox v1 | ACT | 5.26 | 5.26 | 4.08 | 31 ms | 57 ms | 0.3 GB |
+| cubebox v1 | Diffusion | 3.26 | 3.26 | 3.51 | 127 ms | 162 ms | 1.3 GB |
 
 Held out: sort_one 8 episodes (180 predictions), cubebox v0 5 (124), cubebox v1 10 (212). On sort_one SmolVLA has the
 lowest error, ACT is the fastest and smallest; for two models (SmolVLA cubebox v0, GR00T N1.5 cubebox v1) the last
@@ -337,18 +382,19 @@ checkpoint has a lower error than the one served (the lowest held-out loss), so 
 M10 on the busy H200 is higher than M6 on the A100 during the robot runs (SmolVLA 97 vs 53 ms). Figure:
 `report/generated/fig_offline.pdf`.
 
-The other models are added when they are trained (GR00T N1.7, π0.5, MolmoAct 2 on both tasks; ACT and Diffusion on
-cubebox v1).
+On cubebox v1, SmolVLA has the lowest error and ACT is again the fastest. The other models are added when their
+offline evaluation has run (GR00T N1.7 on both tasks: trained, ready to run; π0.5 and MolmoAct 2 after training).
 
-### 9.4 Baselines on every model (condition 1)
+### 9.4 Baselines on every model
 
-**pending** (run by the user as the trainings finish; [PLAN.md](PLAN.md) step 5):
+**pending** (run by the user; [PLAN.md](PLAN.md)). Condition: upstream patient, normal network (setup v2's reference).
+The evals start with the trained models and grow as the others are trained:
 
-| Dataset | Models | Trials | Status |
-|---|---|---|---|
-| `so101_cubebox_v0` | SmolVLA, GR00T N1.5 | 20 | both trained; eval `cubebox_v0_baseline` frozen 2026-11-20, ready for trials (laptop) |
-| `so101_cubebox_v1` | all 7 | 70 | 2 trained, 2 training, 3 to do |
-| `so101_sort_one_v1` | all 7 | 70 (SmolVLA and GR00T N1.5 already have 10 each from 9.1) | 4 trained, 1 training, 2 to do |
+| Dataset | Eval | Models now | Trials | Status |
+|---|---|---|---|---|
+| `so101_sort_one_v1` | `sort_one_baseline` | SmolVLA, GR00T N1.5, GR00T N1.7, ACT, Diffusion (+ π0.5, MolmoAct 2) | 50 (+20) | ready to freeze |
+| `so101_cubebox_v1` | `cubebox_v1_baseline` | the same 5 (+2) | 50 (+20) | ready to freeze |
+| `so101_cubebox_v0` | `cubebox_v0_baseline` | SmolVLA, GR00T N1.5 (as-shipped condition) | 20 | optional; frozen 2026-11-20 |
 
 ### 9.5 Side results (before the scope was locked, 2026-11-20)
 
@@ -364,15 +410,18 @@ trials):
 
 - **10 trials per cell:** the intervals are wide (60% is 31-83%), so only large differences are significant; the
   smoothing gain in success (60 -> 80%, 80 -> 100%) is a trend, not a proven effect.
-- **One task, two models** for the DRTC experiment (sorting; SmolVLA and GR00T N1.5).
+- **One task, two models** for the robot DRTC experiment (sorting; SmolVLA and GR00T N1.5); setup v2's bench covers
+  both tasks and five models, without task success.
 - **The operator judges success** (not blinded); the success rule was written before the first trial.
 - **Shared GPU servers:** other users' jobs run on the A100 and H200, so inference times include contention.
 - **Uncompressed images** make the round trip ~260 ms longer than the inference; compressing them (JPEG) would
   shorten it.
-- **The fault mix is fixed in time** (the same windows in every trial), unlike a real network.
+- **The fault mix was fixed in time** in the first run (the same windows in every trial, during the reach); setup v2
+  moves it by a random 0-4 s per trial.
 - **The bench** uses a replay robot and a simulated latency, so it has no task success.
-- **Metrics changed once** (v1 -> v2, 2026-11-20, before the main experiment): a trial ended by a fault now counts as a
-  failure instead of being repeated.
+- **Metrics changed twice**: v1 -> v2 (2026-11-20, before the first run: a trial ended by a fault counts as a failure
+  instead of being repeated) and v2 -> v3 (2026-11-22: the fault label from the run's record, jerk only while moving,
+  recovery and deviation-from-plan metrics, primary comparisons). Every number here is recomputed with v3.
 
 ## 11. Future work
 
@@ -383,7 +432,7 @@ trials):
   without faults: the edge case DRTC and image compression are for. Official edge trials: not run yet.
 - The DRTC experiment on the cube-in-box task (`so101_cubebox_v1`), if time remains.
 - Compressed images (JPEG) to cut the round trip.
-- RTC in-painting (Black et al. 2025) for the flow-matching models on top of DRTC.
+- RTC for GR00T N1.7 (relative actions need re-anchored leftovers) and the later models.
 - An edge fallback: a small model (ACT) on the robot computer takes over while the server is unreachable.
 
 ## 12. The report and the presentation
@@ -391,7 +440,8 @@ trials):
 **Report (LaTeX):** `report/` (`make` there: results -> numbers, tables, figures -> `report/report.pdf`). How to
 add things: [report/README.md](../report/README.md). Photos to add: [report/assets/README.md](../report/assets/README.md).
 
-**Presentation:** the Slides deck https://claude.ai/artifact/JsUD9Vp56hRnTS5qU7VGcJ (private to the owner; 16:9;
+**Presentation:** (still showing the first run, with v2 metrics' "5-7.5x"; to be updated with setup v2's results)
+the Slides deck https://claude.ai/artifact/JsUD9Vp56hRnTS5qU7VGcJ (private to the owner; 16:9;
 plays videos; downloads as PowerPoint or PDF). Its figures are the report's, at slide size
 (`report/generated/slides/fig_*.png`, uploaded to the deck); after `make` in `report/`, Claude re-uploads the changed
 ones and points the slides at them.
@@ -430,9 +480,9 @@ The trial videos exist for every robot trial (`results/evals/<eval>/sessions/*/t
 | Earlier results | `results/archive/` |
 | Models | Hub `orangemoon599/<model>` (every checkpoint) |
 | Training curves | wandb project `drtc-lab`, Trackio |
-| The conditions | [experiments/main/](experiments/main/), the bench's [experiments/bench_main/](experiments/bench_main/) |
+| The conditions | setup v2: [experiments/v2/](experiments/v2/) (bench) and [experiments/v2_robot/](experiments/v2_robot/), made by `v2/_make.py`; the first run: [experiments/main/](experiments/main/), [experiments/bench_main/](experiments/bench_main/) |
 | Eval plans (frozen) | [evals/](evals/) |
-| Code | [src/drtc/control/](../src/drtc/control/) (DRTC, faults, smoothing), [src/drtc/evals/](../src/drtc/evals/) (evaluation) |
+| Code | [src/drtc/control/](../src/drtc/control/) (DRTC, faults, smoothing), [src/drtc/evals/](../src/drtc/evals/) (evaluation, metrics, the stack rule `stack.py`) |
 | Metrics | [METRICS.md](METRICS.md) |
 
 ## 14. References

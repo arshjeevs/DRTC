@@ -1,3 +1,6 @@
+**The first DRTC run's conditions (2026-11-20), kept unchanged as side results** (the eval `sort_one_drtc_main`
+still points here). The current conditions are setup v2's: [../v2/_README.md](../v2/_README.md).
+
 The four conditions of the locked scope (lab/PLAN.md, "LOCKED SCOPE", 2026-11-20). The same on every task; the real
 network (laptop -> GPU server over WiFi, raw images), no simulated latency.
 

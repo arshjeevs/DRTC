@@ -685,8 +685,11 @@ recipe): continue with `--resume` the same way.
 
 Each run pushes to `orangemoon599/<model>` at its end: the repo root is the best checkpoint by held-out loss (what
 `lab eval serve` uses), `checkpoints/<step>/` the last one with its training state. On the laptop, set
-`status: trained` in the model file, commit and push. Then: the offline evaluation
-([Part 3](#offline-evaluation-m9-m10)) and the robot baseline ([Part 2](#part-2-robot-evaluation)), PLAN.md steps 5-6.
+`status: trained` in the model file, commit and push. Then (PLAN.md steps 2 and 8): the offline evaluation
+([Part 3](#offline-evaluation-m9-m10)), and add it to its task's robot baseline and bench evals: they grow, so the
+model is added under `models:` and frozen on its own ([Growing an eval](#growing-an-eval-more-trials-more-models)).
+For a bench eval that is not frozen yet, add the model to `DATASETS` in `lab/experiments/v2/_make.py` and run it with
+`--evals` instead.
 
 ## When to ask Claude
 
@@ -1013,7 +1016,7 @@ On a GPU server, no robot: each model predicts from the held-out episodes (M9, t
 ```bash
 # A100 (in the H200 container: cd /workspace/drtc_major instead)
 cd ~/drtc_major && . ./.server.env && git pull
-tmux new -s offline '.venv/bin/lab eval offline --models act_cubebox_v1_full,diffusion_cubebox_v1_full; bash'
+tmux new -s offline '.venv/bin/lab eval offline --models grootn17_cubebox_v1_full,grootn17_sort_one_v1_full; bash'
 ```
 
 Which models are left and when: [Step 6](#step-6-offline-evaluation-of-each-new-model).

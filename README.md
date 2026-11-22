@@ -1,6 +1,11 @@
 # Distributed Real-Time Chunking (DRTC)
 
-> **Lab setup (SO101 + Raspberry Pi + laptop GPU):** see [lab/README.md](lab/README.md).
+> **This branch (`major`) is our project on top of LeRobot 0.7:** DRTC and smoothing for client-server robot
+> inference on an SO-101 arm (laptop or Raspberry Pi as the robot computer, A100 / H200 / laptop GPU as the model
+> server). **Start at [lab/README.md](lab/README.md)**: the plan, every command, the metrics and the results.
+>
+> The rest of this page is the original DRTC readme (J. Vial), kept for the method and the credit. Its setup steps
+> (Prime Intellect, Tailscale, the upstream scripts) are for the original code, not for this branch.
 
 Distributed Real-Time Chunking (DRTC) is an async inference approach for action chunking policies in distributed client-server deployments. It combines RTC-compatible in-painting with resilient message handling under unreliable communication.
 
