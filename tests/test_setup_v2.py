@@ -350,3 +350,26 @@ def test_the_stack_rule_follows_the_guards_then_jerk(tmp_path):
     seam, _ = stack.decide(stack.SEAM, tmp_path, only_models={"smolvla_"})
     assert jitter == "zero_lag"  # butterworth: out (M12 +3.0 deg)
     assert seam == "rtc"  # 60/120 = 0.5 beats ensembling's 70/100 = 0.7, each against its own eval's DRTC
+
+
+def test_primary_comparisons_are_tested_with_holm_and_counted_across_models():
+    from drtc.evals import report
+    from drtc.evals import spec as S
+    from drtc.evals.metrics import holm
+
+    assert holm([0.01, 0.04, None, 0.03]) == [0.03, 0.06, None, 0.06]
+    sp = S.EvalSpec(description="d", success="n/a", time_limit_s=14, trials=4, models=["act_sort_one_v1_full"],
+                    conditions={"upstream_patient__drops": "v2/upstream_patient__drops", "drtc__drops": "v2/drtc__drops"},
+                    comparisons=["drtc__drops vs upstream_patient__drops"],
+                    primary=["drtc__drops vs upstream_patient__drops"], robot="replay")
+    rows = []
+    for i in range(6):
+        rows.append({"condition": "drtc__drops", "model": "act_sort_one_v1_full", "M2_stall_pct": 2.0 + i * 0.1,
+                     "M11_recovered_drops": 1, "M11_recovery_drops_s": 0.3, "machine": "m", "server": "s"})
+        rows.append({"condition": "upstream_patient__drops", "model": "act_sort_one_v1_full", "M2_stall_pct": 40.0 + i,
+                     "M11_recovered_drops": 0, "M11_recovery_drops_s": None, "machine": "m", "server": "s"})
+    text = report.render(Registry(), "x", sp, [], rows)
+    assert "## Primary comparisons" in text and "not recovered" in text
+    line = next(l for l in text.splitlines() if l.startswith("| drtc__drops | upstream_patient__drops |") and "M2" in l)
+    assert "yes (significant)" in line
+    assert "| drtc__drops | upstream_patient__drops | M2_stall_pct | 1/1 |" in text

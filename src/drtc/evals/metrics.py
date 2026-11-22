@@ -233,6 +233,42 @@ def mannwhitney_p(a, b) -> float | None:
     return float(mannwhitneyu(a, b, alternative="two-sided")[1])
 
 
+def holm(pvals: list[float | None]) -> list[float | None]:
+    """Holm-Bonferroni adjusted p-values (None stays None)."""
+    idx = [i for i, p in enumerate(pvals) if p is not None]
+    order = sorted(idx, key=lambda i: pvals[i])
+    out: list[float | None] = [None] * len(pvals)
+    m, running = len(order), 0.0
+    for k, i in enumerate(order):
+        running = max(running, min(1.0, (m - k) * pvals[i]))
+        out[i] = running
+    return out
+
+
+NOT_RECOVERED = 1e6  # in a test of M11, a run that never moved again ranks after every recovered one
+
+
+def recovery_values(rows: list[dict], fault: str) -> list[float]:
+    """M11 values of one fault for a rank test: the time, or NOT_RECOVERED; runs not counted for it are left out."""
+    out = []
+    for r in rows:
+        rec = r.get(f"M11_recovered_{fault}")
+        if rec in (None, ""):
+            continue
+        out.append(float(r[f"M11_recovery_{fault}_s"]) if int(float(rec)) == 1 else NOT_RECOVERED)
+    return out
+
+
+def primary_metrics(condition: str, rig: bool) -> list[str]:
+    """What a primary comparison tests (metrics v3): success on the robot; on the bench the stall fraction and the
+    recovery from the condition's own faults (named in its `<system>__<fault>` name)."""
+    if rig:
+        return ["M1_success"]
+    fault = condition.rsplit("__", 1)[-1]
+    faults = {"mix": ["spike", "drops", "outage"]}.get(fault, [fault] if fault in RECOVERY_FAULTS else [])
+    return ["M2_stall_pct"] + [f"M11_recovery_{f}_s" for f in faults]
+
+
 CONTINUOUS = [  # (column, label in the report, decimals)
     ("M1t_time_to_success_s", "M1t time to success (s)", 1),
     ("M2_stall_pct", "M2 stall (%)", 1),

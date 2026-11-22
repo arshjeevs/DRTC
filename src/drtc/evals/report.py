@@ -135,18 +135,63 @@ def render(reg, name, sp, trials, mrows) -> str:
                     cells += [f"{k}/{len(have)}", "-" if v is None else f"{v[0]:.2f} [{v[1]:.2f}-{v[2]:.2f}]"]
                 L.append(f"| {c} | {m} | " + " | ".join(cells) + " |")
         L.append("")
-    # comparisons against the baseline condition
-    conds = list(sp.conditions)
-    base = "baseline" if "baseline" in conds else conds[0]
-    # Comparisons: every condition against the reference (`baseline`, else the first), and each condition against
-    # the one before it in the eval file (e.g. upstream -> drtc -> drtc_smooth: claim 1 and claim 2).
-    pairs = [(c, base) for c in conds if c != base]
-    pairs += [(conds[i], conds[i - 1]) for i in range(1, len(conds)) if (conds[i], conds[i - 1]) not in pairs
-              and conds[i - 1] != base]
+    # comparisons (metrics v3): the eval's declared pairs (else the older default: against the first condition and the
+    # one before). Primary comparisons are tested, Holm-corrected over the eval; all others are exploratory.
+    pairs = S.comparison_pairs(sp)
+    primary = {tuple(x.strip() for x in c.split(" vs ")) for c in sp.primary}
+
+    def values(rows, col):
+        if col.startswith("M11_recovery_"):
+            return M.recovery_values(rows, col[len("M11_recovery_"):-2])
+        return [r.get(col) for r in rows]
+
+    if primary:
+        tests = []  # (condition, reference, model, metric, p, delta, direction)
+        for c, ref in [p for p in pairs if p in primary]:
+            for m in sp.models:
+                a, b = groups.get((c, m), []), groups.get((ref, m), [])
+                if not a or not b:
+                    continue
+                for col in M.primary_metrics(c, rig):
+                    if col == "M1_success":
+                        ka, kb = sum(1 for r in a if r[col] == 1), sum(1 for r in b if r[col] == 1)
+                        tests.append((c, ref, m, col, M.fisher_p(ka, len(a), kb, len(b)),
+                                      f"{_pct(ka / len(a))} vs {_pct(kb / len(b))}", ka / len(a) - kb / len(b)))
+                        continue
+                    va, vb = [x for x in values(a, col) if x is not None], [x for x in values(b, col) if x is not None]
+                    if not va or not vb:
+                        continue
+                    import statistics as _st
+
+                    ma, mb = _st.median(va), _st.median(vb)
+                    show = lambda x: "not recovered" if x >= M.NOT_RECOVERED else f"{x:.2f}"
+                    tests.append((c, ref, m, col, M.mannwhitney_p(va, vb), f"{show(ma)} vs {show(mb)}", mb - ma))
+        adj = M.holm([t[4] for t in tests])
+        L += ["## Primary comparisons (tested; Holm-corrected over this eval)", "",
+              "Named before the runs (lab/METRICS.md v3, rule 7). Success: Fisher's exact test; the others: Mann-Whitney U "
+              "on the runs (M11: a run that never moved again ranks last). `better` = the condition beats its reference.",
+              "", "| Condition | Reference | Model | Metric | Condition vs reference | p | p (Holm) | Better |",
+              "|---|---|---|---|---|---|---|---|"]
+        for (c, ref, m, col, p, shown, gain), pa in zip(tests, adj):
+            better = gain > 0
+            L.append(f"| {c} | {ref} | {m} | {col} | {shown} | {_fmt(p, 4)} | {_fmt(pa, 4)} | "
+                     f"{'yes' if better else 'no'}{' (significant)' if better and pa is not None and pa < 0.05 else ''} |")
+        L.append("")
+        # across models: in how many models the condition beats its reference, per comparison and metric
+        L += ["### Across models", "", "| Condition | Reference | Metric | Models where it is better |", "|---|---|---|---|"]
+        seen = {}
+        for (c, ref, m, col, p, shown, gain) in tests:
+            seen.setdefault((c, ref, col), []).append(gain > 0)
+        for (c, ref, col), wins in seen.items():
+            L.append(f"| {c} | {ref} | {col} | {sum(wins)}/{len(wins)} |")
+        L.append("")
     for ref in dict.fromkeys(r for _, r in pairs):
         others = [c for c, r in pairs if r == ref]
-        L += [f"## Against `{ref}` (same model; METRICS.md rule 5)", "",
-              f"p-values: Fisher's exact test (M1), Mann-Whitney U (the others). Δ = condition minus `{ref}` (medians).",
+        if not others:
+            continue
+        L += [f"## Against `{ref}` (same model; METRICS.md rule 5){' - exploratory' if primary else ''}", "",
+              f"p-values: Fisher's exact test (M1), Mann-Whitney U (the others), not corrected for the number of tests"
+              f"{' (only the primary comparisons above are)' if primary else ''}. Δ = condition minus `{ref}` (medians).",
               ""]
         heads = ([("M1_success", "M1")] if rig else []) + [(c, lbl.split(" (")[0]) for c, lbl, _ in cols]
         L += ["| Condition | Model | " + " | ".join(h for _, h in heads) + " |", "|---|---|" + "---|" * len(heads)]

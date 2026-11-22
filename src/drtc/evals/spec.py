@@ -40,6 +40,11 @@ class EvalSpec(BaseModel):
     video: bool = True
     robot: Literal["rig", "replay"] = "rig"  # replay: the Phase 7-8 bench (M2-M8 only), stored under results/bench
     frozen: dict[str, str] = Field(default_factory=dict)  # model -> Hub commit (lab eval freeze)
+    # Metrics v3 (2026-11-22): the comparisons the report makes, "<condition> vs <reference>" (same model); without
+    # them, every condition against the first and each against the one before it (the older evals). `primary` names
+    # the few that are tested (Holm-corrected over the eval); every other comparison is shown as exploratory.
+    comparisons: list[str] = Field(default_factory=list)
+    primary: list[str] = Field(default_factory=list)
 
     def pairs(self) -> list[tuple[str, str]]:
         """Every (condition, model) of the plan, in file order."""
@@ -117,7 +122,26 @@ def check(reg: Registry, spec: EvalSpec) -> list[str]:
     for m in spec.frozen:
         if m not in spec.models:
             problems.append(f"frozen lists {m!r}, which is not in models")
+    for cmp in spec.comparisons + spec.primary:
+        parts = [x.strip() for x in cmp.split(" vs ")]
+        if len(parts) != 2 or any(x not in spec.conditions for x in parts):
+            problems.append(f"comparison {cmp!r}: write '<condition> vs <reference>' with two of the eval's conditions")
+    for cmp in spec.primary:
+        if cmp not in spec.comparisons:
+            problems.append(f"primary {cmp!r} is not one of the comparisons")
     return problems
+
+
+def comparison_pairs(spec: EvalSpec) -> list[tuple[str, str]]:
+    """(condition, reference) pairs the report compares."""
+    if spec.comparisons:
+        return [tuple(x.strip() for x in c.split(" vs ")) for c in spec.comparisons]
+    conds = list(spec.conditions)
+    base = "baseline" if "baseline" in conds else conds[0]
+    pairs = [(c, base) for c in conds if c != base]
+    pairs += [(conds[i], conds[i - 1]) for i in range(1, len(conds)) if (conds[i], conds[i - 1]) not in pairs
+              and conds[i - 1] != base]
+    return pairs
 
 
 def condition_rtc(reg: Registry, experiment: str) -> bool:
