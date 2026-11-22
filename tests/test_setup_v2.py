@@ -244,3 +244,34 @@ def test_a_run_the_system_ended_is_a_fault_whatever_key_was_pressed():
     (d / "trial.json").write_text(json.dumps(ended))
     m = trial_metrics(d)
     assert m["M1f_fault"] == 1 and m["M1_success"] == 0
+
+
+def test_jerk_counts_only_while_the_arm_moves(tmp_path):
+    """Metrics v3, M7: a long hold adds no zero-jerk samples; the stop and the restart still count."""
+    import csv, json
+
+    from drtc.evals.metrics import trial_metrics
+
+    def run(name, hold_ticks):
+        d = tmp_path / name
+        d.mkdir()
+        (d / "trial.json").write_text(json.dumps({"robot": "replay", "outcome": "completed", "first_action_s": 0.0}))
+        cols = ["t", "action"] + [f"cmd.j{i}" for i in range(5)]
+        rows, t, x = [], 0.0, 0.0
+        rng = np.random.default_rng(0)
+        for k in range(60):  # 2 s of shaky motion, a hold, 2 s more
+            if k == 30:
+                t += hold_ticks / 30.0
+            x += 0.5 + rng.normal(0, 0.3)
+            rows.append([round(t, 4), 1] + [x] * 5)
+            t += 1 / 30.0
+        rows.append([round(t, 4), 0] + [""] * 5)
+        with open(d / "ticks.csv", "w", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(cols)
+            w.writerows(rows)
+        return trial_metrics(d)
+
+    short, long_ = run("short", 15), run("long", 300)  # a 0.5 s and a 10 s hold
+    assert long_["M2_stall_pct"] > short["M2_stall_pct"]
+    assert abs(long_["M7_jerk_k"] - short["M7_jerk_k"]) < 0.05 * short["M7_jerk_k"]  # the hold does not dilute it

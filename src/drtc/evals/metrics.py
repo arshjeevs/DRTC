@@ -81,7 +81,17 @@ def trial_metrics(tdir: Path, fps: float = 30.0) -> dict:
                     a = vals[np.clip(np.searchsorted(t_ok, grid + 1e-9, side="right") - 1, 0, len(t_ok) - 1)]
                     if len(a) >= 4:
                         jerk = np.diff(a, 3, axis=0) * fps ** 3
-                        out["M7_jerk_k"] = float(np.sqrt((jerk ** 2).mean())) / 1000.0
+                        # Metrics v3 (2026-11-22, option A): only while the arm moves. Holding still has zero jerk, so
+                        # over the whole run a system that stalls more looked smoother (patient upstream: 55% stalled,
+                        # jerk 35 against DRTC's 97 in the local check). A jerk sample spans 4 ticks; it counts when at
+                        # least one of them executed a new action, so stopping and restarting still count, a long
+                        # hold does not. Stalls themselves are M2 and M3.
+                        moving = np.zeros(len(grid), dtype=bool)
+                        moving[np.clip(np.round((t_ok - grid[0]) / dt).astype(int), 0, len(grid) - 1)] = True
+                        window = np.convolve(moving.astype(int), np.ones(4, dtype=int), mode="valid") > 0
+                        jerk = jerk[window[: len(jerk)]]
+                        if len(jerk):
+                            out["M7_jerk_k"] = float(np.sqrt((jerk ** 2).mean())) / 1000.0
                     if len(a) >= 2:
                         out["M8b_largest_step_deg"] = float(np.abs(np.diff(a, axis=0)).max())
         else:
