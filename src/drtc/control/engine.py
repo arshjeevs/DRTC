@@ -111,6 +111,10 @@ class DRTCRuntime(ChunkRuntime):
         self.ensemble = None  # TemporalEnsemble
         self.zero_lag: tuple[float, int] | None = None  # (cutoff_hz, history length)
         self.history: deque = deque(maxlen=15)  # the last executed actions (zero-lag smoothing's past)
+        # M12 (metrics v3): the model's own plan, the newest accepted chunk's raw actions by queue cursor step (before
+        # ensembling or zero-lag), and the raw action of the last popped step
+        self.raw_plan: dict[int, np.ndarray] = {}
+        self.last_raw: np.ndarray | None = None
 
     def invalidate(self, *, held: bool = False, preserve_starvation: bool = False) -> int:
         # motion restarts from a held pose: no ensembling or smoothing across it (the resume ramp eases the restart)
@@ -118,17 +122,21 @@ class DRTCRuntime(ChunkRuntime):
             self.ensemble.reset()
         if getattr(self, "history", None) is not None:
             self.history.clear()
+        if getattr(self, "raw_plan", None) is not None:
+            self.raw_plan = {}
         return super().invalidate(held=held, preserve_starvation=preserve_starvation)
 
     def pop(self):
+        step = self.queue.snapshot().cursor  # the queue step this pop executes
         item = super().pop()
-        if item is not None and self.zero_lag is not None:
-            self.history.append(item[0].detach().cpu().float().numpy().copy())
+        if item is not None:
+            action = item[0].detach().cpu().float().numpy()
+            self.last_raw = self.raw_plan.get(step, action).copy()  # RTC (append merge): the queued action is the plan
+            if self.zero_lag is not None:
+                self.history.append(action.copy())
         return item
 
     def _accept_aligned(self, request, actions, provenance, now):
-        if self.ensemble is None and self.zero_lag is None:
-            return super()._accept_aligned(request, actions, provenance, now)
         import torch
 
         snap = self.queue.snapshot()
@@ -136,6 +144,12 @@ class DRTCRuntime(ChunkRuntime):
         trim = None if anchor is None else snap.cursor - anchor
         if trim is None or trim < 0 or trim >= len(actions):
             return super()._accept_aligned(request, actions, provenance, now)  # upstream rejects it the same way
+        raw = actions[trim:].detach().cpu().float().numpy()
+        if self.ensemble is None and self.zero_lag is None:
+            accepted = super()._accept_aligned(request, actions, provenance, now)
+            if accepted:
+                self.raw_plan = {snap.cursor + k: raw[k] for k in range(len(raw))}
+            return accepted
         future = actions[trim:].detach().cpu().double().numpy()
         if self.ensemble is not None:
             future = self.ensemble.apply(snap.cursor, future)
@@ -147,8 +161,10 @@ class DRTCRuntime(ChunkRuntime):
         smoothed = actions.clone()
         smoothed[trim:] = torch.as_tensor(future, dtype=actions.dtype, device=actions.device)
         accepted = super()._accept_aligned(request, smoothed, provenance, now)
-        if accepted and self.ensemble is not None:
-            self.ensemble.commit()
+        if accepted:
+            self.raw_plan = {snap.cursor + k: raw[k] for k in range(len(raw))}
+            if self.ensemble is not None:
+                self.ensemble.commit()
         return accepted
 
     def abandon(self, request_id: str, backoff: float = 0.0) -> bool:
@@ -521,11 +537,34 @@ class DRTCEngine(RemoteInferenceEngine):
         return max(est - since, 0.0) / rt.interval
 
     def get_action(self, obs_frame):
+        import torch
+
+        rt = self.runtime
+        raw = None
         if self.playback is not None:
-            action = self.playback.next(lambda: super(DRTCEngine, self).get_action(obs_frame),
-                                        self.runtime.queue.qsize(), self._ticks_until_chunk())
+            meta = self.__dict__.setdefault("_action_meta", {})  # the popped actions' dtype and device (kept across ticks)
+
+            def pop_with_plan():  # the action and the model's raw plan for it, interpolated together by the playback
+                a = super(DRTCEngine, self).get_action(obs_frame)
+                if a is None:
+                    return None
+                meta["dtype"], meta["device"] = a.dtype, a.device
+                r = getattr(rt, "last_raw", None)
+                r = a.detach().cpu().float() if r is None else torch.as_tensor(r, dtype=torch.float32)
+                return torch.cat([a.detach().cpu().float().flatten(), r.flatten()])
+
+            both = self.playback.next(pop_with_plan, rt.queue.qsize(), self._ticks_until_chunk())
+            if both is None:
+                action = None
+            else:
+                n = both.shape[0] // 2
+                action = both[:n].to(dtype=meta.get("dtype", torch.float32), device=meta.get("device", "cpu"))
+                raw = both[n:].numpy()
         else:
             action = super().get_action(obs_frame)
+            if action is not None:
+                r = getattr(rt, "last_raw", None)
+                raw = r if r is not None else action.detach().cpu().float().numpy()
         if action is not None and self.ramp is not None:
             import torch
 
@@ -536,7 +575,6 @@ class DRTCEngine(RemoteInferenceEngine):
 
             filtered = self.action_filter.apply(action.detach().cpu().numpy())
             action = torch.as_tensor(filtered, dtype=action.dtype, device=action.device)
-        rt = self.runtime
         est = rt.turnaround if rt._completed else None
         self._ticks.append([
             round(time.monotonic() - self._t0, 4), int(action is not None), rt.queue.qsize(), int(rt.pending is not None),
@@ -546,6 +584,7 @@ class DRTCEngine(RemoteInferenceEngine):
             1.0 if self.playback is None else round(self.playback.rate, 3),
             None if action is None else [round(float(x), 4) for x in action.detach().cpu().flatten().tolist()],
             None if self._measured is None else [round(x, 4) for x in self._measured],
+            None if raw is None or action is None else [round(float(x), 4) for x in np.asarray(raw).flatten().tolist()],
         ])
         return action
 
@@ -564,17 +603,19 @@ class DRTCEngine(RemoteInferenceEngine):
             if self._ticks:  # the end of the run: stalls up to here count (lab/METRICS.md M2, M3)
                 rt = self.runtime
                 self._ticks.append([round(time.monotonic() - self._t0, 4), 0, rt.queue.qsize(), int(rt.pending is not None),
-                                    None, rt._completed, None, getattr(rt, "horizon", None), None, None, None])
+                                    None, rt._completed, None, getattr(rt, "horizon", None), None, None, None, None])
             if path and self._ticks:
                 Path(path).parent.mkdir(parents=True, exist_ok=True)
-                n = len(self._joint_names) or max((len(r[-2] or r[-1] or []) for r in self._ticks), default=0)
+                n = len(self._joint_names) or max((len(r[-3] or r[-2] or []) for r in self._ticks), default=0)
                 names = self._joint_names or [f"j{i}" for i in range(n)]
                 with open(path, "w", newline="") as f:
                     w = csv.writer(f)
-                    w.writerow(TICK_FIELDS + [f"cmd.{j}" for j in names] + [f"meas.{j}" for j in names])
+                    w.writerow(TICK_FIELDS + [f"cmd.{j}" for j in names] + [f"meas.{j}" for j in names]
+                               + [f"plan.{j}" for j in names])  # plan: the model's raw action for the step (M12)
                     for r in self._ticks:
-                        cmd, meas = r[-2], r[-1]
-                        w.writerow(r[:-2] + (cmd or [None] * n)[:n] + (meas or [None] * n)[:n])
+                        cmd, meas, plan = r[-3], r[-2], r[-1]
+                        w.writerow(r[:-3] + (cmd or [None] * n)[:n] + (meas or [None] * n)[:n]
+                                   + (plan or [None] * n)[:n])
             rt = self.runtime
             if path and getattr(rt, "chunk_log", None):
                 with open(Path(path).with_name("chunks.csv"), "w", newline="") as f:

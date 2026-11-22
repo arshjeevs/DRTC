@@ -321,3 +321,32 @@ def test_a_stall_cut_short_by_the_operators_key_is_not_counted_as_not_recovered(
     t = np.arange(0, 5.76, 1 / 30)  # the arm paused at 5.76 and the operator pressed f at 5.91
     assert recovery(tmp_path, t, 5.91, 1 / 30, operator_ended=True) == {}
     assert recovery(tmp_path, t, 5.91, 1 / 30) == {"M11_recovered_drops": 0, "M11_recovery_drops_s": None}
+
+
+def test_the_stack_rule_follows_the_guards_then_jerk(tmp_path):
+    import csv
+
+    from drtc.evals import stack
+
+    cols = ["condition", "model", "M7_jerk_k", "M8b_largest_step_deg", "M2_stall_pct", "M12_plan_deviation_deg"]
+
+    def write(eval_name, rows):
+        d = tmp_path / eval_name
+        d.mkdir(exist_ok=True)
+        with open(d / "metrics.csv", "w", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=cols)
+            w.writeheader()
+            for cond, model, jerk, dev in rows:
+                for _ in range(3):
+                    w.writerow({"condition": cond, "model": model, "M7_jerk_k": jerk, "M8b_largest_step_deg": 10,
+                                "M2_stall_pct": 5, "M12_plan_deviation_deg": dev})
+
+    for ds in stack.DATASETS:
+        # Butterworth has the lowest jerk but drifts 3 deg off the plan: ruled out; zero-lag wins
+        write(f"bench_v2_smooth_{ds}", [("drtc__mix", "smolvla_x", 100, 0.2), ("s_butterworth__mix", "smolvla_x", 30, 3.2),
+                                        ("s_zero_lag__mix", "smolvla_x", 50, 0.4), ("s_ensemble__mix", "smolvla_x", 70, 0.5)])
+        write(f"bench_v2_smooth_rtc_{ds}", [("drtc__mix", "smolvla_x", 120, 0.2), ("s_rtc__mix", "smolvla_x", 60, 0.3)])
+    jitter, _ = stack.decide(stack.JITTER, tmp_path)
+    seam, _ = stack.decide(stack.SEAM, tmp_path, only_models={"smolvla_"})
+    assert jitter == "zero_lag"  # butterworth: out (M12 +3.0 deg)
+    assert seam == "rtc"  # 60/120 = 0.5 beats ensembling's 70/100 = 0.7, each against its own eval's DRTC

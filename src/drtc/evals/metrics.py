@@ -94,6 +94,18 @@ def trial_metrics(tdir: Path, fps: float = 30.0) -> dict:
                             out["M7_jerk_k"] = float(np.sqrt((jerk ** 2).mean())) / 1000.0
                     if len(a) >= 2:
                         out["M8b_largest_step_deg"] = float(np.abs(np.diff(a, axis=0)).max())
+            plan_cols = [k for k in rows[0].keys() if k.startswith("plan.")][:ARM_JOINTS]
+            if plan_cols and cmd_cols:
+                # M12 (metrics v3, 2026-11-22): how far smoothing moves the arm off the model's own plan: the mean over
+                # executed ticks and the five arm joints of |commanded - the newest chunk's raw action for that step|
+                dev = []
+                for r in executed:
+                    c = [_f(r[k]) for k in cmd_cols]
+                    p_ = [_f(r[k]) for k in plan_cols]
+                    if None not in c and None not in p_:
+                        dev.append(np.abs(np.array(c) - np.array(p_)).mean())
+                if dev:
+                    out["M12_plan_deviation_deg"] = float(np.mean(dev))
             # a run the operator ended (s/f) during a stall says nothing about recovery: not counted for that fault
             operator = not fault and info.get("label") in ("s", "f")
             out.update(recovery(tdir, t_exec, t_end, dt, fault, operator))
@@ -234,4 +246,5 @@ CONTINUOUS = [  # (column, label in the report, decimals)
     ("M7_jerk_k", "M7 jerk (10^3 deg/s^3)", 2),
     ("M8a_switch_l2_deg", "M8a chunk switch (deg)", 2),
     ("M8b_largest_step_deg", "M8b largest step (deg)", 2),
+    ("M12_plan_deviation_deg", "M12 deviation from the plan (deg)", 2),
 ]
