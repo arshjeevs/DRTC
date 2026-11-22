@@ -1,12 +1,13 @@
 # Workflow
 
 Everything you do in this project, with every command, in order. Each command here was checked against the code
-(2026-11-20). If one fails, the error message usually says what to do; otherwise paste it to Claude.
+(last on 2026-11-22). If one fails, the error message usually says what to do; otherwise paste it to Claude.
 
 - **[Machines](#machines)**: what each machine is for, how to log in, how to update its code.
 - **[The whole path at a glance](#the-whole-path-at-a-glance)**: dataset → trained models → evaluated → report.
-- **[The plan, step by step](#the-plan-step-by-step)**: the remaining steps of PLAN.md (offline evaluation, the
-  robot baselines, the optional cubebox v1 DRTC experiment) with their exact commands, and how to change the plan.
+- **[The plan, step by step](#the-plan-step-by-step)**: the remaining steps of PLAN.md with their exact commands:
+  setup v2 (the bench and the robot DRTC run), offline evaluation, the robot baselines, growing an eval, changing
+  the plan.
 - **[Part 1: from a new dataset to trained models](#part-1-from-a-new-dataset-to-trained-models)**: record, review,
   register, train.
 - **[Part 2: robot evaluation](#part-2-robot-evaluation)**: official trials from the laptop or the Pi, results.
@@ -18,7 +19,8 @@ Everything you do in this project, with every command, in order. Each command he
 
 Related: the plan and its status [PLAN.md](PLAN.md); what every number means [METRICS.md](METRICS.md); every result
 for the report and the slides [REPORT.md](REPORT.md); details on recording [docs/DATA.md](docs/DATA.md), training
-[docs/TRAIN.md](docs/TRAIN.md), how results are stored [docs/EVALUATION.md](docs/EVALUATION.md).
+[docs/TRAIN.md](docs/TRAIN.md), the GPU servers [docs/SERVERS.md](docs/SERVERS.md), how results are stored
+[docs/EVALUATION.md](docs/EVALUATION.md).
 
 # Machines
 
@@ -28,6 +30,9 @@ for the report and the slides [REPORT.md](REPORT.md); details on recording [docs
 | **A100** (80 GB, shared) | training; serving models for robot sessions; bench; offline evaluation | `ssh b230968ee@192.168.5.13` | `~/drtc_major` | `git pull`; after a change of `uv.lock`: `lab/bin/a100-setup`. **Never a plain `uv sync`** there: it installs CUDA 13 builds the driver can't run |
 | **H200** (141 GB, shared, professor's account) | training; serving; bench; offline evaluation | Jupyter terminal, or `ssh jayaraj@192.168.41.118` then `docker exec -it drtc_lab bash` | `/workspace/drtc_major` inside the `drtc_lab` container | **inside the container**: `cd /workspace/drtc_major && . ./.server.env && git pull`, then after a change of `uv.lock`: `uv sync --frozen --extra gpu --extra sim --python /usr/bin/python3`. A `git pull` on the host fails (files there are root-owned) |
 | **Raspberry Pi 5** (8 GB, no GPU) | the edge robot computer (tested; not used for official results yet) | `ssh rasp@raspberrypi.local` (from the laptop, on its hotspot) | `~/drtc_major` | `git pull`; after a change of `uv.lock`: `lab/bin/pi-setup` |
+
+**More on the A100 and the H200** (the container, updating, the rules, which server for what):
+[docs/SERVERS.md](docs/SERVERS.md).
 
 **A second robot laptop** (a teammate's, the same arms and accounts): set it up with
 [docs/SETUP-LAPTOP.md](docs/SETUP-LAPTOP.md); it is `laptop2` in `lab/hosts.yaml` and serves on its own GPU with
@@ -72,17 +77,17 @@ goes to `results/scratch/` and never into the results.
 
 # The plan, step by step
 
-The remaining steps of [PLAN.md](PLAN.md) ("Order of work") with the exact commands, written 2026-11-21. Parts 1-3
-below explain each command in general; this part says which ones to run for the current plan, in which order.
+The remaining steps of [PLAN.md](PLAN.md) ("Order of work") with the exact commands (2026-11-22). Parts 1-3 below
+explain each command in general; this part says which ones to run for the current plan, in which order.
 
 | Plan step | What | Status (2026-11-22) | Here |
 |---|---|---|---|
-| 10 | **Setup v2: the DRTC and smoothing experiments** (bench E1-E3, robot E4) | built 2026-11-22; the bench is next | [Setup v2](#setup-v2-the-drtc-and-smoothing-experiments) |
-| 3 | Trainings | you; π0.5 x2 and MolmoAct 2 left | [Part 1](#part-1-from-a-new-dataset-to-trained-models), steps 7-9 |
-| 6 | Offline M9/M10 for every trained model | 8 done; ACT + Diffusion cubebox v1 ready now | [Step 6](#step-6-offline-evaluation-of-each-new-model) |
-| 5 | Robot baselines: sort_one and cubebox v1 (5 models now, 2 later); cubebox v0 optional | ready to freeze | [Step 5](#step-5-the-robot-baselines) |
-| 7 | Report and slides | Claude, after each result | [Part 3](#the-report-and-the-slides) |
-| 8 | Optional: the DRTC experiment on cubebox v1 | if time remains | [Step 8](#step-8-optional-the-drtc-experiment-on-cubebox-v1) |
+| 4-7, 9 | **Setup v2: the DRTC and smoothing experiments** (bench E1-E3, robot E4) | built; V0 (freeze the bench evals) is next | [Setup v2](#setup-v2-the-drtc-and-smoothing-experiments) |
+| 1 | Trainings | you; π0.5 x2 and MolmoAct 2 cubebox v1 left | [Part 1](#part-1-from-a-new-dataset-to-trained-models), steps 7-9 |
+| 2 | Offline M9/M10 for every trained model | 10 done; GR00T N1.7 x2 ready now | [Step 6](#step-6-offline-evaluation-of-each-new-model) |
+| 8 | Robot baselines: sort_one and cubebox v1 (5 models now, 2 later); cubebox v0 optional | ready to freeze | [Step 5](#step-5-the-robot-baselines) |
+| 10 | Growth when there is time (more trials, models, the cubebox v1 DRTC run) | after the core | [Growing an eval](#growing-an-eval-more-trials-more-models), [Step 8](#step-8-optional-the-drtc-experiment-on-cubebox-v1) |
+| 11 | Report and slides | Claude, after each result | [Part 3](#the-report-and-the-slides) |
 
 To change any of it (another model, more trials, a model dropped): [Changing the plan](#changing-the-plan) and
 [Growing an eval](#growing-an-eval-more-trials-more-models).
@@ -225,12 +230,13 @@ No robot, a few minutes per model, on the H200 or the A100: the held-out action 
 and GPU memory (M10). Run it for each model once its training has finished and pushed to the Hub. Not on a server
 that is serving a robot session at that moment (it would slow the session's model down).
 
-**Now: ACT and Diffusion on cubebox v1.** On the H200 (from the host shell: `docker exec -it drtc_lab bash`):
+**Done:** SmolVLA and GR00T N1.5 on all three datasets, ACT and Diffusion on sort_one and cubebox v1 (10 models).
+**Now: the two GR00T N1.7 models.** On the H200 (from the host shell: `docker exec -it drtc_lab bash`):
 
 ```bash
 cd /workspace/drtc_major && . ./.server.env && git pull
-nvidia-smi                                   # shared GPU: a few GB free is enough (M10 peaks: ACT 0.3 GB, Diffusion 1.3 GB)
-tmux new -s offline '.venv/bin/lab eval offline --models act_cubebox_v1_full,diffusion_cubebox_v1_full; bash'
+nvidia-smi                                   # shared GPU: GR00T needs ~6 GB free
+tmux new -s offline '.venv/bin/lab eval offline --models grootn17_cubebox_v1_full,grootn17_sort_one_v1_full; bash'
 ```
 
 or on the A100:
@@ -239,7 +245,7 @@ or on the A100:
 ssh b230968ee@192.168.5.13
 cd ~/drtc_major && . ./.server.env && git pull
 nvidia-smi
-tmux new -s offline '.venv/bin/lab eval offline --models act_cubebox_v1_full,diffusion_cubebox_v1_full; bash'
+tmux new -s offline '.venv/bin/lab eval offline --models grootn17_cubebox_v1_full,grootn17_sort_one_v1_full; bash'
 ```
 
 Each model prints its numbers, then `-> results/offline/<dataset>/<model>.json` and `pushed to the results store`.
@@ -251,7 +257,6 @@ all three are on the H200; if it stops because the dataset is missing (e.g. cube
 
 | Model(s) | When |
 |---|---|
-| `grootn17_cubebox_v1_full,grootn17_sort_one_v1_full` | the two GR00T N1.7 runs have finished (H200) |
 | `molmoact2_sort_one_v1_lora` | the MolmoAct 2 run has finished (A100) |
 | `pi05_cubebox_v1_full`, `pi05_sort_one_v1_full`, `molmoact2_cubebox_v1_lora` | after their trainings |
 
@@ -697,8 +702,8 @@ Paste the last lines of the window (or the dry run's output) with the question.
 # Part 2: robot evaluation
 
 Official robot trials, from the plan to the report. Why it works this way: [docs/EVALUATION.md](docs/EVALUATION.md).
-What every number means: [METRICS.md](METRICS.md). The example throughout is **`cubebox_v0_baseline`**: SmolVLA and
-GR00T N1.5 on the cube-in-box v0 task, condition `baseline`, 10 trials each (frozen 2026-11-20).
+What every number means: [METRICS.md](METRICS.md). The example throughout is **`cubebox_v1_baseline`**: the 5
+trained models on the cube-in-box v1 task, condition `baseline` (upstream patient, normal network), 10 trials each.
 
 ```
 once per eval    laptop: write lab/evals/<eval>.yaml → lab eval check → lab eval freeze → commit + push
@@ -715,29 +720,29 @@ works the same way ([its section](#the-raspberry-pi-as-the-robot-computer)) and 
 ```bash
 # --- once per eval (laptop) ---
 cd ~/Projects/drtc-major && source .venv/bin/activate && git pull
-lab eval check cubebox_v0_baseline
-lab eval freeze cubebox_v0_baseline
-git add lab/evals/cubebox_v0_baseline.yaml && git commit -m "eval cubebox_v0_baseline: frozen" && git push
+lab eval check cubebox_v1_baseline
+lab eval freeze cubebox_v1_baseline
+git add lab/evals/cubebox_v1_baseline.yaml && git commit -m "eval cubebox_v1_baseline: frozen" && git push
 
 # --- each session: 1. the model server (pick one) ---
 # A100:   ssh b230968ee@192.168.5.13, then
-cd ~/drtc_major && git pull && tmux new -s serve '.venv/bin/lab eval serve cubebox_v0_baseline; bash'
+cd ~/drtc_major && . ./.server.env && git pull && tmux new -s serve '.venv/bin/lab eval serve cubebox_v1_baseline; bash'
 # H200:   in the drtc_lab container
 cd /workspace/drtc_major && . ./.server.env && git pull
-tmux new -s serve '.venv/bin/lab eval serve cubebox_v0_baseline; bash'
+tmux new -s serve '.venv/bin/lab eval serve cubebox_v1_baseline; bash'
 # laptop GPU (8 GB: small models only; add --for-pi when the Pi is the robot computer)
-lab eval serve cubebox_v0_baseline --models smolvla_cubebox_v0_full
+lab eval serve cubebox_v1_baseline --models smolvla_cubebox_v1_full
 
 # --- each session: 2. the robot computer (laptop) ---
 cd ~/Projects/drtc-major && source .venv/bin/activate && git pull
 lab/bin/session record                                      # phone camera + rig check (tmux "robot")
-lab eval servers cubebox_v0_baseline --server a100          # every model "ready"?
-lab eval run cubebox_v0_baseline --server a100 --test       # optional: one test trial (scratch)
-lab eval run cubebox_v0_baseline --server a100              # the official session
+lab eval servers cubebox_v1_baseline --server a100          # every model "ready"?
+lab eval run cubebox_v1_baseline --server a100 --test       # optional: one test trial (scratch)
+lab eval run cubebox_v1_baseline --server a100              # the official session
 
 # --- afterwards (any machine) ---
-lab eval status cubebox_v0_baseline
-lab eval report cubebox_v0_baseline --pull                  # → results/evals/cubebox_v0_baseline/report.md
+lab eval status cubebox_v1_baseline
+lab eval report cubebox_v1_baseline --pull                  # → results/evals/cubebox_v1_baseline/report.md
 ```
 
 ---
@@ -788,17 +793,18 @@ Pick whichever server is free that day. **The whole session uses one server**, a
 
 | Server | Where to type | Command |
 |---|---|---|
-| A100 | `ssh b230968ee@192.168.5.13` | `cd ~/drtc_major && git pull && tmux new -s serve '.venv/bin/lab eval serve cubebox_v0_baseline; bash'` |
-| H200 | the `drtc_lab` container | `cd /workspace/drtc_major && . ./.server.env && git pull`, then `tmux new -s serve '.venv/bin/lab eval serve cubebox_v0_baseline; bash'` |
-| laptop GPU | a laptop terminal | `lab eval serve cubebox_v0_baseline --models smolvla_cubebox_v0_full` (add `--for-pi` when the Pi is the robot computer) |
+| A100 | `ssh b230968ee@192.168.5.13` | `cd ~/drtc_major && . ./.server.env && git pull && tmux new -s serve '.venv/bin/lab eval serve cubebox_v1_baseline; bash'` |
+| H200 | the `drtc_lab` container | `cd /workspace/drtc_major && . ./.server.env && git pull`, then `tmux new -s serve '.venv/bin/lab eval serve cubebox_v1_baseline; bash'` |
+| laptop GPU | a laptop terminal | `lab eval serve cubebox_v1_baseline --models smolvla_cubebox_v1_full` (add `--for-pi` when the Pi is the robot computer) |
 
 It starts the models one after the other and prints each one's status:
 
 ```
-serving cubebox_v0_baseline (2 models) on 127.0.0.1; logs in logs/serve/cubebox_v0_baseline/
-  smolvla_cubebox_v0_full          port 9720  starting (loading the model) ... ready in 540 s
-  groot_cubebox_v0_full            port 9721  starting (loading the model) ... ready in 160 s
-all 2 ready. Leave this running during the session; Ctrl-C stops every server.
+serving cubebox_v1_baseline (5 models) on 127.0.0.1; logs in logs/serve/cubebox_v1_baseline/
+  smolvla_cubebox_v1_full          port 9720  starting (loading the model) ... ready in 540 s
+  groot_cubebox_v1_full            port 9721  starting (loading the model) ... ready in 160 s
+  ...
+all 5 ready. Leave this running during the session; Ctrl-C stops every server.
 ```
 
 - Wait for **`all N ready`**. SmolVLA compiles its model when it starts (about 9 minutes the first time on the A100).
@@ -815,7 +821,7 @@ all 2 ready. Leave this running during the session; Ctrl-C stops every server.
 ```bash
 cd ~/Projects/drtc-major && source .venv/bin/activate && git pull
 lab/bin/session record          # phone camera bridge + rig check; every line ok
-lab eval servers cubebox_v0_baseline --server a100
+lab eval servers cubebox_v1_baseline --server a100
 ```
 
 `lab eval servers` opens the way to the servers and asks each model to describe itself:
@@ -828,23 +834,24 @@ lab eval servers cubebox_v0_baseline --server a100
 | `local` | servers on this same machine (the bench) |
 
 ```
-cubebox_v0_baseline on a100:
-  smolvla_cubebox_v0_full          ready   commit 8beffbfd  checkpoint sha256:...  tcp/127.0.0.1:19720
-  groot_cubebox_v0_full            ready   commit 9b164e1e  checkpoint sha256:...  tcp/127.0.0.1:19721
+cubebox_v1_baseline on a100:
+  smolvla_cubebox_v1_full          ready   commit 8beffbfd  checkpoint sha256:...  tcp/127.0.0.1:19720
+  groot_cubebox_v1_full            ready   commit 9b164e1e  checkpoint sha256:...  tcp/127.0.0.1:19721
+  ...                              (one line per model)
 ```
 
 Every model must say `ready` (through a tunnel the local port is the server's + 10000). Optional checks without
 counting anything:
 
 ```bash
-lab eval run cubebox_v0_baseline --server a100 --test     # one real trial on the arm, kept in results/scratch
-lab eval run cubebox_v0_baseline --server a100 --replay   # one round on the replay robot: the arm doesn't move
+lab eval run cubebox_v1_baseline --server a100 --test     # one real trial on the arm, kept in results/scratch
+lab eval run cubebox_v1_baseline --server a100 --replay   # one round on the replay robot: the arm doesn't move
 ```
 
 ## 4. Run the session
 
 ```bash
-lab eval run cubebox_v0_baseline --server a100
+lab eval run cubebox_v1_baseline --server a100
 ```
 
 It checks everything first and refuses to start when something is off: uncommitted changes in the repo, a changed
@@ -855,10 +862,10 @@ It works in **rounds**. A round is one trial of every model under every conditio
 every machine).
 
 ```
-=== Round 1: 2 trials ===
+=== Round 1: 5 trials ===
 Set this round's layout (the same for every trial of the round).
 
-Round 1, trial 1/2: groot_cubebox_v0_full, t01. Put the cube(s) on the marks, press Enter to start ...
+Round 1, trial 1/5: groot_cubebox_v1_full, t01. Put the cube(s) on the marks, press Enter to start ...
   [success] ending the trial
   t01: SUCCESS in 9.4 s (s; completed)
   Enter = next trial, v = void this trial (setup mistake), q = end the session:
@@ -884,25 +891,25 @@ Round 1, trial 1/2: groot_cubebox_v0_full, t01. Put the cube(s) on the marks, pr
 - Stop whenever you like (`q`). The next `lab eval run` continues where the eval stands, on any machine.
 - `--max-trials N` ends the session after N trials.
 - At the end the session is **pushed** to the results store automatically. Without internet use `--offline`, then
-  `lab eval push cubebox_v0_baseline` later.
+  `lab eval push cubebox_v1_baseline` later.
 
 ## 5. Results
 
 ```bash
-lab eval status cubebox_v0_baseline           # trials done per model, the next round, unpushed sessions
-lab eval report cubebox_v0_baseline --pull    # rebuild the report from every session (all machines)
+lab eval status cubebox_v1_baseline           # trials done per model, the next round, unpushed sessions
+lab eval report cubebox_v1_baseline --pull    # rebuild the report from every session (all machines)
 ```
 
-`results/evals/cubebox_v0_baseline/`:
+`results/evals/cubebox_v1_baseline/`:
 
 | File | What |
 |---|---|
-| `report.md` | success with its 95% interval, trials ended by a fault, time to success; stalls, latency, server time, jerk, chunk jumps (median and spread); comparisons between conditions; trials not counted; sessions |
+| `report.md` | success with its 95% interval, trials ended by a fault, time to success; stalls, latency, server time, jerk, chunk jumps, deviation from the plan (median and spread); recovery after each fault (M11); the primary comparisons (tested, Holm) and every other comparison (exploratory); trials not counted; sessions (METRICS.md v3) |
 | `trials.csv` | one row per trial (also voided ones), with its folder |
 | `metrics.csv` | one row per counted trial, every metric |
-| `sessions/<date>-<machine>/trials/<condition>/<model>/tNN/` | the raw files of one trial: `ticks.csv`, `chunks.csv`, `faults.csv`, `recovery.csv`, `config.yaml`, `trial.json`, `rollout.log`, `video/scene.mp4`, `video/wrist.mp4` |
+| `sessions/<date>-<machine>/trials/<condition>/<model>/tNN/` | the raw files of one trial: `ticks.csv` (with the model's plan, `plan.*`), `chunks.csv`, `faults.csv`, `recovery.csv`, `config.yaml` (with the fault shift), `trial.json` (label, key), `rollout.log`, `video/scene.mp4`, `video/wrist.mp4` |
 
-The report is rebuilt every time, so never edit it. Tell Claude when an eval is done: REPORT.md, the report and the
+The report is rebuilt every time, with the current metrics, so never edit it. Tell Claude when an eval is done: REPORT.md, the report and the
 slides are updated from it.
 
 ## The Raspberry Pi as the robot computer
@@ -956,7 +963,7 @@ lab eval run <eval> --server a100 --test        # a test trial; drop --test for 
 With `--for-pi` the laptop's own sessions cannot reach those servers (they listen on the hotspot address only); serve
 without it for laptop sessions.
 
-First test (2026-11-20, `cubebox_v0_baseline --test`, A100): 29.4-29.9 Hz control, no video frames dropped; the round
+First test (2026-11-20, `cubebox_v1_baseline --test`, A100): 29.4-29.9 Hz control, no video frames dropped; the round
 trip is about twice the laptop's (SmolVLA 594 ms, GR00T N1.5 855 ms: WiFi to the laptop's hotspot, then to the A100),
 so the shipped client (1 s give-up) can starve GR00T N1.5 even without faults.
 
@@ -1038,10 +1045,12 @@ Which models are left and when: [Step 6](#step-6-offline-evaluation-of-each-new-
 
 | Situation | Do |
 |---|---|
-| Realised after a trial that an object wasn't on its mark | `lab eval void cubebox_v0_baseline <model> t05 --reason "cube off its mark"` (add `--condition <name>` when the eval has several), then `lab eval push cubebox_v0_baseline` |
+| Realised after a trial that an object wasn't on its mark | `lab eval void cubebox_v1_baseline <model> t05 --reason "cube off its mark"` (add `--condition <name>` when the eval has several), then `lab eval push cubebox_v1_baseline` |
 | Want to try something without it counting | `--test` (a real session, kept in `results/scratch/`) or `--replay` (no arm movement) |
 | `the git tree has uncommitted changes` | commit and push first (official trials record the exact code), or ask Claude what changed |
-| `... changed since session ...` | the eval file was edited after trials started: undo the edit, or make a new eval |
+| `... changed since session ...: <why>` | the eval file was changed in a way a plan with trials may not (only more `trials` and added `models` are allowed): undo the edit, or make a new eval |
+| A run of an RTC eval ends with `Policy operation deadline exceeded` (server log) | the server's first RTC request compiles for over 5 s: run one `--test` round right after `lab eval serve`, then the official session ([Setup v2, V1](#v1-v2-v4-run-a-bench-eval-gpu-server)) |
+| `lab eval freeze` says `has N trials: freezing only the added models` | expected when an eval grows: the new models are frozen, the others keep their commits |
 | `... is not frozen` | `lab eval freeze <eval>` on the laptop, commit, push, then `git pull` on the server and the robot computer |
 | `not served on a100: ...` | the server isn't running or is still loading: check its tmux window |
 | `ports in use` | that eval is already being served there: `tmux ls`, attach, Ctrl-C |

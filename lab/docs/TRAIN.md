@@ -34,7 +34,7 @@ are fixed (`lab/recipes/`, the originals from Phase 2); a model is a recipe appl
 
 ## 2. On the H200
 
-In the `drtc_lab` container ([H200.md](H200.md) has how to get in):
+In the `drtc_lab` container ([SERVERS.md](SERVERS.md) has how to get in):
 
 ```bash
 cd /workspace/drtc_major && . ./.server.env && git pull && uv sync --frozen --extra gpu --extra sim --python /usr/bin/python3
