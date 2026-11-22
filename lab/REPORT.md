@@ -396,16 +396,6 @@ The evals start with the trained models and grow as the others are trained:
 | `so101_cubebox_v1` | `cubebox_v1_baseline` | the same 5 (+2) | 50 (+20) | ready to freeze |
 | `so101_cubebox_v0` | `cubebox_v0_baseline` | SmolVLA, GR00T N1.5 (as-shipped condition) | 20 | optional; frozen 2026-11-20 |
 
-### 9.5 Side results (before the scope was locked, 2026-11-20)
-
-Valid, but under other settings, so shown separately (`results/archive/2026-11-20-before-scope/`, metrics v1, 20
-trials):
-- `sort_one_baseline_v2`, DRTC with its filter, normal network (80 trials): SmolVLA 80%, Diffusion 80%, ACT 75%,
-  GR00T N1.5 20% (an earlier version of the scheduler; the eval was restarted once after GR00T fixes).
-- `sort_one_faults` (DRTC with its filter under spikes and outages): stopped at 81 of 180 trials when the scope
-  changed.
-- The minor project's results (DRTC replication on the earlier setup): `results/archive/minor/`.
-
 ## 10. Limitations
 
 - **10 trials per cell:** the intervals are wide (60% is 31-83%), so only large differences are significant; the
@@ -477,7 +467,6 @@ The trial videos exist for every robot trial (`results/evals/<eval>/sessions/*/t
 | Bench | `results/bench/<bench>/` |
 | Offline M9/M10 | `results/offline/<dataset>/<model>.json` |
 | All official results (one copy) | private Hub dataset `orangemoon599/drtc-results` |
-| Earlier results | `results/archive/` |
 | Models | Hub `orangemoon599/<model>` (every checkpoint) |
 | Training curves | wandb project `drtc-lab`, Trackio |
 | The conditions | setup v2: [experiments/v2/](experiments/v2/) (bench) and [experiments/v2_robot/](experiments/v2_robot/), made by `v2/_make.py`; the first run: [experiments/main/](experiments/main/), [experiments/bench_main/](experiments/bench_main/) |

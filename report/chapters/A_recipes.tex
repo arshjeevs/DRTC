@@ -1,12 +1,12 @@
 \chapter{Training Recipes}\label{app:recipes}
 
-Every policy is trained with its authors' published recipe; Table~\ref{tab:recipes} summarises them. The full recipe
+Every policy is trained with its authors' published recipe; Table~\ref{tab:recipesfull} gives the main settings. The full recipe
 of each, with every flag, is in the project's registry (\texttt{lab/recipes/}).
 
 \begin{table}[htbp]
   \centering
   \caption{Training recipes.}
-  \label{tab:recipes}
+  \label{tab:recipesfull}
   \small
   \begin{tabularx}{\textwidth}{l X l l c}
     \toprule
@@ -28,3 +28,12 @@ of each, with every flag, is in the project's registry (\texttt{lab/recipes/}).
     \bottomrule
   \end{tabularx}
 \end{table}
+
+\paragraph{Speed settings.} Settings that change only the speed of training are kept apart from the recipes: \smolvla{}
+is compiled, data-loading workers follow each machine's CPU budget, and GR00T~N1.5 can read a cache of its pre-resized
+frames. None of them changes what is learnt.
+
+\paragraph{Served checkpoint.} Every run evaluates the held-out loss about 20 times; the Hub repository's root holds the
+checkpoint with the lowest held-out loss, which is served to the robot, and the last checkpoint is kept with its
+training state. The offline evaluation reports the action error of both (Section~\ref{sec:offline}).
+

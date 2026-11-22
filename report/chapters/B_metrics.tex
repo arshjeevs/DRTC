@@ -1,22 +1,29 @@
 \chapter{Metric Definitions}\label{app:metrics}
 
-The metrics were fixed before the main experiment and revised once, on the same day and before its first trial, so
-that a trial ended by a fault counts as a failure instead of being repeated. A \emph{tick} is one 30~Hz control step of
+The metrics were fixed before the first robot experiment and revised twice, each time with every result recomputed from
+the raw files: version~2 (before the first run) counts a trial ended by a fault as a failure instead of repeating it;
+version~3 (before setup~v2) reads the fault label from the run's own record, counts jerk only while the arm moves, and
+adds the recovery time (M11) and the deviation from the policy's plan (M12). A \emph{tick} is one 30~Hz control step of
 the robot computer; the \emph{first action} is the first tick that executes an action from a chunk; \emph{arm joints}
 are the five joints other than the gripper, in degrees.
 
-\begin{table}[htbp]
-\centering
-\caption{Metric definitions.}\label{tab:metricsfull}
-\small
-\begin{tabularx}{\textwidth}{@{}l p{0.2\textwidth} X@{}}
+\begin{longtable}{@{}l >{\raggedright\arraybackslash}p{0.2\textwidth} p{0.66\textwidth}@{}}
+\caption{Metric definitions (version 3).}\label{tab:metricsfull}\\
 \toprule
 & Metric & Definition \\
 \midrule
+\endfirsthead
+\toprule
+& Metric & Definition \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
 M1 & Success rate & The operator presses the success key before the time limit and the result meets the written
   success rule. A failure key, the time limit, or a terminal fault after the first action is a failure. Reported as
   successes over valid trials with a Wilson 95\% interval. \\
-M1f & Ended by a fault & Trials that a terminal fault ended after the first action (failures in M1). \\
+M1f & Ended by a fault & Trials that the control system ended after the first action (failures in M1), read from the
+  run's outcome and first action whatever key the operator pressed. \\
 M1t & Time to success & Seconds from the first action to the success key; successful trials only. \\
 M2 & Stall fraction & Ticks after the first action at which no new action was available (the arm holds), over all
   ticks after the first action. \\
@@ -29,7 +36,8 @@ M5 & Latency estimate error & For every accepted chunk, the scheduler's latency 
 M6 & Server inference time & For every accepted chunk, the server's reported time to produce it. M4 minus M6 is the
   network and queueing share. \\
 M7 & Jerk & The commanded arm-joint positions on the tick grid (held through stalls), third finite difference times
-  $30^3$, root mean square over the five arm joints and all ticks after the first action, in \jerkunit. \\
+  $30^3$, root mean square over the five arm joints and the samples while the arm moves (a sample spans four ticks
+  and counts when at least one of them executed a new action), in \jerkunit. \\
 M8a & Chunk switch disagreement & At every switch to a new chunk, over the steps both chunks cover, the mean Euclidean
   distance between their arm-joint actions. \\
 M8b & Largest step & The largest change of any arm joint between two consecutive commanded positions. \\
@@ -39,11 +47,27 @@ M9 & Held-out action error & On the held-out episodes, from every 10th frame, th
   seed. \\
 M10 & Inference time, GPU memory & The server's inference time over 200 requests from held-out observations after 10
   warm-up requests (median and 95th percentile), and the peak GPU memory. \\
-\bottomrule
-\end{tabularx}
-\end{table}
+M11 & Recovery time & For each timed fault (spike: until its delayed reply is released; drops, outage, rise: until the
+  window ends; with the trial's shift): seconds from the fault's end to the end of the first stall still going then or
+  starting within 1~s after it, or 0 when there is none. Not recovered: the arm never moves again, or the system ended
+  the run before the fault ended. Not counted for that fault: the operator's key or success ended the run first.
+  Reported as recovered over counted runs and the median of the recovered. \\
+M12 & Deviation from the plan & On every executed tick, the mean over the five arm joints of the absolute difference
+  between the commanded position and the newest accepted chunk's raw action for that step (before any smoothing);
+  0 without smoothing. \\
+\end{longtable}
 
-\paragraph{Reporting rules.} Ten valid trials per condition, policy and task, in rounds with a seeded random order. A
-trial voided for a setup mistake is listed but not counted. Every metric is reduced to one value per trial before it is
-summarised. Comparisons are made within one evaluation, against its baseline condition. A report never averages over
-different robot computers or servers. On the replay robot, M2--M8 are reported but not M1.
+\paragraph{Reporting rules.}
+\begin{itemize}
+\item Ten valid trials per condition, policy and task (robot) or eight runs per cell (bench), in rounds with a seeded
+      random order; plans may grow to more trials or more models, never change otherwise.
+\item A trial voided for a setup mistake is listed but not counted; a fault before the first action is not counted
+      and runs again.
+\item Every metric is reduced to one value per trial before it is summarised (median and interquartile range).
+\item Comparisons are made within one plan and for the same policy; each plan names its comparisons, and only its
+      primary ones are tested, Holm-corrected over the plan; the others are exploratory.
+\item A report never averages over different robot computers or servers; the timing metrics are shown per robot
+      computer and server.
+\item On the replay robot, M2--M8, M11 and M12 are reported, not M1; a bench run whose control loop ran below 27~Hz is
+      not counted.
+\end{itemize}

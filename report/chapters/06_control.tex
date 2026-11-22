@@ -15,7 +15,7 @@ deadlines and latched faults. The policy server is LeRobot's, unchanged.
 
 \begin{figure}[htbp]
   \centering
-  \input{figures/architecture}
+  \begin{adjustbox}{max width=\textwidth}\input{figures/architecture}\end{adjustbox}
   \caption{The control loop. The robot computer runs at 30~Hz; the scheduler decides when to request the next chunk,
            and the smoothing shapes the commands sent to the arm. Faults are injected where a real network would cause
            them, so every scheduler reacts to them with its own logic.}

@@ -5,21 +5,24 @@
 Vision-language-action models are too large to run on the small computer that drives a low-cost robot arm, so they are
 served from a remote GPU and every action depends on the network. When the network delays or loses messages, the
 robot's queue of actions empties and the arm stops; the remote-inference client shipped with LeRobot~0.7 then ends the
-run after one second without actions. This project studies that failure on an SO-101 arm and tests whether Distributed
-Real-Time Chunking (\drtc), a scheduling method designed for unreliable networks, recovers it.
+run after one second without actions, and it never replaces a lost reply. This project studies that failure on an
+SO-101 arm and tests whether Distributed Real-Time Chunking (\drtc), a scheduling method designed for unreliable
+networks, recovers it, which of its parts matter, and how the motion can be kept smooth.
 
-We port \drtc{} onto LeRobot~0.7's remote inference, fix four failure modes that appeared on real hardware with
-long-latency, short-chunk models, add command smoothing (a Butterworth low-pass filter and latency-adaptive playback),
-and build an evaluation framework with network fault injection, frozen evaluation plans, randomised trial order and
-automatic statistical reports. In a sorting task with two policies (\smolvla{} and \groot), served from an A100 to a
-laptop over WiFi, a fixed mix of a latency spike, dropped replies and a full outage lowered task success from
-\R{main/smolvla/baseline/M1} and \R{main/groot/baseline/M1} to \R{main/smolvla/faults/M1} for both models. With
-\drtc{} under the same faults, success was \R{main/smolvla/drtc/M1} and \R{main/groot/drtc/M1}
-(\R{main/smolvla/p/faults-drtc/M1} and \R{main/groot/p/faults-drtc/M1} against the faulted baseline), and no trial
-was ended by a fault. Smoothing reduced the jerk of the commanded motion by a factor of \R{main/smolvla/jerkratio} and
-\R{main/groot/jerkratio} (both $p<0.001$) without lowering success (\R{main/smolvla/smooth/M1} and
-\R{main/groot/smooth/M1}). A replay-robot bench with each fault type alone, and an offline evaluation of the trained
-policies' held-out action error and inference cost, support these results.
+We built a platform on LeRobot~0.7 for recording, training, serving and evaluating policies across a laptop, a
+Raspberry~Pi and two shared GPU servers; recorded and trimmed three datasets for two tasks; and trained seven policies
+with their authors' recipes. We ported \drtc{} into LeRobot's remote-inference runtime with four fixes for slow links and
+short chunks, implemented six smoothing methods and seven kinds of network fault, and built an evaluation framework with
+frozen plans, seeded rounds, raw records of every trial, recovery and plan-deviation metrics, and primary comparisons
+tested with the Holm correction. In a first robot run on a sorting task with \smolvla{} and \groot, a mix of a latency
+spike, dropped replies and an outage lowered task success from \R{main/smolvla/baseline/M1} and
+\R{main/groot/baseline/M1} to \R{main/smolvla/faults/M1}, the shipped client ending every faulted trial at the first
+fault. With \drtc{} success was \R{main/smolvla/drtc/M1} and \R{main/groot/drtc/M1}, no trial was ended by a fault, and
+the arm moved again within about a second and a half of every fault; smoothing reduced the jerk by factors of
+\R{main/smolvla/jerkratio} and \R{main/groot/jerkratio} without lowering success. Because the shipped client gives up
+by design, the experiments were redesigned to compare \drtc{} with a client that waits, to remove each of its parts in
+turn, to choose a smoothing combination by a rule fixed in advance, and to cover two tasks and five policies on a
+replay bench; the report gives their design and the results as they arrive.
 
 \vspace{1em}
 \noindent\textbf{Keywords:} robot learning, vision-language-action models, remote inference, action chunking,

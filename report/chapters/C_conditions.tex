@@ -1,3 +1,26 @@
 \chapter{Conditions and Evaluation Plans}\label{app:conditions}
 
-\pending
+The conditions of setup~v2 are generated from one script, so every system and fault is defined once
+(Section~\ref{sec:registry}). Table~\ref{tab:conditionsfull} lists which fault types each system runs under on the
+bench; the robot uses \texttt{upstream\_patient} (no fault and the mix), \texttt{drtc} (the mix) and the chosen stack
+(the mix). The stack's systems (\texttt{stack}, and the stack without each part) are added once the stack is chosen.
+Table~\ref{tab:plans} lists every evaluation plan of the project. The first run's plans (\texttt{sort\_one\_drtc\_main},
+\texttt{bench\_main\_*}) compare the four conditions of Table~\ref{tab:conditions1}.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Setup v2: the bench systems and the fault types each runs under.}
+  \label{tab:conditionsfull}
+  \small
+  \gentable{tab_conditions}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Every evaluation plan: bench or robot, its size, its primary comparisons, and whether its models are frozen.}
+  \label{tab:plans}
+  \small
+  \begin{adjustbox}{max width=\textwidth}
+  \gentable{tab_plans}
+  \end{adjustbox}
+\end{table}

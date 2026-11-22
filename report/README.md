@@ -25,10 +25,10 @@ Needs: pdflatex and latexmk (TeX Live), and the project's environment with the `
 | `config.tex` | **title page details** (title, names, roll numbers, guide, department, institution, date) and which front-matter pages to include |
 | `preamble.tex` | packages, layout (A4, Times 12 pt, 1.5 spacing), and the macros below |
 | `frontmatter/` | title page, certificate, declaration, acknowledgements, abstract, abbreviations |
-| `chapters/` | `01_introduction` ... `07_conclusion`, appendices `A_recipes`, `B_metrics`, `C_reproducibility` |
-| `figures/` | diagrams drawn in TikZ (architecture, fault mix) |
+| `chapters/` | `01_introduction` ... `12_conclusion` (platform, data, policies, control, evaluation, design, results, edge, discussion), appendices `A_recipes`, `B_metrics`, `C_conditions`, `D_reproducibility` |
+| `figures/` | diagrams drawn in TikZ (`colors.tex` shared; pipeline, machines, architecture, fault mix, setup v2 design) |
 | `assets/` | photos you add (see `assets/README.md`); until a file exists, the report shows a framed placeholder |
-| `scripts/build.py` | reads `../results/` and the registry, writes `generated/` |
+| `scripts/build.py`, `scripts/v2_results.py` | read `../results/` and the registry, write `generated/`; setup v2's, E4's and the baselines' tables appear when their results exist |
 | `generated/` | **made by the build, never edited**: `numbers.tex`, `tab_*.tex`, `fig_*.pdf`; `slides/fig_*.png` for the presentation |
 | `references.bib` | references (entries marked `% check` need their details confirmed) |
 

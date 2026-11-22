@@ -1,3 +1,29 @@
 \chapter{The Edge: a Raspberry Pi as the Robot Computer}\label{ch:edge}
 
-\pending
+Remote inference matters most where the robot computer is smallest. The last step of the platform was therefore to
+run the robot side on a Raspberry Pi~5 instead of the laptop, with the policy still on a GPU server.
+
+\section{Setup}
+
+The Pi~5 (8~GB, Debian, no GPU) runs the same software as the laptop with a CPU build of PyTorch, installed by one
+setup script. It uses the same arms and calibration files, copied from the laptop rather than recalibrated, so a
+policy sees the same joint values on either computer; the rig file lists the arms' serial ports for each machine. The
+Pi connects to the laptop's WiFi hotspot. It can use any of the model servers: the A100 or the H200 through an SSH
+tunnel with its own key, or the laptop's GPU directly, in which case the laptop serves on its hotspot address and the
+Pi connects without a tunnel. The evaluation framework records the robot computer of every trial, and reports never
+average across robot computers.
+
+\section{First test}
+
+A test session (not counted) ran the cube-in-box baseline plan from the Pi with the models on the A100. The control loop
+held \R{edge/hz} with no dropped video frames, so the Pi has enough capacity for the robot side at 30~Hz. The round trip,
+however, roughly doubled compared with the laptop: \R{edge/smolvla/rtt} for \smolvla{} and \R{edge/groot/rtt} for
+\groot, because every request now crosses the hotspot's WiFi to the laptop before reaching the server. With the
+shipped client, \groot's 16-action chunk (0.53~s) was shorter than its round trip, and the queue ran dry even without
+faults.
+
+\section{What it means}
+
+The edge is exactly the situation the redesigned experiments are about: a slower, less reliable link and short chunks.
+The two measures that help on the laptop help more here: \drtc's earlier trigger and its re-request, and compressing
+the images, which make up most of each request. The Pi is set up and tested; official trials with it are future work.

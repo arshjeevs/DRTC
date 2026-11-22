@@ -2,25 +2,33 @@
 
 \section{Conclusion}
 
-We studied remote inference of vision-language-action policies on a low-cost SO-101 arm under network faults. With
-the remote-inference client shipped in LeRobot~0.7, a mix of a latency spike, dropped replies and a short outage lowered
-task success on a sorting task from \R{main/smolvla/baseline/M1} and \R{main/groot/baseline/M1} to
-\R{main/smolvla/faults/M1} and \R{main/groot/faults/M1}. Our implementation of Distributed Real-Time Chunking, with four
-fixes for slow links and short chunks, recovered success to \R{main/smolvla/drtc/M1} and \R{main/groot/drtc/M1} under
-the same faults, and no trial was ended by a fault. Command smoothing then reduced the jerk of the motion by factors
-of \R{main/smolvla/jerkratio} and \R{main/groot/jerkratio} without lowering success. A bench with each fault alone
-reproduced the pattern. The claim of the project, that network faults lower the task score, \drtc{} recovers it, and
-smoothing improves the motion, is supported for both policies tested.
+We built a complete platform for remote inference of robot policies on a low-cost SO-101 arm, on top of LeRobot~0.7:
+three recorded and trimmed datasets, seven policies trained with their authors' recipes, our implementation of
+Distributed Real-Time Chunking with four fixes for slow links and short chunks, six smoothing methods, injection of
+seven kinds of network fault, and an evaluation framework that freezes every plan, runs trials in seeded rounds, keeps
+the raw record of every trial and rebuilds every number from it.
+
+In the first robot run, a mix of a latency spike, dropped replies and a short outage lowered the task success of
+LeRobot's shipped client on the sorting task from \R{main/smolvla/baseline/M1} and \R{main/groot/baseline/M1} to
+\R{main/smolvla/faults/M1} and \R{main/groot/faults/M1}; the client itself ended every faulted trial at the first fault.
+With \drtc{} under the same faults success was \R{main/smolvla/drtc/M1} and \R{main/groot/drtc/M1}, no trial was ended by
+a fault, and the arm moved again within about a second and a half of every fault. Smoothing reduced the jerk by factors
+of \R{main/smolvla/jerkratio} and \R{main/groot/jerkratio} without lowering success. Because the shipped client gives up
+by design, the experiments were redesigned (setup~v2) to compare \drtc{} with a client that waits, to take \drtc{} and
+the smoothing apart, and to cover two tasks and five policies on the bench; its results are reported in
+Sections~\ref{sec:v2bench} and~\ref{sec:v2robot} as they arrive.
 
 \section{Future work}
 
 \begin{itemize}
-\item \textbf{Edge robot computer.} Run the same experiments with a Raspberry Pi~5 as the robot computer; it has been
-      set up with the same software.
-\item \textbf{More tasks and policies.} Complete the baselines of all seven policies and repeat the main experiment on
-      the cube-in-box task.
-\item \textbf{Compression.} Compress the camera images to shorten the round trip.
-\item \textbf{Real-time chunking.} Combine \drtc's scheduling with RTC in-painting for the flow-matching policies.
-\item \textbf{Edge fallback.} Run a small policy (ACT) on the robot computer to keep moving while the server is
+\item \textbf{Complete setup~v2} and the baselines, and grow the robot plans to twenty trials where differences are
+      close.
+\item \textbf{More policies and tasks}: \pizerofive{} and MolmoAct~2 when trained, and the robot DRTC experiment on
+      cube in box.
+\item \textbf{The edge}: official runs with the Raspberry Pi~5 as the robot computer (Chapter~\ref{ch:edge}).
+\item \textbf{Compression} of the camera images to shorten the round trip.
+\item \textbf{RTC for relative-action policies} such as GR00T~N1.7, which needs the previous chunk's actions re-anchored
+      to the new state.
+\item \textbf{An edge fallback}: a small policy (ACT) on the robot computer that keeps the arm moving while the server is
       unreachable.
 \end{itemize}

@@ -215,3 +215,40 @@ def robot_v2(results, write, setn, names, wilson, fisher_p) -> None:
             "\\begin{tabular}{l l r r c c}", "\\toprule",
             "Condition & Policy & Successes & Rate & 95\\% interval & Ended by a fault \\\\", "\\midrule",
             *rows, "\\bottomrule", "\\end{tabular}", ""]))
+
+
+def registry_tables(repo, write) -> None:
+    """Appendix C: setup v2's systems x faults (from lab/experiments/v2) and every evaluation plan (lab/evals)."""
+    import yaml
+
+    v2 = repo / "lab" / "experiments" / "v2"
+    names = sorted(p.stem for p in v2.glob("*.yaml"))
+    systems: dict[str, set] = {}
+    for n in names:
+        sysname, _, fault = n.rpartition("__")
+        systems.setdefault(sysname, set()).add(fault)
+    faults = [f for f, _ in FAULTS]
+    rows = []
+    for sysname in systems:
+        desc = (yaml.safe_load((v2 / f"{sysname}__{sorted(systems[sysname])[0]}.yaml").read_text()) or {}).get(
+            "description", "")
+        desc = desc.split(": ", 1)[-1].split("; fault:")[0]
+        cells = ["$\\bullet$" if f in systems[sysname] else "" for f in faults]
+        rows.append(" & ".join([f"\\texttt{{{sysname.replace('_', '\\_')}}}", *cells]) + " \\\\")
+    write("tab_conditions.tex", "\n".join([
+        "\\begin{tabular}{l " + "c" * len(faults) + "}", "\\toprule",
+        "System & " + " & ".join(faults) + " \\\\", "\\midrule", *rows, "\\bottomrule", "\\end{tabular}", ""]))
+    rows = []
+    for p in sorted((repo / "lab" / "evals").glob("*.yaml")):
+        d = yaml.safe_load(p.read_text()) or {}
+        if not d.get("models"):
+            continue
+        kind = "bench" if d.get("robot") == "replay" else "robot"
+        frozen = "yes" if d.get("frozen") and all(m in d["frozen"] for m in d["models"]) else "no"
+        rows.append(" & ".join([f"\\texttt{{{p.stem.replace('_', '\\_')}}}", kind, str(len(d["models"])),
+                                str(len(d.get("conditions", {}))), str(d.get("trials", "")),
+                                str(len(d.get("primary", []))), frozen]) + " \\\\")
+    write("tab_plans.tex", "\n".join([
+        "\\begin{tabular}{l l r r r r c}", "\\toprule",
+        "Plan & Kind & Models & Conditions & Trials & Primary & Frozen \\\\", "\\midrule", *rows, "\\bottomrule",
+        "\\end{tabular}", ""]))
