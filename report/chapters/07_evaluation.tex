@@ -1,0 +1,165 @@
+\chapter{Evaluation Framework}\label{ch:evaluation}
+
+Every result in this report comes from one framework, built so that a result can only be made one way and can always
+be traced back to the raw records of its trials. This chapter describes it; Chapter~\ref{ch:design} describes the
+experiments run with it.
+
+\section{Three kinds of evaluation}\label{sec:three-evals}
+
+\begin{table}[htbp]
+  \centering
+  \caption{The three kinds of evaluation.}
+  \label{tab:evalkinds}
+  \small
+  \begin{tabularx}{\textwidth}{l X X X}
+    \toprule
+    & Offline & Robot & Bench \\
+    \midrule
+    Question & did the policy learn the movements; how fast and large is it? & does the robot do the task under
+      each condition? & what does each fault do to the timing and the motion? \\
+    Arm moves & no & yes & no (replay robot) \\
+    Operator & no & yes: sets the layout, judges success & no \\
+    Network & none & the real one (WiFi) & simulated, as measured on the robot \\
+    Policy input & held-out recorded frames & the live cameras & held-out episodes, played as if live \\
+    Metrics & M9, M10 & M1 and M2--M12 & M2--M8, M11, M12 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\paragraph{Offline.}\label{sec:offline-design} Without a robot, each trained policy predicts a chunk from every tenth
+frame of every held-out episode, and the first 15 predicted actions (0.5~s, which every policy's chunk covers) are
+compared with the 15 recorded actions that follow (M9). Flow and diffusion policies use one sample with a fixed seed.
+The same run times 200 requests after 10 warm-up requests and records the peak GPU memory (M10). It runs for the served
+checkpoint and the last one, right after each training.
+
+\paragraph{Robot.} The real system end to end: the laptop drives the arm and sends observations over WiFi to a policy
+server; the operator sets the layout, starts each trial and judges success.
+
+\paragraph{Bench.}\label{sec:bench-design} The same pipeline without the arm: the replay robot plays a held-out episode
+as its camera images and joint states, and the policy server runs on the same GPU machine. The network to the robot is
+simulated on every reply as measured on the robot: 250~ms with up to 20~ms of jitter (the network share of the
+turnaround of the first robot run). Each run replays the next held-out episode. Nothing moves and the images do not
+react to the actions, so the bench has no task success; it measures what every condition does to the timing and the
+motion, under each fault type, many times, without operator time. A run whose control loop falls below 27~Hz is not
+counted.
+
+\section{Evaluation plans}\label{sec:evalplans}
+
+Each study is one plan file: its models, its conditions, the number of trials, the written success rule, the time
+limit, the comparisons the report makes, and which of them are tested. Before the first trial the plan is
+\emph{frozen}: every model is pinned to the exact Hub commit it will be served at. The model servers serve only that
+commit, under a name that contains it, so a session cannot reach any other version of a model.
+
+\paragraph{Rounds.} Trials run in rounds. A round runs every model under every condition once, in a random order
+seeded by the plan's seed and the round number, so every machine computes the same order. Slow drifts (light, motor
+temperature, the operator's attention) therefore affect all conditions alike. One layout of the objects is used for all
+trials of a round, and the layouts rotate over the rounds as in the recording.
+
+\paragraph{Labels.} During a trial the operator presses \texttt{s} when the task is done by the written rule (which
+also stops the clock for the time to success) or \texttt{f} when it will not succeed; the time limit (30~s) is a
+failure. When the control system itself ends the run after the first action (a terminal fault), the trial is a failure
+labelled \texttt{fault}, whatever key is pressed afterwards: the label is read from the run's own record, and the key
+is kept separately. A fault before the first action is a setup problem: the trial is not counted and runs again in a
+later round. A trial with a setup mistake (an object off its mark, a cable caught) is \emph{voided} with a reason; it is
+kept and listed, never deleted, and runs again later. Voiding is never used for a policy's failure.
+
+\paragraph{Growth.}\label{sec:growth} A plan with trials may only grow. The number of trials may go up: the next rounds
+continue where the plan stood. Models may be added: freezing then pins only the added ones, the frozen ones never
+change, and the next rounds run the new models until they have as many trials as the others. Everything else (a
+condition, the task, the success rule, the time limit, a model's version) needs a new plan, which the session refuses
+to mix with the old one. Stopping at the end of a round keeps every condition at the same number of trials.
+
+\section{Records and the results store}\label{sec:records}
+
+Every trial stores its raw files: one row per control tick (the queue, stalls, the latency estimate, the commanded and
+the measured joints, and the policy's own planned action for the step), one row per chunk (send and receive times,
+turnaround, server timings, the estimate at sending, the disagreement at the switch), the injected faults, the
+scheduler's recovery actions, the trial's configuration (including its fault shift), its label and key, the log, and a
+video from each camera. Raw files are written once and never edited. A session is one sitting on one robot computer
+with one server; it is pushed to the results store when it ends, and before a session starts the store is pulled, so
+the next round accounts for every machine's trials. Reports, tables and figures are always rebuilt from the raw files,
+so a change of metrics is one rebuild, and every number in this report can be traced to its trials. Test runs go to a
+separate scratch folder that no report reads.
+
+\section{Metrics}\label{sec:metrics}
+
+Table~\ref{tab:metrics} summarises the metrics (version~3); Appendix~\ref{app:metrics} gives the full definitions.
+Every metric is first reduced to one value per trial and then summarised over the trials (median and interquartile
+range), so long trials do not weigh more than short ones. Times are measured on one machine's monotonic clock.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Metrics (version 3).}
+  \label{tab:metrics}
+  \small
+  \begin{tabularx}{\textwidth}{l l X}
+    \toprule
+    & Metric & Definition \\
+    \midrule
+    M1 & Success rate & Successful trials over valid trials, with a Wilson 95\% interval \\
+    M1f & Ended by a fault & Trials that the system ended after the first action \\
+    M1t & Time to success & From the first action to the success key \\
+    M2 & Stall fraction & Share of control ticks after the first action without a new action \\
+    M3 & Stalls & Number of stall events; the longest stall in seconds \\
+    M4 & Turnaround & From sending an observation to receiving its chunk (median and 95th percentile) \\
+    M5 & Estimate error & The scheduler's latency estimate minus the measured turnaround \\
+    M6 & Inference time & The server's reported time per chunk; $\mathrm{M4}-\mathrm{M6}$ is the network share \\
+    M7 & Jerk & Root mean square of the third time derivative of the commanded arm joints, while the arm moves \\
+    M8 & Chunk switch, largest step & Disagreement between chunks at a switch; the largest change between two ticks \\
+    M9 & Held-out error & Offline: mean absolute error of the first 15 predicted actions on held-out episodes \\
+    M10 & Inference cost & Offline: inference time over 200 requests, and peak GPU memory \\
+    M11 & Recovery time & Per fault: from its end until the arm moves again, or \enquote{not recovered} \\
+    M12 & Deviation from the plan & Mean distance between the commanded position and the policy's own action \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+With $T$ the ticks after the first action and $s_t=1$ when tick $t$ has no new action, the stall fraction is
+$\mathrm{M2} = \frac{1}{T}\sum_t s_t$. With $q_{j,t}$ the commanded position of arm joint $j$ on the 30~Hz tick grid
+(held through stalls) and $\mathcal{M}$ the jerk samples whose four ticks include at least one executed action, the
+jerk is
+\begin{equation}
+  \mathrm{M7} = \sqrt{\frac{1}{5\,|\mathcal{M}|} \sum_{j=1}^{5} \sum_{t\in\mathcal{M}} \Bigl( f^3\,\bigl(q_{j,t+3}
+  - 3q_{j,t+2} + 3q_{j,t+1} - q_{j,t}\bigr) \Bigr)^{2}}, \qquad f = 30~\mathrm{Hz},
+\end{equation}
+in \jerkunit. Counting only the samples while the arm moves matters: holding still has zero jerk, so over the whole run
+a system that stalls more would look smoother. The stop and the restart around a stall still count.
+
+\paragraph{Recovery (M11).} For each timed fault, its end is known from the plan and the trial's shift (a spike ends
+when its delayed reply is released). The recovery time is the time from the fault's end until the arm moves again:
+the end of the first stall that is still going at that moment or starts within 1~s after it (a reply lost near the end
+of a window shows only when the queue runs dry), and 0 when there is none. A run in which the arm never moves again,
+or which the system ended before the fault did, is \emph{not recovered}. A run that the operator's key or success ended
+first is not counted for that fault.
+
+\paragraph{Deviation from the plan (M12).} Smoothing changes what the arm is sent; M12 measures how far from what the
+policy asked for. On every executed tick it is the mean over the five arm joints of the distance between the commanded
+position and the newest accepted chunk's raw action for that step, before any smoothing. It is 0 without smoothing, and
+grows with a filter's lag.
+
+\section{Statistics}\label{sec:stats}
+
+Success rates are reported with Wilson 95\% intervals~\cite{wilson1927}. Differences in success between two conditions
+of the same policy use Fisher's exact test~\cite{fisher1935}, and differences in the other metrics the two-sided
+Mann--Whitney $U$ test~\cite{mann1947} on the per-trial values; in a test of M11 a run that never moved again ranks
+after every recovered run. Comparisons are made only within one plan (same sessions, interleaved trials) and only for
+the same policy.
+
+With dozens of conditions and metrics, a report can contain thousands of comparisons, and at a 5\% level many would
+look significant by chance. Each plan therefore names its comparisons in advance, and a few of them as \emph{primary}:
+only those are tested, with the Holm correction~\cite{holm1979} over all primary tests of the plan, and the report also
+counts in how many policies the condition is better. Every other comparison is shown as exploratory, with its effect
+and an uncorrected $p$-value.
+
+\section{Choosing the smoothing stack}\label{sec:stackrule}
+
+The stack is adaptive playback and the resume ramp, plus one seam method (RTC or temporal ensembling) and one jitter
+method (zero-lag smoothing or the Butterworth filter). The two choices are made from the bench by a rule fixed before
+the bench ran, and applied by a script. For each policy and dataset, each candidate is compared with \drtc{} alone in
+its own plan. A candidate is ruled out for that pair if it adds more than 1\degree{} of median deviation from the plan
+(M12), or raises the median stall fraction (M2) or any median recovery time (M11) by more than 10\% (at least 0.5
+percentage points and 0.05~s), or recovers in fewer runs. Of the candidates left, the one with the lower jerk relative to
+its reference wins the pair; within 1\%, the lower largest step. The candidate winning more pairs is chosen. The guard
+on M12 matters because the bench has no task success: without it, the rule would favour whatever smooths hardest,
+including by lagging behind the policy, which on the robot can cost a grasp. Policies without RTC use temporal
+ensembling as the seam method.

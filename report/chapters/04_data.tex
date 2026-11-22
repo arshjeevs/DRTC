@@ -1,0 +1,80 @@
+\chapter{Data}\label{ch:data}
+
+\section{Tasks}\label{sec:tasks}
+
+Two tasks were recorded, on three datasets (Table~\ref{tab:datasets}, Figure~\ref{fig:tasks}).
+\begin{itemize}
+\item \textbf{Cube in box.} A green cube is picked up and put into a box. It is done when the cube is inside the box
+      and the gripper is open. The first recording (v0) was a smaller, initial dataset; the second (v1) repeats the
+      task with more demonstrations and the final camera arrangement.
+\item \textbf{Sorting.} A red or a blue cube, at a fixed position, is put into the square of its colour; the two
+      coloured squares swap sides between layouts. It is done when the cube is fully inside the square of its colour
+      and the gripper has let go of it. Sorting needs the policy to read the scene (which colour, which side), not
+      only to repeat one motion, and is the main task of the DRTC experiments.
+\end{itemize}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Datasets (pinned Hub revisions). Joint units: degrees, or LeRobot's normalised range ($-100$ to $100$) for
+           the cube-in-box recordings.}
+  \label{tab:datasets}
+  \small
+  \gentable{tab_datasets}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \begin{subfigure}[t]{0.48\textwidth}
+    \centering
+    \photo[\textwidth]{task_sort_one.jpg}{The sorting task: the cube and the coloured squares, seen by the scene camera.}
+    \caption{Sorting.}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.48\textwidth}
+    \centering
+    \photo[\textwidth]{task_cubebox.jpg}{The cube-in-box task.}
+    \caption{Cube in box.}
+  \end{subfigure}
+  \caption{The two tasks.}
+  \label{fig:tasks}
+\end{figure}
+
+\section{Recording}\label{sec:recording}
+
+Demonstrations are recorded by teleoperation: the operator moves the leader arm by hand and the follower copies it,
+while both cameras and the follower's joint positions are recorded at 30~fps. One command runs the whole recording
+session from the registry's rig: it opens the arms and cameras, counts episodes with a fixed episode time and reset
+time, and afterwards checks the recording (dropped frames, camera rates, joint limits), trims it, pushes it to the Hub
+and writes its pinned registry entry.
+
+\paragraph{Held-out episodes on top.} A recording of $N+K$ episodes is planned from the start: $N$ to train on and
+$K$ held out, chosen by a seeded random split and never used for training. The held-out episodes pick the best
+checkpoint during training, give the offline action error (Section~\ref{sec:offline-design}), and are what the replay
+bench plays (Section~\ref{sec:bench-design}). Sorting has $80+8$ episodes, cube in box v1 $100+10$.
+
+\paragraph{Layouts.} The object positions are taped on the task board. The layouts rotate in a fixed, balanced order
+over the episodes (for sorting: red or blue cube, times the two sides of the squares, four combinations), so every
+combination is equally represented in training and in the held-out episodes.
+
+\section{Trimming and editing}\label{sec:trimming}
+
+A recorded episode starts and ends with the arm at rest while the operator gets ready and lets go. Trained on such
+episodes, a policy learns that standing still is a valid action at the start: published SO-101 results show that
+\enquote{never starting} is a major failure mode, which trimming the idle start and end removed almost
+entirely~\cite{valloss2026}. Every dataset is therefore kept in two copies:
+\begin{itemize}
+\item the \textbf{raw} copy, the recording as made, which is the only copy ever edited; and
+\item the \textbf{trimmed} copy, rebuilt from the raw one after every change, which is the one models train on.
+\end{itemize}
+The automatic trim measures the recording's own joint noise floor and cuts each episode's start and end where the arm
+is still, without re-encoding the videos (each episode's video window moves). Editing tools on top let the operator
+inspect every episode, view it, delete bad episodes (the rest are renumbered), set a manual trim, undo the last edit
+and push. Manual trims are stored inside the raw copy, so they travel with it. Deleting episodes changes the seeded
+held-out split, so all editing happens before training.
+
+\section{Versions and splits}\label{sec:versions}
+
+A dataset in the registry is pinned to one Hub revision, with its episode and frame counts and its joint units; a
+training run refuses a local copy that does not match. The trimmed copy has the plain name and the raw copy the suffix
+\texttt{\_raw}, so a name without the suffix is always trimmed. The joint units are part of the entry because the two
+cube-in-box recordings use LeRobot's normalised range and the sorting recording uses degrees; datasets in different
+units are never mixed, and errors are only compared within one dataset.

@@ -1,0 +1,148 @@
+\chapter{The Platform}\label{ch:platform}
+
+This chapter describes what the experiments run on: the robot and its cameras, the computers, the software layer we
+built on LeRobot~0.7, and how work moves between the machines. Figure~\ref{fig:pipeline} shows the whole path of the
+project, from a recorded dataset to the report; the following chapters take its stages in turn.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/pipeline}
+  \caption{The path of the project. Datasets are recorded and trimmed on the laptop, policies are trained on the GPU
+           servers, and every trained policy is evaluated in three ways: offline, on the robot, and on the replay
+           bench. The report is rebuilt from the raw result files.}
+  \label{fig:pipeline}
+\end{figure}
+
+\section{Hardware}\label{sec:hardware}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Hardware.}
+  \label{tab:hardware}
+  \small
+  \begin{tabularx}{\textwidth}{l X}
+    \toprule
+    Component & Description \\
+    \midrule
+    Arm & SO-101 follower arm~\cite{so101}: six Feetech servos, joint targets in degrees; an identical leader arm,
+          moved by hand, for recording \\
+    Wrist camera & Zebronics Zeb Live Pro on the gripper, $800\times600$ MJPG at 30~fps \\
+    Scene camera & An Android phone over USB, bridged to a virtual video device (DroidCam), $800\times600$ at 30~fps;
+                   always the same phone, on a fixed mount \\
+    Robot computer & Laptop: Linux, NVIDIA RTX~4060 Laptop GPU (8~GB). Runs the arm, the cameras and the client at
+                     30~Hz; the robot computer of every official experiment \\
+    Edge computer & Raspberry Pi~5 (8~GB, no GPU), as an alternative robot computer (Chapter~\ref{ch:edge}) \\
+    GPU server 1 & NVIDIA A100 80~GB PCIe on a shared server (driver for CUDA $\le$ 12.8) \\
+    GPU server 2 & NVIDIA H200 NVL 141~GB on a shared server, inside a container (driver for CUDA $\le$ 13.0) \\
+    Network & Laptop to server over WiFi and the local network; the Pi reaches the laptop through its hotspot \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+Table~\ref{tab:hardware} lists the hardware and Figures~\ref{fig:setup} and~\ref{fig:robot} show it. The two cameras
+have fixed roles: the wrist camera sees the object and the gripper at close range, the scene camera sees the whole
+task area. Both are read at $800\times600$, and every request to a policy server carries both images uncompressed
+($2\times800\times600\times3$~bytes $\approx$~2.9~MB) together with the six joint positions. The phone is bridged
+to a virtual video device at every boot so that it appears to LeRobot like any other camera; the arms, their serial
+ports and the calibration files are described in a versioned \emph{rig} file, so every recording and every trial
+records exactly which hardware it used.
+
+\begin{figure}[htbp]
+  \centering
+  \photo[0.9\textwidth]{setup.jpg}{The whole setup: the SO-101 arm, the task board, the cameras and the laptop.}
+  \caption{The experimental setup.}
+  \label{fig:setup}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \begin{subfigure}[t]{0.48\textwidth}
+    \centering
+    \photo[\textwidth]{arm_wrist_camera.jpg}{The follower arm with the wrist camera.}
+    \caption{Follower arm and wrist camera.}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.48\textwidth}
+    \centering
+    \photo[\textwidth]{scene_camera.jpg}{The scene camera (phone) and its view of the task.}
+    \caption{Scene camera.}
+  \end{subfigure}
+  \caption{The robot and its cameras.}
+  \label{fig:robot}
+\end{figure}
+
+\section{Software: a layer on LeRobot 0.7}\label{sec:software}
+
+The project is built on LeRobot~0.7~\cite{lerobot}, used as a pinned dependency and not modified. Everything of our
+own lives in a separate layer on top of it, so that LeRobot's training, policy server, robot drivers and safety checks
+are used exactly as they ship, and every change we make is in our own code where it can be tested. The layer has
+four parts:
+\begin{itemize}
+\item \textbf{The registry}: plain YAML files that describe everything an experiment depends on (next section).
+\item \textbf{The \texttt{lab} command}: one entry point that records, trims, trains, serves, runs and evaluates from
+      the registry, and builds the exact LeRobot command for each step.
+\item \textbf{Two LeRobot plugins}, found by LeRobot through its plugin mechanism: GR00T~N1.5, which LeRobot removed
+      after version~0.5.1, ported as a policy plugin with guided RTC (Section~\ref{sec:rtcmethod}); and a
+      \emph{replay robot}, a robot driver that plays a recorded episode as its camera images and joint states, which
+      the bench uses in place of the arm (Section~\ref{sec:bench-design}).
+\item \textbf{The control layer}: our \drtc{} scheduler, the smoothing methods and the fault injector, which run inside
+      LeRobot's remote-inference engine (Chapter~\ref{ch:control}), and the evaluation framework
+      (Chapter~\ref{ch:evaluation}).
+\end{itemize}
+The software runs on Linux on every machine: Python~3.12, PyTorch~2.14.1 built for each server's CUDA version, and
+LeRobot's optional dependencies for the robot, the cameras and the policies. The layer is covered by
+\R{software/tests} automated tests, which run on the laptop without a GPU or a robot.
+
+\section{The registry}\label{sec:registry}
+
+Every object an experiment depends on is a small file in the repository, and every file refers to the others by name:
+
+\begin{table}[htbp]
+  \centering
+  \caption{The registry: what each kind of file fixes.}
+  \label{tab:registry}
+  \small
+  \begin{tabularx}{\textwidth}{l X}
+    \toprule
+    File & What it fixes \\
+    \midrule
+    Rig & the arms (serial ports per machine, calibration files), the cameras (device, role, resolution) \\
+    Dataset & the Hub repository, pinned to one revision with its episode and frame counts, the joint units, the task
+              instruction, the held-out split, and which recording it was trimmed from \\
+    Recipe & how a policy is trained: its authors' settings, unchanged (Section~\ref{sec:recipes}) \\
+    Model & a recipe applied to a dataset; its Hub repository and status \\
+    Host & a machine: its role, GPUs, login, folders, secrets file and CPU budget for parallel trainings \\
+    Condition & one way of running the robot side and the network: scheduler, smoothing, faults
+                (Chapter~\ref{ch:control}) \\
+    Evaluation & one study: the models, conditions, trials, success rule and time limit, frozen before the first
+                 trial (Chapter~\ref{ch:evaluation}) \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+Because a model names its recipe and dataset, and the dataset names its revision, a model's name determines exactly
+what it was trained on and how. A condition composes the shared defaults, the rig and the model, so the same condition
+file is used for every policy. Generated files are made by small scripts in the registry itself; the conditions of the
+main experiments (Chapter~\ref{ch:design}) are generated this way, so their systems and faults are identical
+everywhere.
+
+\section{Machines and how work moves between them}\label{sec:machines}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/machines}
+  \caption{The machines and the three places that carry work between them. Code and plans travel through git,
+           datasets and models through the Hugging Face Hub, and every official result through a private results
+           store. During a robot session the laptop reaches the model server through an SSH tunnel.}
+  \label{fig:machines}
+\end{figure}
+
+Work is never copied between machines by hand (Figure~\ref{fig:machines}). Git carries the code and the registry, so a
+GPU server learns about a new dataset or an evaluation plan with a \texttt{git pull}. The Hugging Face Hub carries the
+datasets and every checkpoint of every trained model. A private dataset repository on the Hub serves as the
+\emph{results store}: every official session is pushed there when it ends, and every report is rebuilt from it.
+
+Both GPU servers are shared with other users and cannot be changed, so the software adapts to them: each gets the
+PyTorch build its driver supports, long jobs run in terminal multiplexer sessions that survive a logout, the H200's
+work runs inside a container started the way the server's guide prescribes, and nothing outside the project's folder
+is ever written or deleted. During a robot session the laptop reaches the model server through one SSH connection
+that forwards a port for every served model; on the H200 the connection reaches into the container.

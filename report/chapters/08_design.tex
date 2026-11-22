@@ -1,0 +1,115 @@
+\chapter{Experimental Design}\label{ch:design}
+
+The DRTC and smoothing experiments were run in two stages. A first robot experiment (20~November 2026) compared
+LeRobot's client as shipped with \drtc{} and with \drtc{} plus smoothing. Its outcome showed that the comparison was
+not yet fair, and the experiments were redesigned as \emph{setup~v2} (22~November 2026), which is the main design of
+this report. This chapter describes both, and the baselines of all policies.
+
+\section{The first run}\label{sec:firstrun}
+
+The first run used \smolvla{} and \groot{} on the sorting task, ten trials per condition, under four conditions on the
+real network (Table~\ref{tab:conditions1}). Conditions 2--4 added the fault mix without a shift.
+
+\begin{table}[htbp]
+  \centering
+  \caption{The conditions of the first run.}
+  \label{tab:conditions1}
+  \small
+  \begin{tabularx}{\textwidth}{c l l X}
+    \toprule
+    \# & Condition & Network & Robot side \\
+    \midrule
+    1 & Baseline & normal & upstream as shipped (1~s grace, 5~s request deadline) \\
+    2 & Baseline + faults & fault mix & as 1 \\
+    3 & \drtc{} + faults & fault mix & \drtc{} with our fixes; no smoothing; holds the arm through stalls \\
+    4 & \drtc{} + smoothing + faults & fault mix & as 3, with the Butterworth filter and adaptive playback \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\section{Why it was redesigned}\label{sec:redesign}
+
+Every trial of condition~2 was ended by upstream's own one-second starvation grace at the first fault, the latency
+spike (Section~\ref{sec:main}). Three things followed.
+\begin{itemize}
+\item The faulted baseline gave up by design, and raising its limit is a single setting. Beating it shows that the
+      default is fragile, not that \drtc's scheduling is better.
+\item Condition~3 differed from condition~2 in two things at once: the scheduling and the patience (a whole-trial
+      grace). The recovery could not be attributed to either.
+\item Condition~4 added two smoothing methods at once, so their effects could not be separated, and the bench had used
+      only two policies and one task.
+\end{itemize}
+Setup~v2 therefore compares \drtc{} with a \emph{patient} upstream that has the same limits (Section~\ref{sec:baseline}),
+adds the ablations that take \drtc{} apart, tests each smoothing method on its own before combining them, runs the bench
+on both tasks and five policies, and moves the faults by a seeded shift so they also hit the grasp.
+
+\section{Setup v2}\label{sec:setupv2}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/design}
+  \caption{Setup v2. The bench experiments E1--E3a run first; E3a chooses the smoothing stack by a rule fixed in
+           advance; E3b tests the stack on the bench and E4 on the robot.}
+  \label{fig:design}
+\end{figure}
+
+\paragraph{The bench} runs on the sorting and the cube-in-box v1 tasks for the five trained policies (\smolvla, \groot,
+GR00T~N1.7, ACT, Diffusion Policy; \pizerofive{} and MolmoAct~2 join when trained), eight runs per cell, 14~s each.
+\begin{itemize}
+\item \textbf{E1, \drtc{} against upstream:} upstream patient, upstream as shipped and \drtc, under every fault type of
+      Table~\ref{tab:faults} (as shipped without the fault-free cell).
+\item \textbf{E2, ablations:} \drtc{} without its cooldown (A1), with upstream's latency estimate (A2), with upstream's
+      trigger (A3), with the original $H/2$ cooldown cap (A4, which undoes our first fix), under every fault type; and
+      $s_{\min}$ at half and one and a half times its value (A5), with no fault and under the mix.
+\item \textbf{E3a, smoothing methods:} \drtc{} under the mix with each method of Table~\ref{tab:smoothing} alone, and
+      with the Butterworth filter plus adaptive playback (the first run's condition~4); RTC only for \smolvla{} and
+      \groot.
+\item \textbf{E3b, the stack:} the stack chosen by the rule of Section~\ref{sec:stackrule}, without faults and under the
+      mix, and the stack without each of its parts. When the stack uses RTC, the policies without it are run with
+      ensembling instead, in a plan of their own.
+\end{itemize}
+E1 and E2 share one plan per task (52 conditions), so every ablation is compared with \drtc{} inside the same sessions.
+
+\paragraph{The robot experiment E4} runs \smolvla{} and \groot{} on sorting, ten trials per condition, on the real
+network: upstream patient without faults and under the mix, \drtc{} under the mix, and \drtc{} with the stack under the
+mix.
+
+\paragraph{Claims and primary comparisons.} Table~\ref{tab:claims} lists the comparisons that are tested; everything
+else is exploratory (Section~\ref{sec:stats}).
+
+\begin{table}[htbp]
+  \centering
+  \caption{The claims and their primary comparisons.}
+  \label{tab:claims}
+  \small
+  \begin{tabularx}{\textwidth}{X l l}
+    \toprule
+    Claim & Comparison & Metric \\
+    \midrule
+    Faults hurt even a client that waits & E4: upstream patient + mix against no fault & M1 \\
+    \drtc's scheduling beats waiting & E4: \drtc{} + mix against upstream patient + mix & M1 \\
+     & E1: \drtc{} against upstream patient, each fault type & M2, M11 \\
+    Smoothing improves the motion without lowering success & E4: \drtc{} + stack against \drtc, under the mix & M1 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\section{Baselines}\label{sec:baselines-design}
+
+Every trained policy is also evaluated on the robot on both tasks without faults, with patient upstream (the same
+reference condition as E4), ten trials each. The baseline plans start with the five trained policies and grow as the
+others are trained (Section~\ref{sec:growth}); the cube-in-box v0 baseline of the first two policies is optional.
+
+\section{Protocol}\label{sec:protocol}
+
+\begin{itemize}
+\item \textbf{Machines.} The laptop is the robot computer of every official trial, and one model server serves a whole
+      plan where possible; every trial records its robot computer and server, and the timing metrics are never
+      averaged across them.
+\item \textbf{Sessions.} One session at a time, from one laptop; each session pulls the results store first and pushes
+      at the end.
+\item \textbf{Layouts.} One layout per round, rotated over the rounds as in the recording.
+\item \textbf{Warm-up.} Plans with an RTC condition begin with one uncounted warm-up round (Section~\ref{sec:rtcmethod}).
+\item \textbf{Growth.} When there is time, in this order: E4 to 20 trials; the robot DRTC experiment on cube in box v1;
+      E4 with a third policy; the baselines to 20 trials; robot runs of a bench fault type that behaved unexpectedly.
+\end{itemize}

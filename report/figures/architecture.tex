@@ -1,11 +1,5 @@
 % System overview: robot computer, network with fault injection, GPU server. Colour is allowed in figures.
-\definecolor{robotfill}{HTML}{EAF2FC}
-\definecolor{robotline}{HTML}{2A78D6}
-\definecolor{serverfill}{HTML}{FDEEE7}
-\definecolor{serverline}{HTML}{EB6834}
-\definecolor{netfill}{HTML}{F0EFEC}
-\definecolor{ink}{HTML}{0B0B0B}
-\definecolor{ink2}{HTML}{52514E}
+\input{figures/colors}
 \begin{tikzpicture}[
   font=\small, node distance=4mm and 6mm,
   blk/.style={draw=#1, rounded corners=2pt, thick, fill=white, align=center, minimum height=8mm, inner sep=3pt},
@@ -16,7 +10,7 @@
 \node[blk=robotline, minimum width=27mm, below=of cams] (arm) {SO-101 arm\\ (follower)};
 \node[blk=robotline, minimum width=30mm, right=10mm of cams] (sched) {Scheduler\\ upstream \textbar{} \drtc};
 \node[blk=robotline, minimum width=30mm, below=of sched] (queue) {Action queue};
-\node[blk=robotline, minimum width=30mm, below=of queue] (smooth) {Smoothing\\ filter, playback};
+\node[blk=robotline, minimum width=30mm, below=of queue] (smooth) {Smoothing\\ (the stack)};
 \begin{scope}[on background layer]
   \node[draw=robotline, fill=robotfill, rounded corners=4pt, thick, fit=(cams)(arm)(sched)(queue)(smooth),
         inner sep=5mm, label={[font=\small\bfseries, text=ink]above:Robot computer (laptop), 30~Hz}] (rc) {};
@@ -26,10 +20,10 @@
       right=14mm of queue] (net) {Network\\ (WiFi)\\[6pt] \textbf{fault}\\ \textbf{injection}};
 % server
 \node[blk=serverline, minimum width=30mm, right=14mm of net, yshift=8mm] (ps) {Policy server\\ (LeRobot 0.7)};
-\node[blk=serverline, minimum width=30mm, below=of ps] (pol) {Policy\\ \smolvla{} \textbar{} \groot};
+\node[blk=serverline, minimum width=30mm, below=of ps] (pol) {Policy\\ (one of seven)};
 \begin{scope}[on background layer]
   \node[draw=serverline, fill=serverfill, rounded corners=4pt, thick, fit=(ps)(pol), inner sep=5mm,
-        label={[font=\small\bfseries, text=ink]above:GPU server (A100)}] (srv) {};
+        label={[font=\small\bfseries, text=ink]above:GPU server (A100, H200 or laptop)}] (srv) {};
 \end{scope}
 % flows
 \draw[arr] (cams) -- node[above, font=\scriptsize]{images} (sched);

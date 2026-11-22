@@ -1,0 +1,13 @@
+% Setup v2: the bench experiments feed the choice of the stack, which the robot experiment uses.
+\input{figures/colors}
+\begin{tikzpicture}[font=\small, node distance=5mm and 8mm,
+  b/.style={draw=#1, thick, rounded corners=2pt, fill=white, align=left, text width=40mm, inner sep=4pt},
+  arr/.style={-{Latex[length=2.2mm]}, thick, ink2}]
+\node[b=greenline] (e12) {\textbf{E1 + E2} (bench)\\ upstream patient, as shipped, \drtc;\\ \drtc{} without each part\\ $\times$ 7 fault types};
+\node[b=greenline, below=of e12] (e3a) {\textbf{E3a} (bench)\\ each smoothing method alone\\ on \drtc{} + mix};
+\node[b=purpleline, right=of e3a] (rule) {\textbf{The stack rule}\\ lowest jerk, unless\\ M12 +1\degree{} or\\ M2 / M11 +10\%};
+\node[b=greenline, right=of rule, yshift=14mm] (e3b) {\textbf{E3b} (bench)\\ the stack, and the stack\\ without each part};
+\node[b=robotline, right=of rule, yshift=-14mm] (e4) {\textbf{E4} (robot, success)\\ patient upstream, + mix,\\ \drtc{} + mix, + stack + mix};
+\draw[arr] (e3a) -- (rule); \draw[arr] (rule.east) -- ++(3mm,0) |- (e3b.west); \draw[arr] (rule.east) -- ++(3mm,0) |- (e4.west);
+\node[right=8mm of e12, text width=60mm, font=\scriptsize, text=ink2, align=left] {Bench: replay robot, simulated network\\ sorting + cube in box v1, five policies, 8 runs per cell};
+\end{tikzpicture}
