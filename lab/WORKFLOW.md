@@ -60,9 +60,10 @@ interleaved in the same sessions. A frozen eval that has trials is never changed
 
 | Situation | Make this eval | In it |
 |---|---|---|
-| A task's baseline (e.g. `so101_cubebox_v1`) | `cubebox_v1_baseline` | every trained model of the task; the one condition `baseline: main/baseline` |
-| A new model or more data for a task | `<task>_baseline_v2` | the new model(s) **plus** the ones to beat, run again side by side |
-| A method compared with the baseline | like `sort_one_drtc_main` | the chosen models; conditions `baseline` + the methods (`main/...`) |
+| A task's baseline (e.g. `so101_cubebox_v1`) | `cubebox_v1_baseline` | every trained model of the task; the one condition `baseline: v2_robot/upstream_patient__none` |
+| A model trained later | the same baseline eval, grown ([Growing an eval](#growing-an-eval-more-trials-more-models)) | add it under `models:` and freeze: only it is frozen |
+| A new version of a model, or more data for a task | `<task>_baseline_v2` | the new model(s) **plus** the ones to beat, run again side by side |
+| A method compared with the baseline | like `sort_one_drtc_v2` (setup v2, E4) | the chosen models; conditions from `v2_robot/` (made by `experiments/v2/_make.py`) and the eval's `comparisons:` |
 
 Only `lab eval run` makes official results (`results/evals/`). Anything else you try (`lab run`, `--test`, `--replay`)
 goes to `results/scratch/` and never into the results.
@@ -148,6 +149,20 @@ runs and pushes the session). Ctrl-C stops at once: the run in progress is not c
 the session is not pushed, so push it yourself: `.venv/bin/lab eval push bench_v2_drtc_sort_one`. Either way the
 same `lab eval run` command later continues where it stopped (an unfinished round is finished first). When the eval
 is done: Ctrl-C the servers in window 1, then the next eval.
+
+**RTC evals (`bench_v2_smooth_rtc_<dataset>`, and E3b/E4 if the stack has RTC): one test round first.** The first
+real RTC request after a server starts compiles for over 5 s, and the server then drops that run. So after `lab eval
+serve` and before the official run, in window 2:
+
+```bash
+.venv/bin/lab eval run bench_v2_smooth_rtc_sort_one --server local --test --max-trials 4   # results/scratch, not counted
+.venv/bin/lab eval run bench_v2_smooth_rtc_sort_one --server local                          # the official one
+```
+
+**Suggested order on one server** (each `serve` + `run` pair as above): `bench_v2_smooth_rtc_sort_one`,
+`bench_v2_smooth_rtc_cubebox_v1` (~10 min each) and `bench_v2_smooth_sort_one`, `bench_v2_smooth_cubebox_v1`
+(~1.5 h each) first, so V3 (the stack) can be done while the long `bench_v2_drtc_sort_one` and
+`bench_v2_drtc_cubebox_v1` (~10 h each) run.
 
 Back on the laptop:
 
@@ -263,8 +278,8 @@ robot computer. The evals start with the 5 trained models; π0.5 and MolmoAct 2 
 | `cubebox_v1_baseline` | the same 5 on cubebox v1 (+2 later) | 50 (+20) | **yes**: freeze (5a) |
 | `cubebox_v0_baseline` | SmolVLA, GR00T N1.5 (old condition `main/baseline`, 1 s grace) | 2 x 10 = 20 | optional; frozen 2026-11-20 |
 
-SmolVLA and GR00T N1.5 run again in `sort_one_baseline`, next to the other five: models are only compared inside one
-eval (METRICS.md rule 5). Their baseline in `sort_one_drtc_main` stays part of the DRTC experiment.
+SmolVLA and GR00T N1.5 run here next to the other models: models are only compared inside one eval (METRICS.md
+rule 5). Their own reference condition in E4 (`sort_one_drtc_v2`) belongs to the DRTC experiment.
 
 ### 5a. Freeze (once per eval, laptop)
 
@@ -272,8 +287,8 @@ When every model of the eval is trained and on the Hub:
 
 ```bash
 cd ~/Projects/drtc-major && source .venv/bin/activate && git pull
-lab eval check sort_one_baseline       # "ok (7 models x 1 conditions x 10 trials = 70; not frozen yet)"
-lab eval freeze sort_one_baseline      # pins each model to its Hub commit; lists the 7 commits
+lab eval check sort_one_baseline       # "ok (5 models x 1 conditions x 10 trials = 50; not frozen yet)"
+lab eval freeze sort_one_baseline      # pins each model to its Hub commit; lists the 5 commits
 git add lab/evals/sort_one_baseline.yaml && git commit -m "eval sort_one_baseline: frozen" && git push
 ```
 
@@ -283,14 +298,14 @@ missing: list only trained models under `models:`, and add the others later
 
 ### 5b. Check the new models once, without counting (before the first official session)
 
-GR00T N1.7, π0.5 and MolmoAct 2 have not been served to the robot yet. Serve the eval (5c, the server part), then
-on the laptop:
+GR00T N1.7 (and later π0.5 and MolmoAct 2) have not been served to the robot yet. Serve the eval (5c, the server
+part), then on the laptop:
 
 ```bash
-lab eval servers sort_one_baseline --server h200            # all 7 "ready"
+lab eval servers sort_one_baseline --server h200            # all 5 "ready"
 lab eval run sort_one_baseline --server h200 --replay       # one round on the replay robot: the arm doesn't move
 lab eval run sort_one_baseline --server h200 --test         # real trials on the arm, kept in results/scratch;
-                                                            # one round (7 trials) is enough, then q
+                                                            # one round (5 trials) is enough, then q
 ```
 
 If one fails (a traceback in its server log `logs/serve/<eval>/`, or `not served`), paste it to Claude before the
@@ -303,8 +318,8 @@ splits the timing metrics (M2-M6) per server when there are several.
 
 | Server | Can serve |
 |---|---|
-| H200 (141 GB) | all 7 at once. The first choice for the 7-model evals |
-| A100 (80 GB) | all 7 only if `nvidia-smi` shows room next to the MolmoAct 2 training (~45 GB used by it) |
+| H200 (141 GB) | every model at once. The first choice for the baselines |
+| A100 (80 GB) | all 5 (~15 GB) if `nvidia-smi` shows room next to any running training |
 | laptop GPU (8 GB) | ACT, Diffusion, SmolVLA only (`--models` on both commands) |
 
 GPU memory per model when serving (M10 peaks so far): ACT 0.3 GB, SmolVLA 1.0 GB, Diffusion 1.3 GB, GR00T N1.5
@@ -319,7 +334,7 @@ model on the same server for all its trials, and run the two groups with `--mode
 cd /workspace/drtc_major && . ./.server.env && git pull
 nvidia-smi
 tmux new -s serve '.venv/bin/lab eval serve sort_one_baseline; bash'
-# wait for "all 7 ready" (each model loads in turn: several minutes), then Ctrl-b d
+# wait for "all 5 ready" (each model loads in turn: several minutes), then Ctrl-b d
 ```
 
 **2. The robot computer (laptop).**
@@ -327,13 +342,13 @@ tmux new -s serve '.venv/bin/lab eval serve sort_one_baseline; bash'
 ```bash
 cd ~/Projects/drtc-major && source .venv/bin/activate && git pull
 lab/bin/session record                                   # phone camera + rig check; every line ok
-lab eval servers sort_one_baseline --server h200         # type the H200 password once; all 7 "ready"
+lab eval servers sort_one_baseline --server h200         # type the H200 password once; all 5 "ready"
 lab eval run sort_one_baseline --server h200             # the official session
 ```
 
 During the session (keys and rules: [Part 2, step 4](#4-run-the-session)):
 
-- **Rounds:** one round = 7 trials (one per model, in a random order). 10 rounds = 70 trials, roughly 1.5 h of
+- **Rounds:** one round = 5 trials (one per model, in a random order). 10 rounds = 50 trials, roughly 1 h of
   trials plus resets; split it over several sessions as you like (`q` ends one, the next `lab eval run`
   continues; `--max-trials N` stops after N).
 - **Layouts:** one layout per round, set before its first trial. cubebox: the cube and the box on their taped marks.
@@ -424,7 +439,7 @@ differs from its earlier sessions in anything else, so a mistake can't slip in.
 | More or fewer trials, another time limit or success rule | edit `trials:`, `time_limit_s:`, `success:` | before the first trial |
 | More trials or another model after trials exist | grow the eval ([Growing an eval](#growing-an-eval-more-trials-more-models)) | always |
 | Anything else after trials exist | a new eval: copy the file to `<eval>_v2.yaml`, delete its `frozen:` block, change it, freeze it; include the models to compare with (rule 5) | always |
-| Another condition (other DRTC or fault settings) | ask Claude: it is a new file in `lab/experiments/main/` and a change to the locked scope. Never edit an experiment file an eval with trials uses | – |
+| Another condition (other DRTC or fault settings) | ask Claude: it is a new system or fault in `lab/experiments/v2/_make.py` (which writes the condition files) and a change to the locked setup. Never edit an experiment file an eval with trials uses | – |
 | Another task's baseline | a new eval file like `sort_one_baseline.yaml`, models of that task | – |
 
 After any edit, check, commit and push, then pull on the server and the robot computer before the next session
@@ -729,35 +744,39 @@ lab eval report cubebox_v0_baseline --pull                  # → results/evals/
 
 ## 1. Write the eval (once per study)
 
-One file per study in `lab/evals/`. `cubebox_v0_baseline.yaml` before freezing:
+One file per study in `lab/evals/`. `cubebox_v1_baseline.yaml` before freezing (setup v2):
 
 ```yaml
-description: Baseline, cubebox v0 - SmolVLA and GR00T N1.5, upstream LeRobot as it ships, normal network
+description: Baseline, cubebox_v1 - upstream LeRobot (patient), normal network
 success: The green cube ends inside the box and the gripper is open, before the time limit.
 time_limit_s: 30          # a trial that runs out is a failure
-trials: 10                # valid trials per model per condition (METRICS.md rule 1)
+trials: 10                # valid trials per model per condition (METRICS.md rule 1); may grow later
 seed: 0                   # the order inside each round
-models:
-  - smolvla_cubebox_v0_full
-  - groot_cubebox_v0_full
+models:                   # the trained ones; more are added later (Growing an eval)
+  - smolvla_cubebox_v1_full
+  - groot_cubebox_v1_full
+  - grootn17_cubebox_v1_full
+  - act_cubebox_v1_full
+  - diffusion_cubebox_v1_full
 conditions:
-  baseline: main/baseline   # the condition's settings: lab/experiments/main/baseline.yaml
+  baseline: v2_robot/upstream_patient__none   # lab/experiments/v2_robot/upstream_patient__none.yaml
 video: true
 ```
 
-- **Decide everything before the first trial.** Once trials exist the plan can't change: a change means a new eval
-  (e.g. `cubebox_v0_baseline_v2`), and `lab eval run` refuses a plan that differs from earlier sessions.
+- **Decide everything before the first trial.** Once trials exist the plan only grows (more `trials`, added
+  `models`); anything else means a new eval (e.g. `cubebox_v1_baseline_v2`), and `lab eval run` refuses it.
 - **`success`** is the rule you apply when you press `s`. Write it so that close calls are rare.
-- **`conditions`**: the four conditions of the locked scope are `main/baseline`, `main/baseline_faults`,
-  `main/drtc_faults` and `main/drtc_smooth_faults` ([experiments/main/_README.md](experiments/main/_README.md));
-  `sort_one_drtc_main.yaml` uses all four.
+- **`conditions`**: setup v2's conditions are generated in `lab/experiments/v2_robot/` (robot) and
+  `lab/experiments/v2/` (bench) by `lab/experiments/v2/_make.py`, which also writes the v2 eval files with their
+  `comparisons:` and `primary:` lists (METRICS.md v3, rules 5 and 7). The older conditions (`main/...`,
+  `bench_main/...`) belong to the first DRTC run and its benches, kept as side results.
 
 Then:
 
 ```bash
-lab eval check cubebox_v0_baseline      # names exist, conditions point at real experiments, task found
-lab eval freeze cubebox_v0_baseline     # pins every model to its current Hub commit, written into the file
-git add lab/evals/cubebox_v0_baseline.yaml && git commit -m "eval cubebox_v0_baseline: frozen" && git push
+lab eval check cubebox_v1_baseline      # names exist, conditions point at real experiments, task found
+lab eval freeze cubebox_v1_baseline     # pins every model to its current Hub commit, written into the file
+git add lab/evals/cubebox_v1_baseline.yaml && git commit -m "eval cubebox_v1_baseline: frozen" && git push
 ```
 
 Freezing makes "the same model" exact: the laptop, the Pi and every server use that commit, and a server serving any
@@ -859,8 +878,9 @@ Round 1, trial 1/2: groot_cubebox_v0_full, t01. Put the cube(s) on the marks, pr
 - **Layouts are yours:** one layout per round, all trials of the round use it; rotate the layouts over the rounds as
   in the recording (10 rounds for 10 trials).
 - **A fault ends a trial** when the system stops the arm (the server stopped, the network dropped, the shipped client
-  gave up): after the arm has started moving it is a **failure** (label `fault`, counted in M1f); before the first
-  action it is a setup problem and the trial is run again in a later round (METRICS.md, v2).
+  gave up): after the arm has started moving it is a **failure** (label `fault`, counted in M1f), whatever key you
+  press while the arm returns home (your key is kept as `key`); before the first action it is a setup problem and
+  the trial is run again in a later round (METRICS.md v3).
 - Stop whenever you like (`q`). The next `lab eval run` continues where the eval stands, on any machine.
 - `--max-trials N` ends the session after N trials.
 - At the end the session is **pushed** to the results store automatically. Without internet use `--offline`, then
@@ -946,9 +966,13 @@ so the shipped client (1 s give-up) can starve GR00T N1.5 even without faults.
 
 ## The bench: replay robot
 
+**The current benches are setup v2's**: commands in [Setup v2](#setup-v2-the-drtc-and-smoothing-experiments) (V0-V4).
+This section explains the bench in general; the `bench_main_*` evals below are the first DRTC run's benches
+(2026-11-20, done), kept as side results.
+
 A bench eval (`robot: replay` in the eval file) needs no robot and no laptop: the model servers and the replay robot
-run on the same GPU server, and the replay robot plays the held-out episodes as the camera input. It records M2-M8
-(no task success: nothing moves). The network to the robot is simulated on every reply as measured on the robot,
+run on the same GPU server, and the replay robot plays the held-out episodes as the camera input. It records M2-M8,
+M11 and M12 (no task success: nothing moves). The network to the robot is simulated on every reply as measured on the robot,
 **250 ± 20 ms** ([experiments/bench_main/](experiments/bench_main/)).
 
 | Bench eval | Compares | Trials |
