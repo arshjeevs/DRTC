@@ -29,6 +29,10 @@ for the report and the slides [REPORT.md](REPORT.md); details on recording [docs
 | **H200** (141 GB, shared, professor's account) | training; serving; bench; offline evaluation | Jupyter terminal, or `ssh jayaraj@192.168.41.118` then `docker exec -it drtc_lab bash` | `/workspace/drtc_major` inside the `drtc_lab` container | **inside the container**: `cd /workspace/drtc_major && . ./.server.env && git pull`, then after a change of `uv.lock`: `uv sync --frozen --extra gpu --extra sim --python /usr/bin/python3`. A `git pull` on the host fails (files there are root-owned) |
 | **Raspberry Pi 5** (8 GB, no GPU) | the edge robot computer (tested; not used for official results yet) | `ssh rasp@raspberrypi.local` (from the laptop, on its hotspot) | `~/drtc_major` | `git pull`; after a change of `uv.lock`: `lab/bin/pi-setup` |
 
+**A second robot laptop** (a teammate's, the same arms and accounts): set it up with
+[docs/SETUP-LAPTOP.md](docs/SETUP-LAPTOP.md); it is `laptop2` in `lab/hosts.yaml` and serves on its own GPU with
+`--server local`.
+
 Rules on the servers: work only in the repo folder; never delete anything outside it; on the H200 only inside
 `drtc_major` (nothing outside, no system changes); on the A100 stop only your own processes. Long jobs run in tmux:
 `tmux attach -t <name>` to look, Ctrl-b d to leave it running, `tmux ls` to list.

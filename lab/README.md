@@ -13,6 +13,8 @@ Our layer on top of LeRobot 0.7 (pinned in `pyproject.toml`). The minor's setup 
 | [REPORT.md](REPORT.md) | every result and fact for the report and the slides, with sources |
 | README.md | this page |
 
+**Setting up a second robot laptop:** [docs/SETUP-LAPTOP.md](docs/SETUP-LAPTOP.md).
+
 **New here? Start with [docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md)**: the whole path (record, train, the three kinds of
 evaluation, report) explained.
 
