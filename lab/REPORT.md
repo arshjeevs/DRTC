@@ -430,34 +430,16 @@ The evals start with the trained models and grow as the others are trained:
 **Report (LaTeX):** `report/` (`make` there: results -> numbers, tables, figures -> `report/report.pdf`). How to
 add things: [report/README.md](../report/README.md). Photos to add: [report/assets/README.md](../report/assets/README.md).
 
-**Presentation:** (still showing the first run, with v2 metrics' "5-7.5x"; to be updated with setup v2's results)
-the Slides deck https://claude.ai/artifact/JsUD9Vp56hRnTS5qU7VGcJ (private to the owner; 16:9;
-plays videos; downloads as PowerPoint or PDF). Its figures are the report's, at slide size
-(`report/generated/slides/fig_*.png`, uploaded to the deck); after `make` in `report/`, Claude re-uploads the changed
-ones and points the slides at them.
-
-| # | Slide (id) | Content | Placeholders |
-|---|---|---|---|
-| 1 | cover | title, names, institution | names, guide, institution, date |
-| 2 | problem | why remote inference; the network fails | video: a condition-2 trial |
-| 3 | remote | diagram: robot computer, network, GPU server; round-trip numbers | |
-| 4 | failure | the 1 s give-up rule; the fault mix timeline | |
-| 5 | claim | the three-part claim, one line per click | |
-| 6 | drtc | trigger, estimator, cooldown; our four fixes | |
-| 7 | smoothing | Butterworth filter, adaptive playback | |
-| 8 | setup | hardware facts; **the laptop as the robot computer** | photo: the setup |
-| 9 | design | the four conditions in the figures' colours; 80 trials | |
-| 10 | success | figure: success per condition; 0% -> 60% / 80% | |
-| 11 | videos | the same faults, three ways | videos: conditions 2, 3, 4 |
-| 12 | motion | figure: jerk; 5-11x smoother; GR00T stalls 65% -> 24% | |
-| 13 | timeline | figure: one trial per condition over time | |
-| 14 | bench | figure: each fault alone; 8 of 8 vs 0 of 8 | |
-| 15 | offline | figure: M9/M10; baselines in progress | (the baselines, when run) |
-| 16 | limits | limits and next steps | |
-| 17 | close | the three results, one per click; questions | |
-
-The trial videos exist for every robot trial (`results/evals/<eval>/sessions/*/trials/<cond>/<model>/tNN/video/
-{scene,wrist}.mp4`), so the video placeholders can be filled from real trials.
+**Presentation (PowerPoint):** `presentation/` (style locked 2026-11-23: minimal serif). Build:
+`.venv/bin/python presentation/build.py` -> `presentation/out/presentation.pptx` (+ a LibreOffice PDF and PNG
+previews; the previews show no animations and substitute the fonts). It reads the same numbers as the report
+(`report/generated/numbers.tex`, so run `make data` in `report/` first when results change), the report's slide
+figures, the title-page details in `report/config.tex`, photos in `report/assets/` (until then a video still or a
+framed placeholder), and embeds real trial videos. Every slide fades in; parts appear click by click; each slide
+has speaker notes. 32 slides in five parts: the problem (4), method (3), experiments (5), results (7), outlook
+(setup v2, its results (pending panels), the Pi, limits, conclusion), plus title, outline, dividers and thanks. To
+change a slide: its function in `build.py`; to add one: a new function listed in `SLIDES`. The old browser deck
+(claude.ai Slides) is retired.
 
 ## 13. Where everything is
 
