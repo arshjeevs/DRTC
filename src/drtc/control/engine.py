@@ -265,10 +265,12 @@ class DRTCInferenceConfig(RemoteInferenceConfig):
     zero_lag: bool = False  # jitter: zero-phase smoothing of recent actions + the queued future (aligned merge)
     zero_lag_cutoff_hz: float = 3.0
     zero_lag_history: int = 15
-    resume_ramp: bool = False  # faults: the soft stop (playback) + the minimum-jerk resume ramp
+    resume_ramp: bool = False  # faults: the minimum-jerk resume ramp after a stall
     resume_ramp_steps: int = 10
     resume_min_stall_s: float = 0.1
-    soft_stop_steps: int = 8
+    # the soft stop before a stall (playback.py): off; dropped from the ramp method 2026-11-22 (it kept a queue alive
+    # long enough to accept a reply made from an old observation, and the next fresh chunk then jumped)
+    soft_stop_steps: int = 0
     soft_stop_floor: float = 0.15
 
     def __post_init__(self) -> None:
@@ -343,12 +345,13 @@ class DRTCEngine(RemoteInferenceEngine):
                                                    cfg.filter_order, cfg.filter_gain)
         self.playback = None
         v2 = isinstance(cfg, DRTCInferenceConfig)
-        if v2 and (cfg.playback_mode == "adaptive" or cfg.resume_ramp):
+        soft = cfg.soft_stop_steps if v2 and cfg.resume_ramp else 0
+        if v2 and (cfg.playback_mode == "adaptive" or soft):
             from drtc.control.playback import AdaptivePlayback
 
             self.playback = AdaptivePlayback(cfg.playback_min_rate, cfg.playback_margin_steps, cfg.playback_rate_slew,
                                              adaptive=cfg.playback_mode == "adaptive",
-                                             soft_stop_steps=cfg.soft_stop_steps if cfg.resume_ramp else 0,
+                                             soft_stop_steps=soft,
                                              soft_stop_floor=cfg.soft_stop_floor)
         self.ramp = None
         if v2 and cfg.resume_ramp:

@@ -12,7 +12,8 @@ rate changes by at most `slew` per tick. With a full queue r = 1: exactly fixed 
 its aligned cursor) advances only when the phase passes a whole action, so new chunks are aligned to what was
 actually executed, and slowed-down actions leave more of every new chunk ahead.
 
-Soft stop (setup v2, 2026-11-22; half of the resume-ramp method, drtc.control.smoothing): with soft_stop_steps > 0,
+Soft stop (setup v2, 2026-11-22; dropped from the resume-ramp method the same day, off by default: see
+drtc.control.smoothing): with soft_stop_steps > 0,
 when at most that many actions are left the target rate also falls with them, max(floor, left / soft_stop_steps),
 so the arm slows down over its last actions instead of stopping at full speed when the queue runs dry (a fault, a
 late reply). The rate may then fall by up to `slew_down` per tick (default: max(slew, 0.15)), fast enough to slow

@@ -206,3 +206,13 @@ def test_a_plan_may_only_grow(tmp_path):
     assert "model b" in plan_change_problem(old, plan_core(p))
     p.write_text(base.replace("time_limit_s: 30", "time_limit_s: 20"))
     assert "changed" in plan_change_problem(old, plan_core(p))
+
+
+def test_the_resume_ramp_has_no_soft_stop():
+    """Dropped 2026-11-22 (the local check): the ramp condition must not slow the queue down before a stall."""
+    from drtc.control.run import build
+
+    cmd, _, _ = build(Registry(), "v2/s_ramp__mix", "smolvla_sort_one_v1_full", "replay", 0, "tcp/127.0.0.1:1", 14,
+                      Path("/tmp/x"), "d", trial=1)
+    assert "--inference.resume_ramp=True" in cmd and "--inference.soft_stop_steps=0" in cmd
+    assert "--inference.playback_mode=fixed" in cmd

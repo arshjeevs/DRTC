@@ -201,7 +201,7 @@ def build(reg: Registry, experiment: str, model: str | None, robot: str, episode
         "inference.playback_margin_steps": float(composed.get("playback_margin_steps", 4.0)),
         "inference.playback_rate_slew": float(composed.get("playback_rate_slew", 0.05)),
         # setup v2 smoothing (drtc.control.smoothing): temporal ensembling and zero-lag smoothing of the queue (both at
-        # each accepted chunk), the soft stop + resume ramp (around stalls)
+        # each accepted chunk), the resume ramp (after stalls)
         "inference.temporal_ensemble": bool(composed.get("temporal_ensemble", False)),
         "inference.ensemble_m": float(composed.get("ensemble_m", 0.01)),
         "inference.zero_lag": bool(composed.get("zero_lag", False)),
@@ -210,7 +210,7 @@ def build(reg: Registry, experiment: str, model: str | None, robot: str, episode
         "inference.resume_ramp": bool(composed.get("resume_ramp", False)),
         "inference.resume_ramp_steps": int(composed.get("resume_ramp_steps", 10)),
         "inference.resume_min_stall_s": float(composed.get("resume_min_stall_s", 0.1)),
-        "inference.soft_stop_steps": int(composed.get("soft_stop_steps", 8)),
+        "inference.soft_stop_steps": int(composed.get("soft_stop_steps", 0)),  # 0: off (2026-11-22)
         "inference.soft_stop_floor": float(composed.get("soft_stop_floor", 0.15)),
         "inference.cooldown_cap": str(composed.get("cooldown_cap", "none")),
         # How long the arm may wait without actions before the run ends with a fault. DRTC holds and goes on when

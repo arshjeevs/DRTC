@@ -12,9 +12,11 @@ Butterworth filter (action_filter.py). Each one targets one source of non-smooth
 - ResumeRamp (the stops and jumps of faults): after a stall (no action for at least `min_stall_s`), the first actions
   are eased from the held pose into the policy's stream with a minimum-jerk blend
   w(tau) = 10 tau^3 - 15 tau^4 + 6 tau^5 over `steps` actions (zero speed and acceleration at the start, the stream's
-  speed at the end), instead of jumping to the new chunk's first action. The soft stop, its other half, is in
-  AdaptivePlayback (soft_stop_steps): the last actions before the queue runs dry are played slower, so the arm does
-  not stop at full speed.
+  speed at the end), instead of jumping to the new chunk's first action. A soft stop before the stall was its other
+  half (AdaptivePlayback soft_stop_steps) and is off since 2026-11-22: in the local check (SmolVLA, the fault mix)
+  it kept the queue from running dry, so a reply made from a 1.3 s old observation was accepted and the next fresh
+  chunk jumped (largest step 38-42 deg against 18 deg; stalls 23% against 15%). Without it the ramp lowered the jerk
+  (42 against 54-60) and the largest step (14 against 16-18 deg).
 """
 
 from __future__ import annotations

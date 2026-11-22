@@ -22,7 +22,8 @@ improves the motion without lowering success.
   fixes (no H/2 cap), the 25 s grace.
 - **Smoothing methods**: adaptive playback (have), Butterworth filter (have), RTC (in the code; flow-matching models
   only: SmolVLA, GR00T N1.5/N1.7, later π0.5 and MolmoAct 2), temporal ensembling (build), zero-lag queue smoothing
-  (build), soft stop + resume ramp (build). Dropped: smoothness guidance (same job as RTC), crossfade (weaker
+  (build), resume ramp (build; its soft stop was dropped
+  2026-11-22 after the local check, see "Build"). Dropped: smoothness guidance (same job as RTC), crossfade (weaker
   ensembling), minimum-jerk transition (inside the resume ramp), One Euro filter, step limiter (a safety cap).
 
 **Faults**: none; spike (one reply +1 s); drops (every reply lost for 1 s); outage (1.5 s, both directions); mix
@@ -43,7 +44,7 @@ model-dataset pairs); π0.5 and MolmoAct 2 join with the same cells when trained
 
 The final stack = adaptive playback + one seam method (RTC or ensembling) + one jitter method (zero-lag or
 Butterworth) + the resume ramp, chosen from E3a by a rule fixed in the eval setup **before** E3a runs; models without
-RTC use ensembling. Size: ~520 runs per pair, ~5,200 runs for the 10 pairs, ~20 h of GPU time on one server at the
+RTC (ACT, Diffusion, GR00T N1.7) use ensembling. Size: ~520 runs per pair, ~5,200 runs for the 10 pairs, ~20 h of GPU time on one server at the
 13.5 s per run measured on the last bench (~10 h with a server per dataset); π0.5 + MolmoAct 2 add ~8 h. Where and
 when: the user decides.
 
@@ -59,7 +60,10 @@ is chosen. Bench runs are 14 s (the latest fault ends at 11.5 s with the shift).
 robot (ACT, SmolVLA): every fault, the shift, the ablations and the smoothing methods work. Found: GR00T N1.7 gets no
 RTC cell (relative actions: LeRobot turns its RTC prefix off); upstream (patient) still ends a run when a reply is
 lost, after its 5 s request deadline, because it never re-sends (what DRTC's cooldown adds); the first RTC request
-after a server start compiles for > 5 s, so RTC evals get one test round first (WORKFLOW).
+after a server start compiles for > 5 s, so RTC evals get one test round first (WORKFLOW). The resume ramp's soft
+stop is dropped (the user, 2026-11-22): on SmolVLA it let a reply from a 1.3 s old observation be accepted and the
+next chunk jumped (largest step 38-42 deg against 18); the ramp alone lowered jerk and the largest step. Models
+without RTC in the stack (ACT, Diffusion, GR00T N1.7) use temporal ensembling as the seam method.
 
 **Robot evals: core and how they grow** (locked 2026-11-22). Core, 10 trials per condition (~1 min per trial with
 the reset, ~3 h): E4 above (80 trials; waits for the final stack); the baselines `sort_one_baseline` and
