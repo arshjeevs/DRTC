@@ -18,17 +18,17 @@ across starting poses but tie each chunk to the state it was predicted from.
 \section{The policies}\label{sec:bg-policies}
 
 \begin{description}[style=nextline, leftmargin=0pt]
-\item[ACT] \cite{zhao2023act} introduced chunking with a transformer conditional variational autoencoder over ResNet
+\item[ACT] Zhao et al.~\cite{zhao2023act} introduced chunking with a transformer conditional variational autoencoder over ResNet
   image features. It is small and fast, has no language input, and predicts long chunks (100 actions here).
-\item[Diffusion Policy] \cite{chi2023diffusion} generates the chunk by iterative denoising with a U-Net conditioned on
+\item[Diffusion Policy] Chi et al.~\cite{chi2023diffusion} generate the chunk by iterative denoising with a U-Net conditioned on
   image features; it predicts 48 actions and executes 24.
-\item[\smolvla] \cite{shukor2025smolvla} pairs a small vision-language model ($\approx$0.45B parameters) with a
+\item[\smolvla] Shukor et al.~\cite{shukor2025smolvla} pair a small vision-language model ($\approx$0.45B parameters) with a
   flow-matching \emph{action expert}; its authors also proposed asynchronous client-server inference.
-\item[GR00T N1.5 and N1.7] \cite{nvidia2025gr00t} use a 3-billion-parameter vision-language model and a diffusion
+\item[GR00T N1.5 and N1.7] NVIDIA's models~\cite{nvidia2025gr00t} use a 3-billion-parameter vision-language model and a diffusion
   transformer action head, with 16-action chunks; N1.7 is trained here with relative arm actions.
-\item[\pizerofive] \cite{pi2025pi05} adds a larger flow-matching expert to a vision-language model ($\approx$3.4B) and
+\item[\pizerofive] Physical Intelligence's model~\cite{pi2025pi05} adds a larger flow-matching expert to a vision-language model ($\approx$3.4B) and
   predicts relative joints, with 50-action chunks.
-\item[MolmoAct 2] \cite{molmoact2} reasons about actions in space before acting and is pretrained on community
+\item[MolmoAct 2] MolmoAct~2~\cite{molmoact2} reasons about actions in space before acting and is pretrained on community
   SO-100/101 data; it is fine-tuned with LoRA here.
 \end{description}
 The chunk length differs widely, from 16 to 100 actions, and it matters for remote inference: a chunk that is barely
