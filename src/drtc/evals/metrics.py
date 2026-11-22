@@ -94,6 +94,9 @@ def trial_metrics(tdir: Path, fps: float = 30.0) -> dict:
                             out["M7_jerk_k"] = float(np.sqrt((jerk ** 2).mean())) / 1000.0
                     if len(a) >= 2:
                         out["M8b_largest_step_deg"] = float(np.abs(np.diff(a, axis=0)).max())
+            # a run the operator ended (s/f) during a stall says nothing about recovery: not counted for that fault
+            operator = not fault and info.get("label") in ("s", "f")
+            out.update(recovery(tdir, t_exec, t_end, dt, fault, operator))
         else:
             out["M2_stall_pct"], out["M3_stall_events"], out["M3_longest_stall_s"] = None, None, None
     chunks_path = tdir / "chunks.csv"
@@ -112,6 +115,71 @@ def trial_metrics(tdir: Path, fps: float = 30.0) -> dict:
         out["M6_server_ms"] = (lambda m: None if m is None else 1000 * m)(
             _median(_f(r["server_total_s"]) for r in rows))
         out["M8a_switch_l2_deg"] = _median(_f(r["switch_l2"]) for r in rows if (_f(r["overlap_steps"]) or 0) > 0)
+    return out
+
+
+# --- M11 recovery (metrics v3, 2026-11-22, option B) -------------------------------------------------------------------
+
+RECOVERY_FAULTS = ("spike", "drops", "outage", "rise")
+RECOVERY_AFTER_S = 1.0  # a stall that starts up to this long after a fault ends is still that fault's (a reply lost
+#                         near the end of a window shows when the queue runs dry; the mix's faults are 1 s apart)
+
+
+def fault_ends(tdir: Path) -> dict[str, tuple[float, float]]:
+    """(start, end) on the run's clock of each timed fault of the trial, from its config.yaml (with the trial's shift)."""
+    import yaml
+
+    p = Path(tdir) / "config.yaml"
+    if not p.is_file():
+        return {}
+    c = yaml.safe_load(p.read_text()) or {}
+    shift = float(c.get("fault_shift_applied_s") or 0.0)
+    out = {}
+    for s in c.get("spikes") or []:
+        st = float(s["start_s"]) + shift
+        out.setdefault("spike", (st, st + float(s["delay_ms"]) / 1000.0))
+    for key, name in (("drop_action", "drops"), ("disconnect", "outage"), ("rise", "rise")):
+        for w in c.get(key) or []:
+            st = float(w["start_s"]) + shift
+            out.setdefault(name, (st, st + float(w["duration_s"])))
+    return out
+
+
+def recovery(tdir: Path, t_exec, t_end: float, dt: float, system_ended: bool = False,
+             operator_ended: bool = False) -> dict:
+    """M11: for each timed fault, the seconds from its end until the arm moves again: the end of the first stall that
+    is still going when the fault ends or starts up to RECOVERY_AFTER_S after it (0 when there is none: the arm never
+    stopped). A stall that lasts to the end of the run is "not recovered": M11_recovered_<fault> = 0 and no time. A
+    run that ended before the fault did is "not recovered" when the system ended it (a terminal fault), and not counted
+    for that fault when the operator or the time limit ended it (e.g. the task was done at 6.8 s, before the outage
+    ended at 7.5 s). Likewise a stall cut short by the operator's s/f key is not counted (the run ended, not the
+    recovery): only the system or the time limit make a run "not recovered"."""
+    out = {}
+    ends = fault_ends(tdir)
+    if not ends:
+        return out
+    # stalls (as M2): from one tick after an executed action to the next one; after the last action, to the end of the
+    # run, where it never ends (inf: not recovered)
+    starts = t_exec + dt
+    stalls = [(a, b) for a, b in zip(starts[:-1], t_exec[1:]) if b - a > 0.5 * dt]
+    if t_end - starts[-1] > 0.5 * dt:
+        stalls.append((starts[-1], np.inf))
+    for name in RECOVERY_FAULTS:
+        if name not in ends:
+            continue
+        f_start, f_end = ends[name]
+        if f_end >= t_end:  # the run ended before the fault did
+            if system_ended:
+                out[f"M11_recovered_{name}"], out[f"M11_recovery_{name}_s"] = 0, None
+            continue
+        hit = next(((a, b) for a, b in stalls if b > f_end and a < f_end + RECOVERY_AFTER_S), None)
+        if hit is None:
+            out[f"M11_recovered_{name}"], out[f"M11_recovery_{name}_s"] = 1, 0.0
+        elif hit[1] == np.inf:
+            if not operator_ended:
+                out[f"M11_recovered_{name}"], out[f"M11_recovery_{name}_s"] = 0, None
+        else:
+            out[f"M11_recovered_{name}"], out[f"M11_recovery_{name}_s"] = 1, float(hit[1] - f_end)
     return out
 
 

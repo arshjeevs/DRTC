@@ -275,3 +275,49 @@ def test_jerk_counts_only_while_the_arm_moves(tmp_path):
     short, long_ = run("short", 15), run("long", 300)  # a 0.5 s and a 10 s hold
     assert long_["M2_stall_pct"] > short["M2_stall_pct"]
     assert abs(long_["M7_jerk_k"] - short["M7_jerk_k"]) < 0.05 * short["M7_jerk_k"]  # the hold does not dilute it
+
+
+def test_recovery_is_the_time_from_a_faults_end_until_the_arm_moves_again(tmp_path):
+    import csv, json
+
+    import yaml
+
+    from drtc.evals.metrics import trial_metrics
+
+    def run(name, times, end):
+        d = tmp_path / name
+        d.mkdir()
+        (d / "trial.json").write_text(json.dumps({"robot": "replay", "outcome": "completed", "first_action_s": 0.0}))
+        (d / "config.yaml").write_text(yaml.safe_dump({
+            "fault_shift_applied_s": 1.0, "spikes": [{"start_s": 1.0, "delay_ms": 1000}],
+            "drop_action": [{"start_s": 4.0, "duration_s": 1.0}], "disconnect": [{"start_s": 6.0, "duration_s": 1.5}]}))
+        with open(d / "ticks.csv", "w", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(["t", "action", "cmd.j0"])
+            w.writerows([[round(t, 4), 1, t] for t in times] + [[end, 0, ""]])
+        return trial_metrics(d)
+
+    dt = 1 / 30
+    ticks = lambda a, b: list(np.arange(a, b, dt))
+    # the spike ends at 3.0 (shifted): the arm stood still 2.8-3.4 -> 0.4 s; drops end at 6.0: no stall -> 0;
+    # the outage ends at 8.5: the arm stops at 8.0 and never moves again -> not recovered
+    m = run("a", ticks(0, 2.8) + ticks(3.4, 8.0), 12.0)
+    assert abs(m["M11_recovery_spike_s"] - 0.4) < 0.05 and m["M11_recovered_spike"] == 1
+    assert m["M11_recovery_drops_s"] == 0.0 and m["M11_recovered_drops"] == 1
+    assert m["M11_recovered_outage"] == 0 and m["M11_recovery_outage_s"] is None
+    # a stall that starts after the fault ended (a lost reply shows when the queue runs dry) still counts
+    m = run("b", ticks(0, 6.5) + ticks(7.0, 12.0), 12.0)
+    assert abs(m["M11_recovery_drops_s"] - 1.0) < 0.05
+
+
+def test_a_stall_cut_short_by_the_operators_key_is_not_counted_as_not_recovered(tmp_path):
+    import json
+
+    import yaml
+
+    from drtc.evals.metrics import recovery
+
+    (tmp_path / "config.yaml").write_text(yaml.safe_dump({"drop_action": [{"start_s": 4.0, "duration_s": 1.0}]}))
+    t = np.arange(0, 5.76, 1 / 30)  # the arm paused at 5.76 and the operator pressed f at 5.91
+    assert recovery(tmp_path, t, 5.91, 1 / 30, operator_ended=True) == {}
+    assert recovery(tmp_path, t, 5.91, 1 / 30) == {"M11_recovered_drops": 0, "M11_recovery_drops_s": None}

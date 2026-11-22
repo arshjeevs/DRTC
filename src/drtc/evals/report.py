@@ -49,6 +49,8 @@ def build(reg: Registry, name: str) -> Path:
         w.writerows(rows)
     mcols = ["condition", "model", "trial", "session", "machine", "server", "M1_success", "M1f_fault"] + [c for c, _, _ in
                                                                                            M.CONTINUOUS]
+    mcols += [f"M11_{k}_{f}" if k == "recovered" else f"M11_recovery_{f}_s" for f in M.RECOVERY_FAULTS
+              for k in ("recovered", "time")]
     with open(out_dir / "metrics.csv", "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=mcols, extrasaction="ignore")
         w.writeheader()
@@ -108,6 +110,30 @@ def render(reg, name, sp, trials, mrows) -> str:
                     cells.append("-" if v is None else f"{v[0]:.{d}f} [{v[1]:.{d}f}-{v[2]:.{d}f}]")
                 nf = sum(1 for r in g if r.get("M1f_fault") == 1)
                 L.append(f"| {c} | {m} | {len(g)} | {nf}/{len(g)} | " + " | ".join(cells) + " |")
+        L.append("")
+    # M11 recovery (metrics v3): per timed fault, how many runs moved again after it and how long that took
+    rec = [f for f in M.RECOVERY_FAULTS if any(r.get(f"M11_recovered_{f}") is not None for r in mrows)]
+    if rec:
+        L += ["## Recovery (M11): from the end of each fault until the arm moves again", "",
+              "Recovered = runs in which the arm moved again after the fault (0 s when it never stopped); the time is the "
+              "median [IQR] over the recovered runs.", "",
+              "| Condition | Model | " + " | ".join(f"{f}: recovered | {f}: time (s)" for f in rec) + " |",
+              "|---|---|" + "---|---|" * len(rec)]
+        for c in sp.conditions:
+            for m in sp.models:
+                g = groups.get((c, m), [])
+                if not g or not any(r.get(f"M11_recovered_{f}") is not None for f in rec for r in g):
+                    continue
+                cells = []
+                for f in rec:
+                    have = [r for r in g if r.get(f"M11_recovered_{f}") is not None]
+                    if not have:
+                        cells += ["-", "-"]
+                        continue
+                    k = sum(1 for r in have if r[f"M11_recovered_{f}"] == 1)
+                    v = M.median_iqr(r.get(f"M11_recovery_{f}_s") for r in have)
+                    cells += [f"{k}/{len(have)}", "-" if v is None else f"{v[0]:.2f} [{v[1]:.2f}-{v[2]:.2f}]"]
+                L.append(f"| {c} | {m} | " + " | ".join(cells) + " |")
         L.append("")
     # comparisons against the baseline condition
     conds = list(sp.conditions)
