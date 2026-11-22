@@ -6,6 +6,7 @@ scheduler: drtc
 estimator: jk
 cooldown: true
 cooldown_cap: half_chunk
+request_deadline: trial
 disconnect:
 - start_s: 6.0
   duration_s: 1.5

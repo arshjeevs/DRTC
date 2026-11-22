@@ -33,15 +33,19 @@ FAULTS = {
 }
 ALL = list(FAULTS)
 
-UPSTREAM = {"scheduler": "upstream", "estimator": "upstream", "cooldown": False}
-DRTC = {"scheduler": "drtc", "estimator": "jk", "cooldown": True, "cooldown_cap": "none"}
-SHIPPED = {"starvation_grace_s": 1.0}  # LeRobot's default; without it the grace is the whole trial
+# Patient (2026-11-22): the starvation grace (unset = the whole trial) and the request deadline both last the whole
+# trial, so no default ends a run; upstream as shipped keeps LeRobot's 1 s grace and 5 s request deadline.
+PATIENT = {"request_deadline": "trial"}
+UPSTREAM = {"scheduler": "upstream", "estimator": "upstream", "cooldown": False, **PATIENT}
+DRTC = {"scheduler": "drtc", "estimator": "jk", "cooldown": True, "cooldown_cap": "none", **PATIENT}
+SHIPPED = {"starvation_grace_s": 1.0, "request_deadline": "lerobot"}  # LeRobot's defaults
 
 # system -> (description, settings, faults it runs under on the bench)
 SYSTEMS = {
     # E1
-    "upstream_patient": ("upstream LeRobot, starvation grace = the whole trial", UPSTREAM, ALL),
-    "upstream_shipped": ("upstream LeRobot as it ships (1 s starvation grace)", {**UPSTREAM, **SHIPPED}, ALL[1:]),
+    "upstream_patient": ("upstream LeRobot, starvation grace and request deadline = the whole trial", UPSTREAM, ALL),
+    "upstream_shipped": ("upstream LeRobot as it ships (1 s starvation grace, 5 s request deadline)",
+                         {**UPSTREAM, **SHIPPED}, ALL[1:]),
     "drtc": ("DRTC (our version), no smoothing", DRTC, ALL),
     # E2: DRTC minus one part
     "a1_no_cooldown": ("DRTC without the cooldown re-request", {**DRTC, "cooldown": False}, ALL),

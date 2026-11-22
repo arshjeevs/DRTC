@@ -7,6 +7,7 @@ scheduler: drtc
 estimator: upstream
 cooldown: true
 cooldown_cap: none
+request_deadline: trial
 loss:
   p: 0.1
   seed: 0

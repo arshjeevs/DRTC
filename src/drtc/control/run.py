@@ -30,7 +30,7 @@ RESULTS = Path("results") / "scratch"  # test runs only (lab/docs/EVALUATION.md 
 INDEX_FIELDS = ["run_id", "experiment", "model", "trial", "success", "started_at", "duration_s", "git_commit",
                 "git_dirty", "note", "run_dir", "robot", "host", "outcome"]
 # Composed experiment keys this run applies; anything else that is set is reported as not applied yet.
-APPLIED = {"starvation_grace_s", "scheduler", "blend_steps", "blend_weight", "cooldown", "cooldown_cap", "epsilon", "playback_mode", "playback_min_rate", "playback_margin_steps",
+APPLIED = {"starvation_grace_s", "request_deadline", "scheduler", "blend_steps", "blend_weight", "cooldown", "cooldown_cap", "epsilon", "playback_mode", "playback_min_rate", "playback_margin_steps",
            "playback_rate_slew", "action_filter_mode", "action_filter_butterworth_cutoff", "action_filter_gain", *("drop_obs", "drop_action", "dup_obs", "dup_action", "reorder_obs", "reorder_action", "disconnect",
               "spikes", "latency", "rise", "loss"), "fault_shift_s", "fault_shift_seed", "s_min_scale",
            "temporal_ensemble", "ensemble_m", "zero_lag", "zero_lag_cutoff_hz", "zero_lag_history", "resume_ramp",
@@ -219,6 +219,12 @@ def build(reg: Registry, experiment: str, model: str | None, robot: str, episode
         "inference.action_starvation_grace_s": float(composed.get("starvation_grace_s") or
                                                      (duration if duration is not None else composed.get("duration_s",
                                                                                                          25.0))),
+        # How long one request may wait for its reply before the run ends with a fault (LeRobot's action_timeout_s,
+        # 5 s by default). Setup v2 (2026-11-22): `request_deadline: trial` = the whole trial, for upstream (patient)
+        # and DRTC alike, so a lost reply never ends a run; upstream then waits (it never re-sends), DRTC's cooldown
+        # re-sends long before. Unset (upstream as shipped): LeRobot's default.
+        **({"inference.action_timeout_s": float(duration if duration is not None else composed.get("duration_s", 25.0))}
+           if composed.get("request_deadline") == "trial" else {}),
         **({"inference.faults_json": json.dumps(apply_faults(composed, trial))}
            if any(composed.get(k) for k in FAULT_KEYS) else {}),
         "fps": float(composed.get("fps", 30)),

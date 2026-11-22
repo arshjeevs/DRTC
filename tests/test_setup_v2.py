@@ -216,3 +216,16 @@ def test_the_resume_ramp_has_no_soft_stop():
                       Path("/tmp/x"), "d", trial=1)
     assert "--inference.resume_ramp=True" in cmd and "--inference.soft_stop_steps=0" in cmd
     assert "--inference.playback_mode=fixed" in cmd
+
+
+def test_patient_systems_never_end_a_run_on_a_lost_reply_and_shipped_keeps_lerobots_defaults():
+    from drtc.control.run import build
+
+    reg = Registry()
+    for exp in ("v2/upstream_patient__drops", "v2/drtc__drops", "v2/a1_no_cooldown__loss", "v2_robot/upstream_patient__mix"):
+        cmd, _, _ = build(reg, exp, "act_sort_one_v1_full", "replay", 0, "tcp/127.0.0.1:1", 14, Path("/tmp/x"), "d")
+        assert "--inference.action_timeout_s=14.0" in cmd and "--inference.action_starvation_grace_s=14.0" in cmd, exp
+    cmd, _, _ = build(reg, "v2/upstream_shipped__drops", "act_sort_one_v1_full", "replay", 0, "tcp/127.0.0.1:1", 14,
+                      Path("/tmp/x"), "d")
+    assert not any(x.startswith("--inference.action_timeout_s") for x in cmd)
+    assert "--inference.action_starvation_grace_s=1.0" in cmd

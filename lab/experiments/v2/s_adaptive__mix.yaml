@@ -6,6 +6,7 @@ scheduler: drtc
 estimator: jk
 cooldown: true
 cooldown_cap: none
+request_deadline: trial
 playback_mode: adaptive
 spikes:
 - start_s: 2.0

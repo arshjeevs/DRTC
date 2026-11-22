@@ -6,6 +6,7 @@ scheduler: drtc
 estimator: jk
 cooldown: false
 cooldown_cap: none
+request_deadline: trial
 latency:
   base_ms: 250
   jitter_ms: 20

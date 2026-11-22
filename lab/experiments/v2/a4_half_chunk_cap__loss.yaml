@@ -6,6 +6,7 @@ scheduler: drtc
 estimator: jk
 cooldown: true
 cooldown_cap: half_chunk
+request_deadline: trial
 loss:
   p: 0.1
   seed: 0

@@ -15,11 +15,12 @@ and the old benches are archived as side results.
 improves the motion without lowering success.
 
 **Systems**
-- **upstream (patient)**: LeRobot's own scheduler with the starvation grace raised to the whole trial (25 s). The
-  baseline everywhere: raising the grace is one flag, so DRTC must beat upstream at its best.
+- **upstream (patient)**: LeRobot's own scheduler with the starvation grace and (since the local check, the user
+  2026-11-22) the request deadline (`action_timeout`, 5 s by default) raised to the whole trial. The baseline
+  everywhere: each is one flag, so DRTC must beat upstream at its best; no default ends a run.
 - **upstream (as shipped)**: the same with the 1 s grace. Bench only, to show the default breaks.
 - **DRTC**: its trigger (`H - s_min`), the Jacobson-Karels estimator, the cooldown re-request with our 2026-11-20
-  fixes (no H/2 cap), the 25 s grace.
+  fixes (no H/2 cap), the same whole-trial grace and request deadline as upstream (patient).
 - **Smoothing methods**: adaptive playback (have), Butterworth filter (have), RTC (in the code; flow-matching models
   only: SmolVLA, GR00T N1.5/N1.7, later π0.5 and MolmoAct 2), temporal ensembling (build), zero-lag queue smoothing
   (build), resume ramp (build; its soft stop was dropped
@@ -59,7 +60,9 @@ robot run on cubebox v1 stays optional.
 is chosen. Bench runs are 14 s (the latest fault ends at 11.5 s with the shift). Local check on the laptop's replay
 robot (ACT, SmolVLA): every fault, the shift, the ablations and the smoothing methods work. Found: GR00T N1.7 gets no
 RTC cell (relative actions: LeRobot turns its RTC prefix off); upstream (patient) still ends a run when a reply is
-lost, after its 5 s request deadline, because it never re-sends (what DRTC's cooldown adds); the first RTC request
+lost, after its 5 s request deadline, because it never re-sends (what DRTC's cooldown adds), so its request
+deadline is now the whole trial too (the user), for DRTC as well: it then waits to the end of the run (checked: 55%
+stalled, longest stall 7.5 s under the mix); the first RTC request
 after a server start compiles for > 5 s, so RTC evals get one test round first (WORKFLOW). The resume ramp's soft
 stop is dropped (the user, 2026-11-22): on SmolVLA it let a reply from a 1.3 s old observation be accepted and the
 next chunk jumped (largest step 38-42 deg against 18); the ramp alone lowered jerk and the largest step. Models

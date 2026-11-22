@@ -103,8 +103,8 @@ generated files in [experiments/v2/](experiments/v2/) (bench) and [experiments/v
 
 V1 and V2 need nothing from each other: run them in either order, or on two servers at once (one dataset each).
 
-**What the names mean.** Systems: `upstream_patient` (LeRobot's scheduler, starvation grace = the whole trial, the
-baseline), `upstream_shipped` (the same with LeRobot's 1 s grace), `drtc` (our DRTC), `a1_no_cooldown`,
+**What the names mean.** Systems: `upstream_patient` (LeRobot's scheduler, starvation grace and request deadline = the
+whole trial, the baseline), `upstream_shipped` (the same with LeRobot's 1 s grace and 5 s request deadline), `drtc` (our DRTC), `a1_no_cooldown`,
 `a2_upstream_estimator`, `a3_upstream_trigger`, `a4_half_chunk_cap`, `a5_smin_half`, `a5_smin_x1_5` (DRTC minus or
 changed in one part), `s_<method>` (DRTC + one smoothing method). Faults: `none`, `spike` (one reply +1 s), `drops`
 (every reply lost for 1 s), `outage` (1.5 s, both directions), `mix` (spike, drops, outage), `rise` (+400 ms on
@@ -173,10 +173,12 @@ sort_one_drtc_v2`), then on the laptop `lab eval servers sort_one_drtc_v2 --serv
 
 ### Notes from the local check (2026-11-22, ACT and SmolVLA on the laptop's replay robot)
 
-- `upstream_patient` under faults still ends with `Remote inference request deadline exceeded` when a reply is
-  lost (the drops or the outage): upstream never re-sends a request, so a lost reply ends the run after its 5 s
-  request deadline (`action_timeout`), whatever the starvation grace. This is upstream's behaviour, not a bug of
-  the bench: replacing a lost reply is what DRTC's cooldown adds (ablation A1 shows it).
+- Upstream never re-sends a request, so a lost reply (the drops, the outage, loss) ended `upstream_patient` runs
+  after LeRobot's 5 s request deadline (`action_timeout`), whatever the starvation grace. Since 2026-11-22 (the
+  user) upstream (patient) and DRTC both have `request_deadline: trial` (the whole trial): patient upstream then
+  holds the arm and waits to the end of the run (checked: 55% stalled, longest stall 7.5 s under the mix), which
+  shows up in the stall metrics instead of ending the run. Replacing a lost reply is what DRTC's cooldown adds
+  (ablation A1). `upstream_shipped` keeps LeRobot's 1 s grace and 5 s deadline.
 - GR00T N1.7 has no RTC cell: our N1.7 models are trained with relative actions, and LeRobot turns the RTC prefix
   off for those.
 - **RTC evals: warm up first.** The first real RTC request after a server starts compiles the RTC path and took
