@@ -1,0 +1,70 @@
+# Setup v2 bench E1 + E2 on so101_cubebox_v1 (lab/PLAN.md, 2026-11-22): DRTC against upstream (patient and as shipped)
+# and the DRTC ablations A1-A5, under every fault type, in one eval so every comparison is inside it.
+# Replay robot on the held-out episodes, simulated network 250 +- 20 ms; M2-M8 only. 14 s per run: the latest
+# fault (the outage, shifted by up to 4 s) ends at 11.5 s.
+description: 'Bench v2 E1 + E2, cubebox_v1: DRTC vs upstream and the DRTC ablations, all fault types (replay robot)'
+success: n/a (replay robot)
+time_limit_s: 14
+trials: 8
+seed: 0
+models:
+- smolvla_cubebox_v1_full
+- groot_cubebox_v1_full
+- grootn17_cubebox_v1_full
+- act_cubebox_v1_full
+- diffusion_cubebox_v1_full
+conditions:
+  upstream_patient__none: v2/upstream_patient__none
+  upstream_patient__spike: v2/upstream_patient__spike
+  upstream_patient__drops: v2/upstream_patient__drops
+  upstream_patient__outage: v2/upstream_patient__outage
+  upstream_patient__mix: v2/upstream_patient__mix
+  upstream_patient__rise: v2/upstream_patient__rise
+  upstream_patient__loss: v2/upstream_patient__loss
+  upstream_shipped__spike: v2/upstream_shipped__spike
+  upstream_shipped__drops: v2/upstream_shipped__drops
+  upstream_shipped__outage: v2/upstream_shipped__outage
+  upstream_shipped__mix: v2/upstream_shipped__mix
+  upstream_shipped__rise: v2/upstream_shipped__rise
+  upstream_shipped__loss: v2/upstream_shipped__loss
+  drtc__none: v2/drtc__none
+  drtc__spike: v2/drtc__spike
+  drtc__drops: v2/drtc__drops
+  drtc__outage: v2/drtc__outage
+  drtc__mix: v2/drtc__mix
+  drtc__rise: v2/drtc__rise
+  drtc__loss: v2/drtc__loss
+  a1_no_cooldown__none: v2/a1_no_cooldown__none
+  a1_no_cooldown__spike: v2/a1_no_cooldown__spike
+  a1_no_cooldown__drops: v2/a1_no_cooldown__drops
+  a1_no_cooldown__outage: v2/a1_no_cooldown__outage
+  a1_no_cooldown__mix: v2/a1_no_cooldown__mix
+  a1_no_cooldown__rise: v2/a1_no_cooldown__rise
+  a1_no_cooldown__loss: v2/a1_no_cooldown__loss
+  a2_upstream_estimator__none: v2/a2_upstream_estimator__none
+  a2_upstream_estimator__spike: v2/a2_upstream_estimator__spike
+  a2_upstream_estimator__drops: v2/a2_upstream_estimator__drops
+  a2_upstream_estimator__outage: v2/a2_upstream_estimator__outage
+  a2_upstream_estimator__mix: v2/a2_upstream_estimator__mix
+  a2_upstream_estimator__rise: v2/a2_upstream_estimator__rise
+  a2_upstream_estimator__loss: v2/a2_upstream_estimator__loss
+  a3_upstream_trigger__none: v2/a3_upstream_trigger__none
+  a3_upstream_trigger__spike: v2/a3_upstream_trigger__spike
+  a3_upstream_trigger__drops: v2/a3_upstream_trigger__drops
+  a3_upstream_trigger__outage: v2/a3_upstream_trigger__outage
+  a3_upstream_trigger__mix: v2/a3_upstream_trigger__mix
+  a3_upstream_trigger__rise: v2/a3_upstream_trigger__rise
+  a3_upstream_trigger__loss: v2/a3_upstream_trigger__loss
+  a4_half_chunk_cap__none: v2/a4_half_chunk_cap__none
+  a4_half_chunk_cap__spike: v2/a4_half_chunk_cap__spike
+  a4_half_chunk_cap__drops: v2/a4_half_chunk_cap__drops
+  a4_half_chunk_cap__outage: v2/a4_half_chunk_cap__outage
+  a4_half_chunk_cap__mix: v2/a4_half_chunk_cap__mix
+  a4_half_chunk_cap__rise: v2/a4_half_chunk_cap__rise
+  a4_half_chunk_cap__loss: v2/a4_half_chunk_cap__loss
+  a5_smin_half__none: v2/a5_smin_half__none
+  a5_smin_half__mix: v2/a5_smin_half__mix
+  a5_smin_x1_5__none: v2/a5_smin_x1_5__none
+  a5_smin_x1_5__mix: v2/a5_smin_x1_5__mix
+video: false
+robot: replay

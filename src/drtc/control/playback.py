@@ -11,14 +11,24 @@ with ticks_until_next_chunk from DRTC's latency estimate minus the ticks since t
 rate changes by at most `slew` per tick. With a full queue r = 1: exactly fixed playback. The runtime's queue (and
 its aligned cursor) advances only when the phase passes a whole action, so new chunks are aligned to what was
 actually executed, and slowed-down actions leave more of every new chunk ahead.
+
+Soft stop (setup v2, 2026-11-22; half of the resume-ramp method, drtc.control.smoothing): with soft_stop_steps > 0,
+when at most that many actions are left the target rate also falls with them, max(floor, left / soft_stop_steps),
+so the arm slows down over its last actions instead of stopping at full speed when the queue runs dry (a fault, a
+late reply). The rate may then fall by up to `slew_down` per tick (default: max(slew, 0.15)), fast enough to slow
+down within those few actions; it rises again by `slew` when a chunk arrives. With `adaptive` False only the soft
+stop sets the rate (the resume ramp alone, without adaptive playback).
 """
 
 from __future__ import annotations
 
 
 class AdaptivePlayback:
-    def __init__(self, min_rate: float = 0.5, margin_steps: float = 4.0, slew: float = 0.05):
+    def __init__(self, min_rate: float = 0.5, margin_steps: float = 4.0, slew: float = 0.05, *, adaptive: bool = True,
+                 soft_stop_steps: int = 0, soft_stop_floor: float = 0.15, slew_down: float | None = None):
         self.min_rate, self.margin, self.slew = min_rate, margin_steps, slew
+        self.adaptive, self.soft_steps, self.soft_floor = adaptive, int(soft_stop_steps), soft_stop_floor
+        self.slew_down = slew_down if slew_down is not None else (max(slew, 0.15) if self.soft_steps else slew)
         self.rate = 1.0
         self.frac = 0.0
         self.a0 = None  # the action at the phase's whole step
@@ -28,10 +38,14 @@ class AdaptivePlayback:
         self.rate, self.frac, self.a0, self.a1 = 1.0, 0.0, None, None
 
     def target_rate(self, queued: int, ticks_until_chunk: float) -> float:
-        need = max(ticks_until_chunk, 0.0) + self.margin
-        if need <= 0 or queued >= need:
-            return 1.0
-        return max(self.min_rate, queued / need)
+        rate = 1.0
+        if self.adaptive:
+            need = max(ticks_until_chunk, 0.0) + self.margin
+            if need > 0 and queued < need:
+                rate = max(self.min_rate, queued / need)
+        if self.soft_steps and queued <= self.soft_steps:
+            rate = min(rate, max(self.soft_floor, queued / self.soft_steps))
+        return rate
 
     def next(self, pop, queued: int, ticks_until_chunk: float):
         """One tick. `pop()` takes the next action from the runtime (None when there is none). Returns the position
@@ -43,7 +57,7 @@ class AdaptivePlayback:
             self.frac, self.rate = 0.0, 1.0
             return self.a0
         target = self.target_rate(queued + (1 if self.a1 is not None else 0), ticks_until_chunk)
-        self.rate += min(max(target - self.rate, -self.slew), self.slew)
+        self.rate += min(max(target - self.rate, -self.slew_down), self.slew)
         self.frac += self.rate
         while self.frac >= 1.0 - 1e-9:
             if self.a1 is None:

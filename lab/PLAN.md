@@ -52,6 +52,21 @@ faults; 2 upstream patient + mix; 3 DRTC + mix; 4 DRTC + the final stack + mix. 
 (faults hurt even when waiting), 3 against 2 (DRTC's scheduling beats waiting), 4 against 3 (smoothing). The DRTC
 robot run on cubebox v1 stays optional.
 
+**Robot evals: core and how they grow** (locked 2026-11-22). Core, 10 trials per condition (~1 min per trial with
+the reset, ~3 h): E4 above (80 trials; waits for the final stack); the baselines `sort_one_baseline` and
+`cubebox_v1_baseline` for SmolVLA, GR00T N1.5, GR00T N1.7, ACT, Diffusion (50 + 50 trials; condition: upstream
+patient, no faults, the same reference as E4). Trials run in rounds (every model x condition once per round, in a
+seeded order); always stop at the end of a round. They grow append-only, without redoing anything:
+- **more trials**: raise `trials` (10 -> 20) and run the same command; it continues with round 11;
+- **more models** (π0.5, MolmoAct 2 when trained): add them to `models` and `lab eval freeze`: only the new models
+  are frozen, the frozen ones never change; the next rounds run the new models until they catch up (no check model);
+- **a new condition or task**: a new eval file, which runs its own reference condition again.
+
+When there is time, in this order: 1 E4 10 -> 20 trials (+80); 2 the DRTC robot run on cubebox v1 (2 models, the 4
+conditions, 80); 3 E4 on a third model (GR00T N1.7 if its baseline is good, +40); 4 the baselines 10 -> 20 (+100 to
+140); 5 a robot run of a bench fault that surprised us (40 each); 6 optional: `cubebox_v0_baseline` (2 models, 20,
+frozen).
+
 **Order**: 1 build (the systems, the new faults and the shift, the three smoothing methods, RTC with DRTC and
 GR00T N1.7 served with RTC (to check), the eval setup, bench eval files per dataset, each tested locally first);
 2 E1 + E2 on all pairs (need no new smoothing); 3 E3a, then the stack is fixed, then E3b; 4 E4 on the robot.

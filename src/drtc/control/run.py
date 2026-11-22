@@ -32,7 +32,9 @@ INDEX_FIELDS = ["run_id", "experiment", "model", "trial", "success", "started_at
 # Composed experiment keys this run applies; anything else that is set is reported as not applied yet.
 APPLIED = {"starvation_grace_s", "scheduler", "blend_steps", "blend_weight", "cooldown", "cooldown_cap", "epsilon", "playback_mode", "playback_min_rate", "playback_margin_steps",
            "playback_rate_slew", "action_filter_mode", "action_filter_butterworth_cutoff", "action_filter_gain", *("drop_obs", "drop_action", "dup_obs", "dup_action", "reorder_obs", "reorder_action", "disconnect",
-              "spikes", "latency"), "estimator", "s_min", "latency_k", "latency_alpha", "latency_beta", "duration_s", "fps", "task",
+              "spikes", "latency", "rise", "loss"), "fault_shift_s", "fault_shift_seed", "s_min_scale",
+           "temporal_ensemble", "ensemble_m", "zero_lag", "zero_lag_cutoff_hz", "zero_lag_history", "resume_ramp",
+           "resume_ramp_steps", "resume_min_stall_s", "soft_stop_steps", "soft_stop_floor", "estimator", "s_min", "latency_k", "latency_alpha", "latency_beta", "duration_s", "fps", "task",
            "policy_type", "pretrained_name_or_path", "finetune", "model", "name", "description", "train",
            "rtc_enabled", "num_flow_matching_steps", "actions_per_chunk"}
 APPLIED_PREFIXES = ("robot_", "camera", "client_host", "server_host", "gpu")
@@ -42,7 +44,55 @@ PENDING = {"smoothness_guidance": "smoothing C (not ported yet)", "rtc_sigma_d":
             
            "full_diagnostics": "old client diagnostics"}
 FAULT_KEYS = ("drop_obs", "drop_action", "dup_obs", "dup_action", "reorder_obs", "reorder_action", "disconnect",
-              "spikes", "latency")
+              "spikes", "latency", "rise", "loss")
+WINDOW_KEYS = ("drop_obs", "drop_action", "dup_obs", "dup_action", "reorder_obs", "reorder_action", "disconnect",
+               "spikes", "rise")  # faults with a start time, moved by the fault shift
+
+
+def fault_shift(composed: dict, trial: int) -> float:
+    """Setup v2 (lab/PLAN.md, 2026-11-22): the seconds every timed fault of this trial is moved by.
+
+    `fault_shift_s: [lo, hi]` draws a shift uniformly from [lo, hi], seeded by (fault_shift_seed, trial number) only:
+    trial k gets the same shift in every condition and for every model, so all conditions meet the same faults.
+    """
+    rng = composed.get("fault_shift_s")
+    if not rng:
+        return 0.0
+    import random
+
+    lo, hi = (float(rng[0]), float(rng[1])) if isinstance(rng, (list, tuple)) else (0.0, float(rng))
+    return round(random.Random(f"fault-shift-{composed.get('fault_shift_seed', 0)}-{trial}").uniform(lo, hi), 3)
+
+
+def apply_faults(composed: dict, trial: int) -> dict:
+    """The faults of this trial: timed faults moved by the trial's shift; loss seeded by the trial number."""
+    shift = fault_shift(composed, trial)
+    out = {}
+    for k in FAULT_KEYS:
+        v = composed.get(k)
+        if not v:
+            continue
+        if k in WINDOW_KEYS:
+            v = [{**w, "start_s": round(float(w["start_s"]) + shift, 4)} for w in v]
+        elif k == "loss":
+            v = {**v, "seed": int(v.get("seed", 0)) * 1000 + trial}
+        out[k] = v
+    composed["fault_shift_applied_s"] = shift
+    return out
+
+
+def scaled_s_min(composed: dict) -> int:
+    """DRTC's s_min, times `s_min_scale` (ablation A5: the same relative change for every model's own s_min),
+    kept within 1 .. chunk - 1."""
+    s_min = int(composed.get("s_min", 20))
+    scale = composed.get("s_min_scale")
+    if scale:
+        s_min = max(1, int(round(s_min * float(scale))))
+        chunk = composed.get("actions_per_chunk")
+        if chunk:
+            s_min = min(s_min, int(chunk) - 1)
+        composed["s_min_applied"] = s_min
+    return s_min
 
 
 def append_index(rows: list[dict], index: Path | None = None) -> None:
@@ -97,7 +147,8 @@ def rtc_requested(reg: Registry, experiment: str) -> bool:
 
 
 def build(reg: Registry, experiment: str, model: str | None, robot: str, episode: int, endpoint: str,
-          duration: float | None, run_dir: Path, deployment: str | None = None) -> tuple[list[str], dict, list[str]]:
+          duration: float | None, run_dir: Path, deployment: str | None = None,
+          trial: int = 1) -> tuple[list[str], dict, list[str]]:
     from drtc.control.serve import camera_renames, deployment_name, semantics_for
 
     composed = reg.compose(experiment, model_override=model)
@@ -135,7 +186,7 @@ def build(reg: Registry, experiment: str, model: str | None, robot: str, episode
         # drtc: DRTC's trigger; upstream: LeRobot's own (refill when the queued playback reaches the turnaround)
         "inference.scheduler": str(composed.get("scheduler", "drtc")),
         "inference.estimator": composed.get("estimator", "jk"),
-        "inference.s_min": int(composed.get("s_min", 20)),
+        "inference.s_min": scaled_s_min(composed),
         "inference.latency_k": float(composed.get("latency_k", 1.5)),
         "inference.latency_alpha": float(composed.get("latency_alpha", 0.125)),
         "inference.latency_beta": float(composed.get("latency_beta", 0.25)),
@@ -149,6 +200,18 @@ def build(reg: Registry, experiment: str, model: str | None, robot: str, episode
         "inference.playback_min_rate": float(composed.get("playback_min_rate", 0.5)),
         "inference.playback_margin_steps": float(composed.get("playback_margin_steps", 4.0)),
         "inference.playback_rate_slew": float(composed.get("playback_rate_slew", 0.05)),
+        # setup v2 smoothing (drtc.control.smoothing): temporal ensembling and zero-lag smoothing of the queue (both at
+        # each accepted chunk), the soft stop + resume ramp (around stalls)
+        "inference.temporal_ensemble": bool(composed.get("temporal_ensemble", False)),
+        "inference.ensemble_m": float(composed.get("ensemble_m", 0.01)),
+        "inference.zero_lag": bool(composed.get("zero_lag", False)),
+        "inference.zero_lag_cutoff_hz": float(composed.get("zero_lag_cutoff_hz", 3.0)),
+        "inference.zero_lag_history": int(composed.get("zero_lag_history", 15)),
+        "inference.resume_ramp": bool(composed.get("resume_ramp", False)),
+        "inference.resume_ramp_steps": int(composed.get("resume_ramp_steps", 10)),
+        "inference.resume_min_stall_s": float(composed.get("resume_min_stall_s", 0.1)),
+        "inference.soft_stop_steps": int(composed.get("soft_stop_steps", 8)),
+        "inference.soft_stop_floor": float(composed.get("soft_stop_floor", 0.15)),
         "inference.cooldown_cap": str(composed.get("cooldown_cap", "none")),
         # How long the arm may wait without actions before the run ends with a fault. DRTC holds and goes on when
         # actions arrive (default: the whole trial; stalls are measured, M2, M3). Upstream as it ships gives up after
@@ -156,7 +219,7 @@ def build(reg: Registry, experiment: str, model: str | None, robot: str, episode
         "inference.action_starvation_grace_s": float(composed.get("starvation_grace_s") or
                                                      (duration if duration is not None else composed.get("duration_s",
                                                                                                          25.0))),
-        **({"inference.faults_json": json.dumps({k: composed[k] for k in FAULT_KEYS if composed.get(k)})}
+        **({"inference.faults_json": json.dumps(apply_faults(composed, trial))}
            if any(composed.get(k) for k in FAULT_KEYS) else {}),
         "fps": float(composed.get("fps", 30)),
         "task": composed["task"],
@@ -266,7 +329,7 @@ def main(argv: list[str] | None = None) -> int:
             model_id = reg.compose(a.experiment, model_override=a.model)["model"]
             run_dir = RESULTS / f"{datetime.now():%Y%m%d}" / exp_id / model_id / run_id
             cmd, composed, notes = build(reg, a.experiment, a.model, a.robot, a.episode, a.endpoint, a.duration,
-                                         run_dir, a.deployment)
+                                         run_dir, a.deployment, trial=trial)
         except RegistryError as e:
             print(f"lab run: {e}", file=sys.stderr)
             return 1

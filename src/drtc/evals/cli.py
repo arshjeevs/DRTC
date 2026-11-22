@@ -54,12 +54,19 @@ def cmd_freeze(reg: Registry, a) -> int:
         return 0
     started = store.trials(a.eval, S.results_root(sp))
     if sp.frozen and started:
-        changed = [m for m in sp.models if sp.frozen.get(m) != current.get(m)]
-        print(f"lab eval freeze: {a.eval} already has {len(started)} trials at its frozen versions, and these models "
-              f"changed on the Hub since: {', '.join(changed)}.\n"
-              f"  A frozen plan with trials is never changed (lab/docs/EVALUATION.md rule 4): make a new eval for the new "
-              f"versions, e.g. lab/evals/{a.eval}_v2.yaml.", file=sys.stderr)
-        return 1
+        # Append-only (setup v2, 2026-11-22): a plan with trials never changes a frozen model. Models added to the
+        # eval since (e.g. a model that finished training) are frozen now; the others keep their commits.
+        new = [m for m in sp.models if not sp.frozen.get(m)]
+        moved = [m for m in sp.models if sp.frozen.get(m) and sp.frozen[m] != current.get(m)]
+        if moved:
+            print(f"  NOTE these frozen models changed on the Hub since; the eval keeps serving their frozen commit "
+                  f"(for the new versions make a new eval, e.g. lab/evals/{a.eval}_v2.yaml): {', '.join(moved)}")
+        if not new:
+            print(f"{a.eval}: every model is frozen and it has {len(started)} trials; nothing to do")
+            return 0
+        current = {m: sp.frozen.get(m) or current[m] for m in sp.models}
+        print(f"{a.eval} has {len(started)} trials: freezing only the added models ({', '.join(new)}); "
+              f"the next rounds run them until they have as many trials as the others")
     path = S.eval_path(reg, a.eval)
     S.write_frozen(path, current)
     for m in sp.models:

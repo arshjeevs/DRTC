@@ -35,6 +35,8 @@ import csv
 import math
 import time
 from collections import deque
+
+import numpy as np
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -105,6 +107,49 @@ class DRTCRuntime(ChunkRuntime):
         self.max_delay: int | None = None  # the server's prediction steps (set by the engine from the handshake)
         self.recent: deque[float] = deque(maxlen=10)  # the last measured turnarounds (the cooldown covers them)
         self.chunk_log: list[list] = []  # CHUNK_FIELDS rows, monotonic times
+        # setup v2 smoothing at each accepted chunk (drtc.control.smoothing), set by the engine
+        self.ensemble = None  # TemporalEnsemble
+        self.zero_lag: tuple[float, int] | None = None  # (cutoff_hz, history length)
+        self.history: deque = deque(maxlen=15)  # the last executed actions (zero-lag smoothing's past)
+
+    def invalidate(self, *, held: bool = False, preserve_starvation: bool = False) -> int:
+        # motion restarts from a held pose: no ensembling or smoothing across it (the resume ramp eases the restart)
+        if getattr(self, "ensemble", None) is not None:
+            self.ensemble.reset()
+        if getattr(self, "history", None) is not None:
+            self.history.clear()
+        return super().invalidate(held=held, preserve_starvation=preserve_starvation)
+
+    def pop(self):
+        item = super().pop()
+        if item is not None and self.zero_lag is not None:
+            self.history.append(item[0].detach().cpu().float().numpy().copy())
+        return item
+
+    def _accept_aligned(self, request, actions, provenance, now):
+        if self.ensemble is None and self.zero_lag is None:
+            return super()._accept_aligned(request, actions, provenance, now)
+        import torch
+
+        snap = self.queue.snapshot()
+        anchor = request.observation.action_cursor
+        trim = None if anchor is None else snap.cursor - anchor
+        if trim is None or trim < 0 or trim >= len(actions):
+            return super()._accept_aligned(request, actions, provenance, now)  # upstream rejects it the same way
+        future = actions[trim:].detach().cpu().double().numpy()
+        if self.ensemble is not None:
+            future = self.ensemble.apply(snap.cursor, future)
+        if self.zero_lag is not None:
+            from drtc.control.smoothing import zero_lag
+
+            hist = np.stack(list(self.history)) if self.history else None
+            future = zero_lag(hist, future, self.zero_lag[0], 1.0 / self.interval)
+        smoothed = actions.clone()
+        smoothed[trim:] = torch.as_tensor(future, dtype=actions.dtype, device=actions.device)
+        accepted = super()._accept_aligned(request, smoothed, provenance, now)
+        if accepted and self.ensemble is not None:
+            self.ensemble.commit()
+        return accepted
 
     def abandon(self, request_id: str, backoff: float = 0.0) -> bool:
         """Give up the request in flight (its late reply is then discarded as stale)."""
@@ -214,6 +259,17 @@ class DRTCInferenceConfig(RemoteInferenceConfig):
     playback_min_rate: float = 0.5
     playback_margin_steps: float = 4.0
     playback_rate_slew: float = 0.05
+    # Setup v2 smoothing (drtc.control.smoothing; lab/PLAN.md 2026-11-22)
+    temporal_ensemble: bool = False  # seams: ACT's temporal ensembling of the queued steps (aligned merge)
+    ensemble_m: float = 0.01
+    zero_lag: bool = False  # jitter: zero-phase smoothing of recent actions + the queued future (aligned merge)
+    zero_lag_cutoff_hz: float = 3.0
+    zero_lag_history: int = 15
+    resume_ramp: bool = False  # faults: the soft stop (playback) + the minimum-jerk resume ramp
+    resume_ramp_steps: int = 10
+    resume_min_stall_s: float = 0.1
+    soft_stop_steps: int = 8
+    soft_stop_floor: float = 0.15
 
     def __post_init__(self) -> None:
         super().__post_init__()
@@ -286,10 +342,30 @@ class DRTCEngine(RemoteInferenceEngine):
             self.action_filter = ButterworthFilter(cfg.filter_cutoff_hz, 1.0 / self.runtime.interval,
                                                    cfg.filter_order, cfg.filter_gain)
         self.playback = None
-        if isinstance(cfg, DRTCInferenceConfig) and cfg.playback_mode == "adaptive":
+        v2 = isinstance(cfg, DRTCInferenceConfig)
+        if v2 and (cfg.playback_mode == "adaptive" or cfg.resume_ramp):
             from drtc.control.playback import AdaptivePlayback
 
-            self.playback = AdaptivePlayback(cfg.playback_min_rate, cfg.playback_margin_steps, cfg.playback_rate_slew)
+            self.playback = AdaptivePlayback(cfg.playback_min_rate, cfg.playback_margin_steps, cfg.playback_rate_slew,
+                                             adaptive=cfg.playback_mode == "adaptive",
+                                             soft_stop_steps=cfg.soft_stop_steps if cfg.resume_ramp else 0,
+                                             soft_stop_floor=cfg.soft_stop_floor)
+        self.ramp = None
+        if v2 and cfg.resume_ramp:
+            from drtc.control.smoothing import ResumeRamp
+
+            self.ramp = ResumeRamp(cfg.resume_ramp_steps, cfg.resume_min_stall_s)
+        if v2 and isinstance(self.runtime, DRTCRuntime):
+            if cfg.temporal_ensemble or cfg.zero_lag:
+                if self.runtime.chunk_merge != "aligned":
+                    raise ValueError("temporal_ensemble and zero_lag work on the aligned merge (not with RTC's append)")
+            if cfg.temporal_ensemble:
+                from drtc.control.smoothing import TemporalEnsemble
+
+                self.runtime.ensemble = TemporalEnsemble(cfg.ensemble_m)
+            if cfg.zero_lag:
+                self.runtime.zero_lag = (cfg.zero_lag_cutoff_hz, cfg.zero_lag_history)
+                self.runtime.history = deque(maxlen=max(1, cfg.zero_lag_history))
         self.faults = None
         spec = getattr(cfg, "faults_json", None)
         if spec:
@@ -447,6 +523,11 @@ class DRTCEngine(RemoteInferenceEngine):
                                         self.runtime.queue.qsize(), self._ticks_until_chunk())
         else:
             action = super().get_action(obs_frame)
+        if action is not None and self.ramp is not None:
+            import torch
+
+            eased = self.ramp.apply(action.detach().cpu().double().numpy())
+            action = torch.as_tensor(eased, dtype=action.dtype, device=action.device)
         if action is not None and self.action_filter is not None:
             import torch
 

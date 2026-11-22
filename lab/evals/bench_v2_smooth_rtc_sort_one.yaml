@@ -1,0 +1,16 @@
+# Setup v2 bench E3a, the RTC cell, on so101_sort_one_v1: SmolVLA and GR00T N1.5 only (ACT and Diffusion have no RTC;
+# GR00T N1.7 is trained with relative actions, for which upstream switches its RTC prefix off). With its own
+# DRTC reference so the comparison stays inside this eval.
+description: 'Bench v2 E3a, sort_one: RTC on DRTC + mix (replay robot, flow-matching models)'
+success: n/a (replay robot)
+time_limit_s: 14
+trials: 8
+seed: 0
+models:
+- smolvla_sort_one_v1_full
+- groot_sort_one_v1_full
+conditions:
+  drtc__mix: v2/drtc__mix
+  s_rtc__mix: v2/s_rtc__mix
+video: false
+robot: replay

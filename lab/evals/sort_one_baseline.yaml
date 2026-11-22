@@ -1,21 +1,18 @@
-# Baseline (condition 1) on sort_one, all 7 models (lab/PLAN.md, "LOCKED SCOPE", order of work step 5).
-# SmolVLA and GR00T N1.5 run here again next to the others: models are only compared inside one eval (METRICS.md
-# rule 5); their baseline in sort_one_drtc_main stays part of the DRTC experiment.
-# Not frozen yet: freeze once all 7 are trained and on the Hub (lab/WORKFLOW.md, "The plan, step by step", step 5).
-# Until the first trial this file may still be edited (models, trials, success rule); after that only a new eval.
-description: Baseline, sort_one - all 7 models, upstream LeRobot as it ships, normal network
+# Baseline on sort_one (lab/PLAN.md, setup v2 robot evals, 2026-11-22): upstream LeRobot with the starvation grace
+# raised to the whole trial (the same reference condition as E4), normal network, 10 trials per model.
+# The 5 trained models now; π0.5 and MolmoAct 2 are added to `models` when trained and frozen with
+# `lab eval freeze` (append-only: the frozen models never change; lab/WORKFLOW.md, "Growing an eval").
+description: Baseline, sort_one - upstream LeRobot (patient), normal network
 success: The cube is fully inside the square of its colour and the gripper has let go of it, before the time limit.
 time_limit_s: 30
 trials: 10
 seed: 0
 models:
-  - smolvla_sort_one_v1_full
-  - groot_sort_one_v1_full
-  - grootn17_sort_one_v1_full
-  - pi05_sort_one_v1_full
-  - molmoact2_sort_one_v1_lora
-  - act_sort_one_v1_full
-  - diffusion_sort_one_v1_full
+- smolvla_sort_one_v1_full
+- groot_sort_one_v1_full
+- grootn17_sort_one_v1_full
+- act_sort_one_v1_full
+- diffusion_sort_one_v1_full
 conditions:
-  baseline: main/baseline
+  baseline: v2_robot/upstream_patient__none
 video: true

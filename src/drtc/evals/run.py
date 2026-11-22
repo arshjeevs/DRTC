@@ -94,6 +94,27 @@ def plan_sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def plan_core(path: Path) -> dict:
+    """What a plan with trials may never change (setup v2, 2026-11-22): everything but `trials`, `models` and `frozen`,
+    which may only grow (more trials; models added and frozen, the frozen ones unchanged)."""
+    data = yaml.safe_load(path.read_text()) or {}
+    core = {k: v for k, v in data.items() if k not in ("trials", "models", "frozen")}
+    return {"core_sha": hashlib.sha256(json.dumps(core, sort_keys=True, default=str).encode()).hexdigest(),
+            "trials": int(data.get("trials", 20)), "frozen": dict(data.get("frozen") or {})}
+
+
+def plan_change_problem(old: dict, new: dict) -> str | None:
+    """Why the plan `new` is not an append-only extension of a session's plan `old` (None: it is)."""
+    if old.get("core_sha") != new["core_sha"]:
+        return "its task, success rule, time limit, seed, conditions or robot changed"
+    if new["trials"] < int(old.get("trials", 0)):
+        return f"trials went down ({old.get('trials')} -> {new['trials']})"
+    for m, sha in (old.get("frozen") or {}).items():
+        if new["frozen"].get(m) != sha:
+            return f"model {m} was removed or its frozen commit changed"
+    return None
+
+
 def machine(reg: Registry) -> str:
     host = reg.current_host()
     return host.id if host else socket.gethostname()
@@ -134,7 +155,7 @@ def run_trial(reg: Registry, sp: S.EvalSpec, condition: str, model: str, number:
     held = held_out_episodes(reg, model)
     episode = held[(number - 1) % len(held)] if robot == "replay" else 0
     cmd, composed, notes = build(reg, sp.conditions[condition], model, robot, episode, endpoint, sp.time_limit_s,
-                                 tdir, serving.deployment(sp, model))
+                                 tdir, serving.deployment(sp, model), trial=number)
     (tdir / "config.yaml").write_text(yaml.safe_dump(composed, sort_keys=False))
     video = TrialVideo(tdir / "video", camera_roles(reg, model, robot)) if sp.video else None
     holder: dict = {}
@@ -240,6 +261,7 @@ def session_run(reg: Registry, name: str, server: str, models: list[str] | None,
         raise RegistryError("the git tree has uncommitted changes: commit them first (official trials record the "
                             "exact code), or use --test")
     psha = plan_sha(S.eval_path(reg, name))
+    pcore = plan_core(S.eval_path(reg, name))
     if not test and not offline:
         try:
             new = sync.pull(reg, name, kind)
@@ -250,12 +272,16 @@ def session_run(reg: Registry, name: str, server: str, models: list[str] | None,
                   f"sessions only. Use --offline to skip this check.")
     for s in store.sessions(name, root):
         try:
-            other = json.loads((s / "session.json").read_text()).get("plan_sha")
+            meta = json.loads((s / "session.json").read_text())
         except (OSError, json.JSONDecodeError):
             continue
-        if other and other != psha and not test:
-            raise RegistryError(f"lab/evals/{name}.yaml changed since session {s.name} (its plan differs). A plan "
-                                f"with trials is never changed: put the change in a new eval")
+        other, other_core = meta.get("plan_sha"), meta.get("plan_core")
+        if test or not other or other == psha:
+            continue
+        why = plan_change_problem(other_core, pcore) if other_core else "it was made before plans could grow"
+        if why:
+            raise RegistryError(f"lab/evals/{name}.yaml changed since session {s.name}: {why}. A plan with trials only "
+                                f"grows (more trials, added models); any other change goes in a new eval")
     if sp.robot == "replay":
         try:
             import lerobot_robot_replay  # noqa: F401
@@ -306,7 +332,8 @@ def session_run(reg: Registry, name: str, server: str, models: list[str] | None,
                "git_commit": commit}
         (session / "session.json").write_text(json.dumps({
             "eval": name, "session": session.name, "machine": mach, "robot": sp.robot, "server": server,
-            "server_gpu": gpu, "git_commit": commit, "plan_sha": psha, "metrics_version": METRICS_VERSION,
+            "server_gpu": gpu, "git_commit": commit, "plan_sha": psha, "plan_core": pcore,
+            "metrics_version": METRICS_VERSION,
             "models": {m: {"revision": sp.frozen[m], "deployment": serving.deployment(sp, m),
                            "artifact_identity": artifacts[m]} for m in chosen},
             "test": test, "started_at": datetime.now().isoformat(timespec="seconds"),

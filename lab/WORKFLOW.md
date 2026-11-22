@@ -74,15 +74,111 @@ goes to `results/scratch/` and never into the results.
 The remaining steps of [PLAN.md](PLAN.md) ("Order of work") with the exact commands, written 2026-11-21. Parts 1-3
 below explain each command in general; this part says which ones to run for the current plan, in which order.
 
-| Plan step | What | Status (2026-11-21) | Here |
+| Plan step | What | Status (2026-11-22) | Here |
 |---|---|---|---|
-| 3 | Trainings | you; 3 running, 3 to do | [Part 1](#part-1-from-a-new-dataset-to-trained-models), steps 7-9 |
+| 10 | **Setup v2: the DRTC and smoothing experiments** (bench E1-E3, robot E4) | built 2026-11-22; the bench is next | [Setup v2](#setup-v2-the-drtc-and-smoothing-experiments) |
+| 3 | Trainings | you; π0.5 x2 and MolmoAct 2 left | [Part 1](#part-1-from-a-new-dataset-to-trained-models), steps 7-9 |
 | 6 | Offline M9/M10 for every trained model | 8 done; ACT + Diffusion cubebox v1 ready now | [Step 6](#step-6-offline-evaluation-of-each-new-model) |
-| 5 | Robot baselines: 3 evals | `cubebox_v0_baseline` ready; the other two written, frozen once their 7 models are trained | [Step 5](#step-5-the-robot-baselines) |
+| 5 | Robot baselines: sort_one and cubebox v1 (5 models now, 2 later); cubebox v0 optional | ready to freeze | [Step 5](#step-5-the-robot-baselines) |
 | 7 | Report and slides | Claude, after each result | [Part 3](#the-report-and-the-slides) |
 | 8 | Optional: the DRTC experiment on cubebox v1 | if time remains | [Step 8](#step-8-optional-the-drtc-experiment-on-cubebox-v1) |
 
-To change any of it (another model, more trials, a model dropped): [Changing the plan](#changing-the-plan).
+To change any of it (another model, more trials, a model dropped): [Changing the plan](#changing-the-plan) and
+[Growing an eval](#growing-an-eval-more-trials-more-models).
+
+## Setup v2: the DRTC and smoothing experiments
+
+The plan: [PLAN.md](PLAN.md), "DRTC + SMOOTHING EXPERIMENT SETUP v2" (locked 2026-11-22). The conditions are
+generated files in [experiments/v2/](experiments/v2/) (bench) and [experiments/v2_robot/](experiments/v2_robot/)
+(robot), one per system and fault: `<system>__<fault>.yaml`, written by `experiments/v2/_make.py`.
+
+| Step | Eval(s) | Where | Runs | Time (about) |
+|---|---|---|---|---|
+| V1 | E1 + E2: `bench_v2_drtc_sort_one`, `bench_v2_drtc_cubebox_v1` | a GPU server (you choose) | 2,080 each | ~10 h each |
+| V2 | E3a: `bench_v2_smooth_<dataset>` and `bench_v2_smooth_rtc_<dataset>` | a GPU server | 280 + 32 each | ~1.5 h each |
+| V3 | the final stack is chosen (the rule from the eval setup) and E3b + E4 are written | Claude | – | – |
+| V4 | E3b: `bench_v2_stack_<dataset>` | a GPU server | ~240 each | ~1.2 h each |
+| V5 | E4: `sort_one_drtc_v2` (SmolVLA + GR00T N1.5, 4 conditions, 10 trials) | the laptop + a GPU server | 80 | ~1.5 h |
+| (5) | the baselines (5 models now) can run any time | the laptop + a GPU server | 50 + 50 | ~1 h each |
+
+V1 and V2 need nothing from each other: run them in either order, or on two servers at once (one dataset each).
+
+**What the names mean.** Systems: `upstream_patient` (LeRobot's scheduler, starvation grace = the whole trial, the
+baseline), `upstream_shipped` (the same with LeRobot's 1 s grace), `drtc` (our DRTC), `a1_no_cooldown`,
+`a2_upstream_estimator`, `a3_upstream_trigger`, `a4_half_chunk_cap`, `a5_smin_half`, `a5_smin_x1_5` (DRTC minus or
+changed in one part), `s_<method>` (DRTC + one smoothing method). Faults: `none`, `spike` (one reply +1 s), `drops`
+(every reply lost for 1 s), `outage` (1.5 s, both directions), `mix` (spike, drops, outage), `rise` (+400 ms on
+every reply for 5 s), `loss` (10% of the replies lost). Every timed fault is moved by a random 0-4 s per trial
+number: trial 3 meets its faults at the same times in every condition (`fault_shift_applied_s` in the trial's
+`config.yaml`).
+
+### V0. Freeze the bench evals (once, laptop)
+
+```bash
+cd ~/Projects/drtc-major && source .venv/bin/activate && git pull
+for e in bench_v2_drtc_sort_one bench_v2_drtc_cubebox_v1 bench_v2_smooth_sort_one bench_v2_smooth_cubebox_v1 \
+         bench_v2_smooth_rtc_sort_one bench_v2_smooth_rtc_cubebox_v1; do
+  lab eval check $e && lab eval freeze $e
+done
+git add lab/evals/bench_v2_*.yaml && git commit -m "bench v2 evals: frozen" && git push
+```
+
+`check` prints `ok (5 models x 52 conditions x 8 trials = 2080; not frozen yet)` for the E1 + E2 evals; `freeze`
+lists each model's Hub commit.
+
+### V1, V2, V4. Run a bench eval (GPU server)
+
+The same two commands for every bench eval, in tmux so it keeps running when you disconnect. On the A100
+(`ssh b230968ee@192.168.5.13`, `cd ~/drtc_major && . ./.server.env`) or in the H200 container
+(`cd /workspace/drtc_major && . ./.server.env`):
+
+```bash
+git pull
+nvidia-smi                                                 # room for the 5 models: ~15 GB
+tmux new -s bench                                          # window 1: the model servers
+.venv/bin/lab eval serve bench_v2_drtc_sort_one            # wait for "all 5 ready"
+# Ctrl-b c (window 2): the runs
+.venv/bin/lab eval run bench_v2_drtc_sort_one --server local
+# Ctrl-b d detaches; `tmux attach -t bench` comes back
+```
+
+What you see: `round 1, 17/260: ...` lines, one per run (14 s each), in rounds (every model x condition once per
+round, 8 rounds). **Stopping and continuing:** to stop cleanly, start it with `--max-trials N` (it stops after N
+runs and pushes the session). Ctrl-C stops at once: the run in progress is not counted (it is run again later) and
+the session is not pushed, so push it yourself: `.venv/bin/lab eval push bench_v2_drtc_sort_one`. Either way the
+same `lab eval run` command later continues where it stopped (an unfinished round is finished first). When the eval
+is done: Ctrl-C the servers in window 1, then the next eval.
+
+Back on the laptop:
+
+```bash
+lab eval status bench_v2_drtc_sort_one                     # runs done per condition and model
+lab eval report bench_v2_drtc_sort_one --pull              # results/bench/bench_v2_drtc_sort_one/report.md
+```
+
+Tell Claude when an eval is done: the results go into REPORT.md and the report.
+
+### V3. The final smoothing stack (after V2)
+
+Claude applies the selection rule (fixed in the eval setup, before V2 runs) to the V2 results, then writes the
+stack's conditions with `.venv/bin/python lab/experiments/v2/_make.py --stack <methods>` and the evals
+`bench_v2_stack_<dataset>` (E3b) and `sort_one_drtc_v2` (E4). Then V0 (check, freeze, commit) for them, V4 on a GPU
+server, and V5 on the robot.
+
+### V5. The robot run (E4) and the baselines
+
+Like [Step 5c](#5c-each-session) with the eval's name: the model server on a GPU server (`lab eval serve
+sort_one_drtc_v2`), then on the laptop `lab eval servers sort_one_drtc_v2 --server <server>` and
+`lab eval run sort_one_drtc_v2 --server <server>`. One round = 8 trials (2 models x 4 conditions); 10 rounds.
+
+### Notes from the local check (2026-11-22, ACT and SmolVLA on the laptop's replay robot)
+
+- `upstream_patient` under faults still ends with `Remote inference request deadline exceeded` when a reply is
+  lost (the drops or the outage): upstream never re-sends a request, so a lost reply ends the run after its 5 s
+  request deadline (`action_timeout`), whatever the starvation grace. This is upstream's behaviour, not a bug of
+  the bench: replacing a lost reply is what DRTC's cooldown adds (ablation A1 shows it).
+- GR00T N1.7 has no RTC cell: our N1.7 models are trained with relative actions, and LeRobot turns the RTC prefix
+  off for those.
 
 ## Step 6: offline evaluation of each new model
 
@@ -132,14 +228,16 @@ Then tell Claude, who adds them to REPORT.md, the report and the slides.
 
 ## Step 5: the robot baselines
 
-Condition 1 (`main/baseline`: upstream LeRobot as it ships, normal network), 10 trials per model, the laptop as
-the robot computer. Three evals, one per dataset:
+Setup v2 (2026-11-22): the condition is `v2_robot/upstream_patient__none` (upstream LeRobot with the starvation
+grace raised to the whole trial, normal network: the same reference as E4), 10 trials per model, the laptop as the
+robot computer. The evals start with the 5 trained models; π0.5 and MolmoAct 2 are added when they are trained
+([Growing an eval](#growing-an-eval-more-trials-more-models)).
 
 | Eval | Models | Trials | Ready? |
 |---|---|---|---|
-| `cubebox_v0_baseline` | SmolVLA, GR00T N1.5 | 2 x 10 = 20 | **yes**: frozen 2026-11-20 |
-| `cubebox_v1_baseline` | all 7 (`lab/evals/cubebox_v1_baseline.yaml`) | 7 x 10 = 70 | after all 7 cubebox v1 trainings: freeze (5a) |
-| `sort_one_baseline` | all 7 (`lab/evals/sort_one_baseline.yaml`) | 7 x 10 = 70 | after all 7 sort_one trainings: freeze (5a) |
+| `sort_one_baseline` | SmolVLA, GR00T N1.5, GR00T N1.7, ACT, Diffusion (+ π0.5, MolmoAct 2 later) | 5 x 10 = 50 (+20) | **yes**: freeze (5a) |
+| `cubebox_v1_baseline` | the same 5 on cubebox v1 (+2 later) | 50 (+20) | **yes**: freeze (5a) |
+| `cubebox_v0_baseline` | SmolVLA, GR00T N1.5 (old condition `main/baseline`, 1 s grace) | 2 x 10 = 20 | optional; frozen 2026-11-20 |
 
 SmolVLA and GR00T N1.5 run again in `sort_one_baseline`, next to the other five: models are only compared inside one
 eval (METRICS.md rule 5). Their baseline in `sort_one_drtc_main` stays part of the DRTC experiment.
@@ -156,8 +254,8 @@ git add lab/evals/sort_one_baseline.yaml && git commit -m "eval sort_one_baselin
 ```
 
 `freeze` stops with `cannot read orangemoon599/<model> on the Hub ... is it trained and pushed?` while a model is
-missing. If a model will not be ready in time (π0.5 takes ~27 h, MolmoAct 2 ~5 days), take it out of `models:` first
-([Changing the plan](#changing-the-plan)); one eval cannot be frozen part-way.
+missing: list only trained models under `models:`, and add the others later
+([Growing an eval](#growing-an-eval-more-trials-more-models)).
 
 ### 5b. Check the new models once, without counting (before the first official session)
 
@@ -234,29 +332,65 @@ H200 or the A100) and `cubebox_v1_baseline`.
 
 ## Step 8 (optional): the DRTC experiment on cubebox v1
 
-Only if time remains (PLAN.md step 8): the four conditions of `sort_one_drtc_main` with SmolVLA and GR00T N1.5 on
-cubebox v1, 2 x 4 x 10 = 80 trials. Make the eval from the sort_one one:
+Only if time remains (PLAN.md, setup v2, robot evals, item 2): E4's four conditions with SmolVLA and GR00T N1.5 on
+cubebox v1, 2 x 4 x 10 = 80 trials. Make the eval from E4 once it exists (setup v2, V3):
 
 ```bash
-cp lab/evals/sort_one_drtc_main.yaml lab/evals/cubebox_v1_drtc_main.yaml
+cp lab/evals/sort_one_drtc_v2.yaml lab/evals/cubebox_v1_drtc_v2.yaml
 ```
 
-Edit `lab/evals/cubebox_v1_drtc_main.yaml`:
+Edit `lab/evals/cubebox_v1_drtc_v2.yaml`:
 
-- `description:` `DRTC experiment, cubebox v1 - baseline, baseline + faults, DRTC + faults, DRTC + smoothing + faults`
+- `description:` `DRTC v2, cubebox v1 - upstream patient, + mix, DRTC + mix, DRTC + stack + mix`
 - `success:` `The green cube ends inside the box and the gripper is open, before the time limit.`
 - `models:` `smolvla_cubebox_v1_full` and `groot_cubebox_v1_full`
 - **delete the whole `frozen:` block** at the end (and its comment line): those are the sort_one models' commits.
 - keep `conditions:`, `trials: 10`, `time_limit_s: 30` as they are (the same experiment as on sort_one).
 
-Then `lab eval check`, `lab eval freeze`, commit and push (5a), and sessions as in 5c with `cubebox_v1_drtc_main`
-(2 models: the H200 or the A100; one round = 8 trials).
+Then `lab eval check`, `lab eval freeze`, commit and push (5a), and sessions as in 5c with `cubebox_v1_drtc_v2`
+(one round = 8 trials).
+
+## Growing an eval: more trials, more models
+
+Since 2026-11-22 an eval with trials may **grow** (and only grow): `lab eval run` accepts a plan whose `trials` went
+up or that has new models, as long as everything else is unchanged and every frozen model keeps its commit. Trials
+run in rounds (every model x condition once per round, in a seeded order), so stop at the end of a round and every
+condition has the same number of trials.
+
+**More trials** (e.g. E4 from 10 to 20 when there is time):
+
+```bash
+# edit lab/evals/sort_one_drtc_v2.yaml: trials: 10 -> trials: 20
+lab eval check sort_one_drtc_v2                 # "... x 20 trials"
+git add lab/evals/sort_one_drtc_v2.yaml && git commit -m "eval sort_one_drtc_v2: 20 trials" && git push
+lab eval run sort_one_drtc_v2 --server h200     # continues with round 11
+```
+
+**More models** (e.g. π0.5 and MolmoAct 2 in the baselines once trained):
+
+```bash
+# edit lab/evals/sort_one_baseline.yaml: add pi05_sort_one_v1_full and molmoact2_sort_one_v1_lora under models:
+lab eval check sort_one_baseline
+lab eval freeze sort_one_baseline     # "has 50 trials: freezing only the added models (...)"; the others keep theirs
+git add lab/evals/sort_one_baseline.yaml && git commit -m "eval sort_one_baseline: + pi05, molmoact2" && git push
+lab eval serve sort_one_baseline      # on the server: now 7 models
+lab eval run sort_one_baseline --server h200     # the next rounds hold only the two new models until they have
+                                                  # 10 trials each; with trials: 20 later, all 7 run together again
+```
+
+The new models run on another day than the first ones: comparing them with the older models also compares the two
+days (light, cube, arm). Comparisons inside one model are not affected.
+
+**Anything else** (a condition, the time limit, the success rule, a model's version): a new eval, below.
+
+What to add first when there is time (PLAN.md, setup v2, robot evals): E4 to 20 trials; the DRTC robot run on
+cubebox v1; E4 on a third model; the baselines to 20 trials; a robot run of a bench fault that surprised us.
 
 ## Changing the plan
 
-The rule: **an eval can be edited freely until its first official trial; after that it is never changed**, and a
-change means a new eval (`<eval>_v2`). `lab eval run` refuses a plan that differs from its earlier sessions, so a
-mistake can't slip in.
+The rule: **an eval can be edited freely until its first official trial; after that it only grows** (more trials,
+added models: above), and any other change means a new eval (`<eval>_v2`). `lab eval run` refuses a plan that
+differs from its earlier sessions in anything else, so a mistake can't slip in.
 
 | You want to | Do | Allowed |
 |---|---|---|
@@ -264,7 +398,8 @@ mistake can't slip in.
 | Add a model | add its name under `models:` (it must be in `lab/models/*.yaml`), then `lab eval freeze` again | before the first trial |
 | Retrained a model before any trial | `lab eval freeze <eval>` again (pins the new Hub commit) | before the first trial |
 | More or fewer trials, another time limit or success rule | edit `trials:`, `time_limit_s:`, `success:` | before the first trial |
-| Any of these after trials exist | a new eval: copy the file to `<eval>_v2.yaml`, delete its `frozen:` block, change it, freeze it; include the models to compare with (rule 5) | always |
+| More trials or another model after trials exist | grow the eval ([Growing an eval](#growing-an-eval-more-trials-more-models)) | always |
+| Anything else after trials exist | a new eval: copy the file to `<eval>_v2.yaml`, delete its `frozen:` block, change it, freeze it; include the models to compare with (rule 5) | always |
 | Another condition (other DRTC or fault settings) | ask Claude: it is a new file in `lab/experiments/main/` and a change to the locked scope. Never edit an experiment file an eval with trials uses | – |
 | Another task's baseline | a new eval file like `sort_one_baseline.yaml`, models of that task | – |
 
