@@ -261,10 +261,15 @@ def build(reg: Registry, model_id: str, steps: int | None = None, download: bool
         flags["steps"] = t.get("steps", 20_000)
     if held_out:
         flags["eval_steps"] = max(50, flags["steps"] // 20)  # ~20 held-out evaluations per run, as before
+    # A recipe's stop_at cuts the run short (save + push at that step) without changing the schedule, which LeRobot
+    # sizes from `steps`. A shorter run (--steps, a test) ends before it anyway.
+    stop_at = t.get("stop_at")
+    if stop_at is not None and stop_at >= flags["steps"]:
+        stop_at = None
     info = {"model": model_id, "recipe": r.recipe.id, "dataset": f"{r.dataset.id}@{r.dataset.revision[:10]}",
             "episodes": len(episodes) if episodes is not None else "all", "held_out": held_out,
             "frames": frames, "epochs": t.get("epochs"), "unknown_flags": unknown_policy_flags(r.policy, flags),
-            "variants": variants, "speed": speed,
+            "variants": variants, "speed": speed, "stop_at": stop_at,
             "resolved": r}
     return flags, info
 
@@ -393,9 +398,10 @@ def prune_checkpoints(latest: Path, losses: dict[int, float], keep_last: int = K
     return removed
 
 
-def install_clean_stop(lerobot_train, model: str, losses_file: Path | None = None) -> dict:
-    """At the next step after a stop request: save a checkpoint, then stop (the caller pushes it)."""
-    state = {"requested": False, "saved": None, "eval": EvalLosses(losses_file)}
+def install_clean_stop(lerobot_train, model: str, losses_file: Path | None = None, stop_at: int | None = None) -> dict:
+    """At the next step after a stop request, or at step `stop_at` (the recipe's): save a checkpoint, then stop (the
+    caller pushes it)."""
+    state = {"requested": False, "saved": None, "eval": EvalLosses(losses_file), "stop_at": stop_at}
     logging.getLogger().addHandler(state["eval"])
     stop = stop_file(model)
     stop.parent.mkdir(parents=True, exist_ok=True)
@@ -415,6 +421,10 @@ def install_clean_stop(lerobot_train, model: str, losses_file: Path | None = Non
     update_last = lerobot_train.update_last_checkpoint
 
     def should_save_checkpoint(step, save_freq, total_steps):
+        if stop_at is not None and step >= stop_at and not state["requested"]:
+            state["requested"] = True
+            print(f"\nstep {step}: the recipe's stop_at ({stop_at}) is reached: saving a checkpoint and stopping",
+                  flush=True)
         if stop.exists() and not state["requested"]:
             stop.unlink(missing_ok=True)
             request()
@@ -449,6 +459,9 @@ def print_summary(flags: dict, info: dict) -> None:
         print(f"episodes: {info['episodes']} for training, held out: {info['held_out']}")
     if info["frames"]:
         print(f"epochs {info['epochs']} x {info['frames']} frames / batch {flags['batch_size']} = {flags['steps']} steps")
+    if info.get("stop_at"):
+        print(f"stops at step {info['stop_at']} of {flags['steps']} (recipe stop_at; the LR schedule is that of "
+              f"{flags['steps']} steps)")
     if info["unknown_flags"]:
         print(f"WARNING: {r.policy} has no config field for: {', '.join(info['unknown_flags'])}")
 
@@ -483,6 +496,7 @@ def main(argv: list[str] | None = None) -> int:
         local = out / "checkpoints" / "last" / "pretrained_model" / "train_config.json"
         cfg_path = str(local) if local.is_file() else r.hub
         flags = {"config_path": cfg_path, "resume": True}
+        stop_at = r.train.get("stop_at")  # the recipe's, also for a resumed run
     else:
         try:
             check_local_dataset(r)
@@ -491,6 +505,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"lab train: {e}", file=sys.stderr)
             return 1
         print_summary(flags, info)
+        stop_at = info["stop_at"]
         if info["unknown_flags"] and not args.dry_run:
             print("lab train: fix the recipe's flags first (or remove them)", file=sys.stderr)
             return 1
@@ -530,7 +545,7 @@ def main(argv: list[str] | None = None) -> int:
     if reg.settings.wandb_project and flags.get("trackio.enable", True) and \
             "--trackio.enable=false" not in extra and not args.no_wandb:
         wandb_mirror.install(reg.settings.wandb_project, reg.settings.wandb_entity)  # wandb next to Trackio
-    state = install_clean_stop(lerobot_train, args.model, out / "eval_losses.json")
+    state = install_clean_stop(lerobot_train, args.model, out / "eval_losses.json", stop_at=stop_at)
     sys.argv = cmd
     try:
         lerobot_train.main()

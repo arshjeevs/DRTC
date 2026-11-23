@@ -615,8 +615,8 @@ smolvla_sort_two_v1_full: {recipe: smolvla_authors, dataset: so101_sort_two_v1, 
   | GR00T N1.5 | `groot_n15_nvidia` | 10k x 32 | ~1.4 h (~3.6 h with other runs) |
   | Diffusion Policy | `diffusion_original` | 600 epochs x 64 | ~11 h for 110 episodes, with other runs |
   | GR00T N1.7 | `groot_n17_nvidia` | 20k x 64 | not measured yet |
-  | π0.5 | `pi05_openpi` | 20k x 64 | ~27 h, ~77 GB of GPU memory |
-  | MolmoAct 2 | `molmoact2_lora` | 50k x 16 | ~5 days on the A100 (~9-10 s per step) |
+  | π0.5 | `pi05_openpi` | 20k x 64, stopped at 15k | ~27 h, ~77 GB of GPU memory |
+  | MolmoAct 2 | `molmoact2_lora` | 50k x 16, stopped at 30k | ~5 days on the A100 (~9-10 s per step) |
 
 - `status` is a note only (`planned` → `trained` once it's on the Hub); nothing depends on it.
 

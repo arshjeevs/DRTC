@@ -24,8 +24,8 @@ original authors' recipe); a model is a recipe applied to a dataset.
    | SmolVLA | `smolvla_authors` | 20k steps x 64 | ~1.1 h (H200 alone) | compiled; the VLM is frozen |
    | GR00T N1.5 | `groot_n15_nvidia` | 10k steps x 32 | ~1.4 h (H200 alone) | frame cache (prepared on the server) |
    | GR00T N1.7 | `groot_n17_nvidia` | 20k steps x 64 | several hours | relative arm actions (`lab prepare` makes their stats) |
-   | π0.5 | `pi05_openpi` | 20k steps x 64 | ~27 h, ~77 GB | the H200 only; relative joints |
-   | MolmoAct 2 | `molmoact2_lora` | 50k steps x 16 | ~5 days on the A100 | LoRA rank 64 on the VLM |
+   | π0.5 | `pi05_openpi` | 20k steps x 64, **stopped at 15k** | ~27 h for 20k, ~77 GB | the H200 only; relative joints |
+   | MolmoAct 2 | `molmoact2_lora` | 50k steps x 16, **stopped at 30k** | ~5 days on the A100 for 50k | LoRA rank 64 on the VLM |
    | Diffusion | `diffusion_original` | 600 epochs x 64 | a few hours | ResNet-18 from scratch |
 3. Commit and push; check on the laptop that the command builds (it downloads nothing):
 
@@ -93,7 +93,10 @@ tmux new -d -s train -n act '.venv/bin/lab train act_sort_one_v1_full; bash'
 .venv/bin/lab stop --all                   # every lab train on this machine
 ```
 
-Ctrl-C in the window does the same. Continue later, here or on another server:
+Ctrl-C in the window does the same. A recipe can also stop itself: `train.stop_at` (π0.5 15k, MolmoAct 2 30k,
+set 2026-11-23 for time) saves, pushes and exits at that step, while the LR schedule stays that of `steps`. A run
+started before 2026-11-23 does not know `stop_at`: stop it with `lab stop` right after that checkpoint appears.
+Continue later, here or on another server:
 
 ```bash
 .venv/bin/lab train act_sort_one_v1_full --resume

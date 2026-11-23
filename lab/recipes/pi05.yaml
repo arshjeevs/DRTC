@@ -9,7 +9,9 @@ pi05_openpi:
   # 22c30e5b: same weights as the earlier pin a538eb27; its saved processors have the relative_actions step (added
   # upstream 2026-06-03), which LeRobot needs to fine-tune with use_relative_actions.
   base: lerobot/pi05_base@22c30e5b34f9e7ab738b1b34fc2fc5ecfe2d28f0
-  train: {steps: 20000, batch_size: 64, save_freq: 1000}
+  # Cut short for time (2026-11-23): stops at 15k of the 20k steps; the LR schedule is still that of 20k (LeRobot
+  # sizes it from `steps`), so the model is the 15k checkpoint of the original 20k run, not a 15k recipe.
+  train: {steps: 20000, stop_at: 15000, batch_size: 64, save_freq: 1000}
   flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true, policy.train_expert_only: false,
     policy.freeze_vision_encoder: false, policy.chunk_size: 50, policy.n_action_steps: 50,
     policy.use_relative_actions: true, policy.relative_exclude_joints: [gripper],

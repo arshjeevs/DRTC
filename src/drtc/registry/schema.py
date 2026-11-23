@@ -157,7 +157,8 @@ class Settings(BaseModel):
 # --- recipes and models -------------------------------------------------------------------------------------------
 
 SERVE_KEYS = {"rtc_enabled", "num_flow_matching_steps", "actions_per_chunk", "s_min"}
-TRAIN_KEYS = {"epochs", "steps", "batch_size", "save_freq", "episodes", "split"}
+# stop_at: end the run cleanly (save, push) at this step; the LR schedule stays that of `steps` (a run cut short for time)
+TRAIN_KEYS = {"epochs", "steps", "stop_at", "batch_size", "save_freq", "episodes", "split"}
 DATA_KEYS = {"frames"}  # dataset preparation for speed (drtc.data.prepare)
 
 
