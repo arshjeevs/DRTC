@@ -134,6 +134,24 @@ lists each model's Hub commit.
 
 ### V1, V2, V4. Run a bench eval (GPU server)
 
+**All of them in one go (`lab/bin/bench-v2`, 2026-11-25).** In the H200 container (or on the A100), after V0:
+
+```bash
+cd /workspace/drtc_major && . ./.server.env && git -c safe.directory=/workspace/drtc_major pull --ff-only
+tmux new -s bench
+lab/bin/bench-v2                       # the six V1 + V2 evals, short ones first (~32 h with 7 models)
+# Ctrl-b d detaches; tmux attach -t bench comes back; cat logs/bench_v2/summary.log shows the progress
+```
+
+Per eval it starts the servers, waits for all of them, runs the RTC warm-up (test, not counted) when the eval serves
+RTC, runs the official session (pushed at the end), stops the servers and goes on. Complete evals are skipped, so
+starting it again continues where it stopped; an eval left incomplete (a server died) is retried with fresh servers,
+up to 3 times. V4 later: `lab/bin/bench-v2 bench_v2_stack_sort_one bench_v2_stack_cubebox_v1` (plus the `_nortc_`
+ones if V3 writes them). Ctrl-C stops the run in progress and the servers; push that session with `lab eval push
+<eval>`. Logs: `logs/bench_v2/` (`summary.log`, `<eval>.run.log`, `<eval>.serve.log`).
+
+By hand, one eval at a time:
+
 The same two commands for every bench eval, in tmux so it keeps running when you disconnect. On the A100
 (`ssh b230968ee@192.168.5.13`, `cd ~/drtc_major && . ./.server.env`) or in the H200 container
 (`cd /workspace/drtc_major && . ./.server.env`):
