@@ -26,10 +26,10 @@ def needs_compat(hub: str, revision: str | None = None) -> bool:
     """Old-format checkpoint: our LoRA adapter (adapter_config with lerobot_trainable) or an old policy type."""
     from huggingface_hub import hf_hub_download
 
-    from .configs import TYPE_MAP
+    from .configs import is_old_type
 
     cfg = json.loads(Path(hf_hub_download(hub, "config.json", revision=revision)).read_text())
-    if cfg.get("type") in TYPE_MAP:
+    if is_old_type(cfg):
         return True
     if is_adapter(hub, revision):
         from huggingface_hub import hf_hub_download as dl
