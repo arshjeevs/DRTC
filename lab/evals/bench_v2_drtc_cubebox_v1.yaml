@@ -15,6 +15,8 @@ models:
 - grootn17_cubebox_v1_full
 - act_cubebox_v1_full
 - diffusion_cubebox_v1_full
+- pi05_cubebox_v1_full
+- molmoact2_cubebox_v1_lora
 conditions:
   upstream_patient__none: v2/upstream_patient__none
   upstream_patient__spike: v2/upstream_patient__spike

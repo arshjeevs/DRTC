@@ -106,11 +106,15 @@ def stack_settings(parts: list[str]) -> dict:
 EVALS = HERE.parent.parent / "evals"
 DATASETS = {
     "sort_one": ("so101_sort_one_v1", ["smolvla_sort_one_v1_full", "groot_sort_one_v1_full", "grootn17_sort_one_v1_full",
-                                       "act_sort_one_v1_full", "diffusion_sort_one_v1_full"]),
+                                       "act_sort_one_v1_full", "diffusion_sort_one_v1_full", "pi05_sort_one_v1_full",
+                                       "molmoact2_sort_one_v1_lora"]),
     "cubebox_v1": ("so101_cubebox_v1", ["smolvla_cubebox_v1_full", "groot_cubebox_v1_full", "grootn17_cubebox_v1_full",
-                                        "act_cubebox_v1_full", "diffusion_cubebox_v1_full"]),
+                                        "act_cubebox_v1_full", "diffusion_cubebox_v1_full", "pi05_cubebox_v1_full",
+                                        "molmoact2_cubebox_v1_lora"]),
 }
-RTC_MODEL = ("smolvla_", "groot_")  # GR00T N1.7 (grootn17_): relative actions, LeRobot turns its RTC prefix off
+# π0.5 and MolmoAct 2 joined on 2026-11-25 (trained: π0.5 15k of 20k, MolmoAct 2 30k of 50k steps).
+RTC_MODEL = ("smolvla_", "groot_")  # GR00T N1.7 (grootn17_) and π0.5: relative actions, LeRobot turns the RTC prefix
+# off; MolmoAct 2: its recipe serves without RTC
 ABLATIONS = ["a1_no_cooldown", "a2_upstream_estimator", "a3_upstream_trigger", "a4_half_chunk_cap"]
 
 

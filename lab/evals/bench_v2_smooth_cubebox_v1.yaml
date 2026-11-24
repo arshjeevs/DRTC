@@ -13,6 +13,8 @@ models:
 - grootn17_cubebox_v1_full
 - act_cubebox_v1_full
 - diffusion_cubebox_v1_full
+- pi05_cubebox_v1_full
+- molmoact2_cubebox_v1_lora
 conditions:
   drtc__mix: v2/drtc__mix
   s_butterworth__mix: v2/s_butterworth__mix
