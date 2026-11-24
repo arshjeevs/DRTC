@@ -17,3 +17,8 @@ comparisons:
 - s_rtc__mix vs drtc__mix
 video: false
 robot: replay
+
+# Written by `lab eval freeze`: the Hub commit each model is served at. Do not edit by hand.
+frozen:
+  smolvla_sort_one_v1_full: '45d5b9e60ad2cc8e2ebdd51b62cf44f2de9ed0cf'
+  groot_sort_one_v1_full: 'fcf412c9282bde6a14c2f40052b562508700e313'

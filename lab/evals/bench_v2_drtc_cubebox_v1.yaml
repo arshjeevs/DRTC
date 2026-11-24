@@ -125,3 +125,13 @@ primary:
 - drtc__loss vs upstream_patient__loss
 video: false
 robot: replay
+
+# Written by `lab eval freeze`: the Hub commit each model is served at. Do not edit by hand.
+frozen:
+  smolvla_cubebox_v1_full: 'c0daf0502099c07ce5f74d79cb493338baacdc50'
+  groot_cubebox_v1_full: 'b873dec480a25ad2d47d00bf2cbfdd49b092b9f0'
+  grootn17_cubebox_v1_full: '93bf72da4ec4985f848b03c62b608d6ab7cd528c'
+  act_cubebox_v1_full: 'e17dbcd9409eee62c0f1a7cc511c730f588da64b'
+  diffusion_cubebox_v1_full: '641c906749fa7bf9e01f952f9857d40639076811'
+  pi05_cubebox_v1_full: '52980f1d8268fe6c0a35528e5b1d76d31347007f'
+  molmoact2_cubebox_v1_lora: 'a5e979ece123a93128702c9b461005ddc6d63e48'
