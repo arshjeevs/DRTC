@@ -474,6 +474,87 @@ def bench_figure(summ: dict, st: dict) -> None:
     save(fig, "fig_bench", st)
 
 
+# --- setup v2 figures (written only when their results exist) -------------------------------------------------------
+
+V2_FAULTS = [("none", "no fault"), ("spike", "spike"), ("drops", "drops"), ("outage", "outage"), ("mix", "mix"),
+             ("rise", "rise"), ("loss", "loss")]
+
+
+def v2_e1_figure(ds: str, st: dict) -> None:
+    """E1: per fault type, each policy's median stall fraction with patient upstream and with DRTC (slope chart)."""
+    f = RESULTS / "bench" / f"bench_v2_drtc_{ds}" / "metrics.csv"
+    if not f.is_file():
+        return
+    df = pd.read_csv(f)
+    faults = [(k, n) for k, n in V2_FAULTS if (df["condition"] == f"drtc__{k}").any()]
+    if not faults:
+        return
+    style_axes(st)
+    w = st["width"]
+    fig, axes = plt.subplots(1, len(faults), figsize=(w, w * 0.42), sharey=True)
+    axes = np.atleast_1d(axes)
+    for ax, (fault, fname) in zip(axes, faults):
+        for model in sorted(df["model"].unique()):
+            up = med(df[(df["condition"] == f"upstream_patient__{fault}") & (df["model"] == model)]["M2_stall_pct"])
+            dr = med(df[(df["condition"] == f"drtc__{fault}") & (df["model"] == model)]["M2_stall_pct"])
+            if math.isnan(up) or math.isnan(dr):
+                continue
+            ax.plot([0, 1], [up, dr], color=GRID if dr <= up else AXIS, lw=st["lw"] * 0.7, zorder=1)
+            ax.scatter([0], [up], s=st["dot"], color=COLORS["faults"], zorder=2)
+            ax.scatter([1], [dr], s=st["dot"], color=COLORS["drtc"], zorder=2)
+        ax.set_xticks([0, 1], ["patient", "DRTC"], fontsize=st["font"] * 0.8)
+        ax.set_xlim(-0.35, 1.35)
+        ax.set_title(fname)
+        ax.grid(axis="x", visible=False)
+    axes[0].set_ylabel("Stall (% of the run)")
+    axes[0].set_ylim(bottom=0)
+    save(fig, f"fig_v2_e1_{ds}", st)
+
+
+def v2_stack_figure(st: dict) -> None:
+    """E3b: each policy's median stall fraction with DRTC alone and with the stack, both tasks (dumbbells)."""
+    tasks = [("sort_one", "Sorting"), ("cubebox_v1", "Cube in box v1")]
+    data = {}
+    for ds, _ in tasks:
+        for name in (f"bench_v2_stack_{ds}", f"bench_v2_stack_nortc_{ds}"):
+            f = RESULTS / "bench" / name / "metrics.csv"
+            if not f.is_file():
+                continue
+            df = pd.read_csv(f)
+            for model in df["model"].unique():
+                g = df[df["model"] == model]
+                d = g[g["condition"] == "drtc__mix"]
+                s = g[g["condition"].isin(["stack__mix", "stack_nortc__mix"])]
+                if len(d) and len(s):
+                    data[(ds, model.split("_")[0])] = (med(d["M2_stall_pct"]), med(s["M2_stall_pct"]),
+                                                       med(d["M7_jerk_k"]) / med(s["M7_jerk_k"]))
+    if not data:
+        return
+    style_axes(st)
+    w = st["width"]
+    fig, axes = plt.subplots(1, 2, figsize=(w, w * 0.45), sharey=True)
+    pols = sorted({m for _, m in data}, key=lambda m: data.get(("sort_one", m), (0, 0, 0))[0])
+    for ax, (ds, title) in zip(axes, tasks):
+        for i, m in enumerate(pols):
+            v = data.get((ds, m))
+            if not v:
+                continue
+            ax.plot([v[0], v[1]], [i, i], color=AXIS, lw=st["lw"], zorder=1)
+            ax.scatter([v[0]], [i], s=st["dot"], color=MUTED, zorder=2)
+            ax.scatter([v[1]], [i], s=st["dot"], color=COLORS["smooth"], zorder=2)
+            ax.text(78, i, f"÷{v[2]:.0f}", va="center", ha="left", fontsize=st["font"] * 0.85, color=INK2)
+        ax.set_yticks(range(len(pols)), [POLICY_PLAIN.get(m, m) for m in pols])
+        ax.set_xlim(0, 90)
+        ax.set_xticks([0, 25, 50, 75])
+        ax.set_xlabel("Stall under the mix (% of the run)")
+        ax.set_title(title)
+        ax.grid(axis="y", visible=False)
+    handles = [Line2D([], [], marker="o", ls="", color=MUTED, label="DRTC alone"),
+               Line2D([], [], marker="o", ls="", color=COLORS["smooth"], label="DRTC + the stack  (÷ jerk)")]
+    fig.legend(handles=handles, loc="lower center", bbox_to_anchor=(0.5, 1.0), ncol=2)
+    save(fig, "fig_v2_stack", st)
+
+
 # --- offline ------------------------------------------------------------------------------------------------------------
 
 def policy_of(model: str) -> str:
@@ -627,6 +708,10 @@ def main() -> int:
 
     for stale in [*OUT.glob("tab_v2_*.tex"), *OUT.glob("tab_base_*.tex"), OUT / "tab_e4.tex"]:
         stale.unlink(missing_ok=True)  # written again below only if their results exist
+    for st in STYLES.values():
+        v2_stack_figure(st)
+        for ds in ("sort_one", "cubebox_v1"):
+            v2_e1_figure(ds, st)
     v2_results.main_recovery(df, MODELS, CONDS, write, setn)
     v2_results.bench_v2(RESULTS, write, setn, POLICY_NAMES)
     v2_results.robot_v2(RESULTS, write, setn, POLICY_NAMES, wilson, fisher_p)

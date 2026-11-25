@@ -217,6 +217,16 @@ Tables~\ref{tab:v2e2sort} and~\ref{tab:v2e2cube} give the ablations: for each pa
 policies the stalls rose and by how much. The primary comparisons (\drtc{} against patient upstream, each fault type)
 are tested in the plans' reports.
 
+\begin{figure}[htbp]
+  \centering
+  \genfigure{fig_v2_e1_sort_one}
+  \par\medskip
+  \genfigure{fig_v2_e1_cubebox_v1}
+  \caption{E1: each policy's median stall fraction with patient upstream (orange) and with \drtc{} (green), per
+           fault type; sorting (top) and cube in box v1 (bottom). A line going down: \drtc{} stalls less.}
+  \label{fig:v2e1}
+\end{figure}
+
 \begin{table}[htbp]
   \centering
   \caption{E1 on sorting: \drtc{} against patient upstream (medians over 8 runs; recovered: runs that moved again
@@ -316,7 +326,8 @@ about 20\% are not reliable.
 
 \subsection{The stack on the bench (E3b)}\label{sec:v2e3b}
 
-Tables~\ref{tab:v2e3bsort} and~\ref{tab:v2e3bcube} compare the stack with \drtc{} alone under the mix, and
+Figure~\ref{fig:v2stack} and Tables~\ref{tab:v2e3bsort} and~\ref{tab:v2e3bcube} compare the stack with \drtc{} alone
+under the mix, and
 Tables~\ref{tab:v2e3bablsort} and~\ref{tab:v2e3bablcube} remove one part at a time. \smolvla{} and \groot{} ran the
 stack as chosen, with RTC; the five policies without RTC ran it with temporal ensembling as the seam method.
 
@@ -348,6 +359,14 @@ the robot is stated in Section~\ref{sec:v2robot}.
 Without faults the stack still stalled \groot{} (20--23\%) and GR00T~N1.7 (36\%): the chunk of these policies is barely
 longer than their round trip even on a good network (Section~\ref{sec:shortchunk}). The other policies stalled for
 less than 13\% of a fault-free run, \smolvla{} excepted (22\%, with RTC).
+
+\begin{figure}[htbp]
+  \centering
+  \genfigure{fig_v2_stack}
+  \caption{E3b: each policy's median stall fraction under the fault mix with \drtc{} alone (grey) and with the stack
+           (orange), and how many times lower the stack's jerk was (right).}
+  \label{fig:v2stack}
+\end{figure}
 
 \begin{table}[htbp]
   \centering
