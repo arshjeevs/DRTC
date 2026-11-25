@@ -146,8 +146,8 @@ lab/bin/bench-v2                       # the six V1 + V2 evals, short ones first
 Per eval it starts the servers, waits for all of them, runs the RTC warm-up (test, not counted) when the eval serves
 RTC, runs the official session (pushed at the end), stops the servers and goes on. Complete evals are skipped, so
 starting it again continues where it stopped; an eval left incomplete (a server died) is retried with fresh servers,
-up to 3 times. V4 later: `lab/bin/bench-v2 bench_v2_stack_sort_one bench_v2_stack_cubebox_v1` (plus the `_nortc_`
-ones if V3 writes them). Ctrl-C stops the run in progress and the servers; push that session with `lab eval push
+up to 3 times. V4 later: `lab/bin/bench-v2 bench_v2_stack_sort_one bench_v2_stack_cubebox_v1
+bench_v2_stack_nortc_sort_one bench_v2_stack_nortc_cubebox_v1` (the stack has RTC, so V3 wrote the `_nortc_` ones). Ctrl-C stops the run in progress and the servers; push that session with `lab eval push
 <eval>`. Logs: `logs/bench_v2/` (`summary.log`, `<eval>.run.log`, `<eval>.serve.log`).
 
 By hand, one eval at a time:

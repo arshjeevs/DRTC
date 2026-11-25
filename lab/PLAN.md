@@ -71,6 +71,12 @@ MolmoAct 2 join when trained):
 (zero-lag or Butterworth), chosen from E3a by the rule fixed before E3a ran (`python -m drtc.evals.stack`;
 METRICS.md rule 9). Models without RTC use ensembling.
 
+**Chosen 2026-11-25 (V3): adaptive + RTC + Butterworth + ramp** (ACT, Diffusion, GR00T N1.7, π0.5, MolmoAct 2:
+ensembling instead of RTC). Seam: RTC won 1 pair (GR00T N1.5 sort_one), ensembling none; the other 3 RTC-capable pairs
+ruled both out. Jitter: Butterworth won 2 pairs (ACT x2), zero-lag 1 (Diffusion cubebox); in the other 11 pairs both
+were ruled out, Butterworth mostly by M12 (+1.0 to 1.6 deg from the plan), zero-lag by M11 recovery. Output of
+`python -m drtc.evals.stack`; E3b: `bench_v2_stack{,_nortc}_<dataset>`, E4: `sort_one_drtc_v2`.
+
 **The robot (E4, `sort_one_drtc_v2`)**: sort_one, SmolVLA + GR00T N1.5, the laptop, 10 trials per condition:
 upstream patient without faults and with the mix, DRTC + mix, DRTC + the stack + mix (80 trials). Primary claims:
 faults hurt even when waiting, DRTC's scheduling beats waiting, smoothing improves the motion.
@@ -96,7 +102,7 @@ the laptop for every official experiment (the Pi is set up and tested).
 | 3 | Setup v2 build and eval setup (metrics v3), tested on the laptop's replay robot | Claude | ✓ 2026-11-22 |
 | 4 | V0: freeze the bench evals | the user | · next |
 | 5 | V1 + V2: E1 + E2 and E3a on the bench | the user, on a GPU server (WORKFLOW Setup v2) | · |
-| 6 | V3: choose the stack, write E3b and E4 | Claude (from the stack command's output) | · after E3a |
+| 6 | V3: choose the stack, write E3b and E4 | Claude (from the stack command's output) | ✓ 2026-11-25 (written; to freeze) |
 | 7 | V4: E3b on the bench | the user | · |
 | 8 | Baselines on the robot (5 models now, sort_one + cubebox v1) | the user (WORKFLOW Step 5) | · ready to freeze any time |
 | 9 | V5: E4 on the robot | the user | · after the stack |

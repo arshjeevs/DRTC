@@ -2,7 +2,7 @@
 # Run the setup v2 bench evals one after another on this GPU server (WORKFLOW.md, "Setup v2", V1 + V2 / V4).
 #
 #   lab/bin/bench-v2                    # the six V1 + V2 evals, short ones first
-#   lab/bin/bench-v2 bench_v2_stack_sort_one bench_v2_stack_cubebox_v1    # any evals, in this order (e.g. V4)
+#   lab/bin/bench-v2 bench_v2_stack_sort_one bench_v2_stack_cubebox_v1 bench_v2_stack_nortc_sort_one bench_v2_stack_nortc_cubebox_v1   # any evals, in this order (V4)
 #
 # Start it in tmux (tmux new -s bench), detach with Ctrl-b d. Per eval: start `lab eval serve`, wait for all servers,
 # a warm-up test round when the eval serves RTC (not counted), the official `lab eval run`, stop the servers.
