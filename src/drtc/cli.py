@@ -233,6 +233,10 @@ def main(argv: list[str] | None = None) -> None:
         from drtc.control.summary import main as results_main
 
         sys.exit(results_main(argv[1:]))
+    if argv and argv[0] == "demo":  # the live demo console (presentation)
+        from drtc.demo.console import main as demo_main
+
+        sys.exit(demo_main(argv[1:]))
     if argv and argv[0] == "run":
         from drtc.control.run import main as run_main
 

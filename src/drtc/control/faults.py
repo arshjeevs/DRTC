@@ -172,11 +172,33 @@ class FaultInjector:
             self.events.append((round(t, 4), kind, value))
 
     def due_spike(self, t: float) -> float | None:
-        for s in self.plan.spikes:
-            if not s[2] and t >= s[0]:
-                s[2] = True
-                return s[1]
+        with self._lock:
+            for s in self.plan.spikes:
+                if not s[2] and t >= s[0]:
+                    s[2] = True
+                    return s[1]
         return None
+
+    # Live faults (the demo console's buttons), from another thread while the run goes on. The readers iterate the
+    # plan's lists without the lock; appending to a list or adding a dict key is atomic in CPython, so they see the
+    # new fault from their next check on.
+    def spike_now(self, delay_s: float = 1.0) -> float:
+        t = self.now()
+        with self._lock:
+            self.plan.spikes.append([t, float(delay_s), False])
+        return t
+
+    def drop_replies_now(self, duration_s: float = 1.0) -> float:
+        return self._window_now("drop_action", duration_s)
+
+    def outage_now(self, duration_s: float = 1.5) -> float:
+        return self._window_now("disconnect", duration_s)
+
+    def _window_now(self, kind: str, duration_s: float) -> float:
+        t = self.now()
+        with self._lock:
+            self.plan.windows.setdefault(kind, []).append((t, float(duration_s)))
+        return t
 
     def install(self, client) -> None:
         """Wrap the client's transport publish (observations) and its reply channel (actions)."""

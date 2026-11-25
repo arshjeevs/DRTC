@@ -1,0 +1,14 @@
+# The live demo console (lab demo): DRTC (our version), no smoothing. As the setup v2 bench conditions (lab/experiments/v2/), with the bench's
+# 250 ms reply latency and no scheduled faults: the console's buttons inject them.
+description: 'Demo console: DRTC (our version), no smoothing'
+model: smolvla_sort_one_v1_full
+action_filter_mode: none
+scheduler: drtc
+estimator: jk
+cooldown: true
+cooldown_cap: none
+request_deadline: trial
+latency:
+  base_ms: 250
+  jitter_ms: 20
+  seed: 0

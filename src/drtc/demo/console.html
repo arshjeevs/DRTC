@@ -1,0 +1,959 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>DRTC Demo Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Palette and type follow the project deck and simulator (presentation/simulator/page.html):
+   paper, ink, blue accent, orange alert, light and dark themes. */
+:root {
+  --bg: #F6F5F1; --panel: #FCFBF8; --ink: #15191F; --muted: #5E636D; --grid: #DEDBD2;
+  --accent: #1C5CAB; --accent-soft: #D6E2F2; --alert: #EB6834; --alert-soft: #FBE1D6; --good: #2E7D4F;
+  --fault: rgba(235, 104, 52, 0.12);
+  --display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --text: "Inter", "Segoe UI", system-ui, sans-serif;
+  --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #15191F; --panel: #1C2128; --ink: #F1F0EC; --muted: #A9AEB8; --grid: #2E343D;
+  --accent: #6DA7EC; --accent-soft: #233650; --alert: #F08A5D; --alert-soft: #43291F; --good: #5DBB85;
+  --fault: rgba(240, 138, 93, 0.14); color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #15191F; --panel: #1C2128; --ink: #F1F0EC; --muted: #A9AEB8; --grid: #2E343D;
+  --accent: #6DA7EC; --accent-soft: #233650; --alert: #F08A5D; --alert-soft: #43291F; --good: #5DBB85;
+  --fault: rgba(240, 138, 93, 0.14); color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--text); margin: 0; }
+.wrap {
+  max-width: 1180px; margin: 0 auto; padding-block: 28px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 18px;
+}
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(26px, 3.4vw, 36px); font-weight: 700; letter-spacing: -0.01em; }
+.eyebrow { font: 600 12px/1 var(--text); letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+header { display: grid; gap: 8px; }
+header p { margin: 0; color: var(--muted); max-width: 72ch; }
+
+/* status bar */
+.status-bar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px;
+  padding: 11px 16px; background: var(--panel); border: 1px solid var(--grid); border-radius: 10px;
+}
+.status-main { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.status-badge {
+  display: inline-flex; align-items: center; gap: 7px; padding: 4px 10px; border-radius: 999px;
+  font: 600 12px/1 var(--text); letter-spacing: 0.04em; text-transform: uppercase; flex: none;
+  background: var(--grid); color: var(--muted);
+}
+.status-badge::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.status-badge[data-server="starting"] { background: var(--accent-soft); color: var(--accent); }
+.status-badge[data-server="ready"] { background: var(--accent-soft); color: var(--good); }
+.status-badge[data-server="failed"] { background: var(--alert-soft); color: var(--alert); }
+.status-badge[data-server="saved"] { background: var(--accent-soft); color: var(--accent); }
+.status-text { font-size: 14px; color: var(--ink); min-width: 0; overflow-wrap: anywhere; }
+.action-msg { font-size: 13px; font-weight: 500; color: var(--alert); }
+.action-msg:empty { display: none; }
+
+/* controls */
+.controls {
+  display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: end; padding: 14px 18px;
+  background: var(--panel); border: 1px solid var(--grid); border-radius: 10px;
+}
+.field { display: grid; gap: 6px; min-width: 0; }
+.field > label, .field > .lbl {
+  font: 600 11px/1 var(--text); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
+}
+.btn-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+select, button { font: 500 14px/1.15 var(--text); color: var(--ink); }
+select {
+  background: var(--bg); border: 1px solid var(--grid); border-radius: 6px; padding: 8px 10px;
+  min-width: 190px; max-width: 100%;
+}
+.btn {
+  background: var(--bg); border: 1px solid var(--grid); border-radius: 6px; padding: 8px 12px;
+  cursor: pointer; white-space: nowrap;
+}
+.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+:root[data-theme="dark"] .btn.primary { color: #0E1116; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn.primary { color: #0E1116; } }
+.btn.inject { border-color: var(--alert); color: var(--alert); }
+.btn.inject:hover { background: var(--alert-soft); }
+.btn:hover:not(:disabled) { border-color: var(--muted); }
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* side-by-side live view: camera + schematic arm */
+.stage { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.stage-card {
+  background: var(--panel); border: 1px solid var(--grid); border-radius: 10px;
+  padding: 14px 16px; display: grid; gap: 10px; align-content: start; min-width: 0;
+}
+.stage-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 12px; }
+.stage-head h2 { font-size: 17px; font-weight: 700; }
+.stage-meta { font-size: 12px; font-family: var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.cam-box {
+  position: relative; width: 100%; aspect-ratio: 4 / 3; max-height: 250px;
+  background: var(--bg); border: 1px solid var(--grid); border-radius: 8px; overflow: hidden;
+  display: grid; place-items: center;
+}
+.cam-box img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.cam-box img[hidden] { display: none; }
+.cam-empty { color: var(--muted); font-size: 13px; text-align: center; padding: 12px; }
+.arm-box {
+  width: 100%; aspect-ratio: 4 / 3; max-height: 250px;
+  background: var(--bg); border: 1px solid var(--grid); border-radius: 8px; overflow: hidden;
+}
+.arm-box canvas { width: 100%; height: 100%; display: block; }
+.stage-caption { margin: 0; font-size: 13px; color: var(--muted); }
+
+/* lanes */
+.lanes { display: grid; gap: 14px; }
+.lane {
+  display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 0; background: var(--panel);
+  border: 1px solid var(--grid); border-radius: 10px; overflow: hidden;
+}
+.lane-main { padding: 14px 16px 10px; min-width: 0; display: grid; gap: 8px; align-content: start; }
+.lane-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; align-items: baseline; }
+.lane-title { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.lane-head h3 { font-size: 18px; font-weight: 700; }
+.saved-tag {
+  font: 600 11px/1 var(--text); letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 3px 8px; border-radius: 999px; background: var(--grid); color: var(--muted);
+}
+.saved-tag[hidden] { display: none; }
+.lane-head .sub { color: var(--muted); font-size: 13px; }
+.lane canvas { width: 100%; height: 190px; display: block; }
+.lane-side { border-left: 1px solid var(--grid); padding: 14px 16px; display: grid; gap: 10px; align-content: start; }
+.state {
+  display: inline-flex; align-items: center; gap: 8px; font: 600 14px/1 var(--text); padding: 8px 12px;
+  border-radius: 999px; width: fit-content;
+}
+.state::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+.state.moving { background: var(--accent-soft); color: var(--accent); }
+.state.stalled { background: var(--alert-soft); color: var(--alert); }
+.state.completed { background: var(--accent-soft); color: var(--good); }
+.state.ended { background: var(--ink); color: var(--bg); }
+.state.ended::before { border-radius: 2px; }
+.state.idle { background: var(--grid); color: var(--muted); }
+.why { font-size: 13px; color: var(--muted); min-height: 2.6em; }
+dl { margin: 0; display: grid; grid-template-columns: 1fr auto; gap: 5px 10px; font-size: 13px; }
+dt { color: var(--muted); }
+dd { margin: 0; font: 600 13px var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+.progress { height: 6px; background: var(--grid); border-radius: 3px; overflow: hidden; }
+.progress > i { display: block; height: 100%; background: var(--accent); width: 0; }
+
+/* key and notes */
+.key { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 13px; color: var(--muted); }
+.key span { display: inline-flex; gap: 7px; align-items: center; }
+.sw { width: 18px; height: 10px; border-radius: 2px; display: inline-block; }
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px 28px; }
+.notes section { display: grid; gap: 8px; align-content: start; }
+.notes h2 { font-size: 17px; }
+.notes p { margin: 0; color: var(--muted); font-size: 14px; max-width: 72ch; }
+
+@media (max-width: 760px) {
+  .stage { grid-template-columns: minmax(0, 1fr); }
+  .lane { grid-template-columns: minmax(0, 1fr); }
+  .lane-side { border-left: 0; border-top: 1px solid var(--grid); grid-template-columns: 1fr 1fr; }
+  .lane-side .why, .lane-side .progress-wrap { grid-column: 1 / -1; }
+  .lane canvas { height: 140px; }
+  select { width: 100%; min-width: 0; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Live demo</div>
+    <h1>DRTC Demo Console</h1>
+    <p>The real client code, SmolVLA on this laptop's GPU, a recorded sorting episode replayed as the robot; network faults from the buttons.</p>
+  </header>
+
+  <div class="status-bar" role="status" aria-live="polite">
+    <div class="status-main">
+      <span class="status-badge" id="serverBadge" data-server="off">off</span>
+      <span class="status-text" id="serverMsg">Connecting to console…</span>
+    </div>
+    <div class="action-msg" id="actionMsg" role="alert"></div>
+  </div>
+
+  <div class="controls">
+    <div class="field">
+      <span class="lbl">Run live</span>
+      <div class="btn-row">
+        <button type="button" class="btn" id="runShipped">Run LeRobot as shipped</button>
+        <button type="button" class="btn" id="runPatient">Run patient</button>
+        <button type="button" class="btn" id="runDrtc">Run DRTC</button>
+        <button type="button" class="btn primary" id="runAll">Run all three with the same faults</button>
+      </div>
+    </div>
+    <div class="field">
+      <span class="lbl">Network faults</span>
+      <div class="btn-row">
+        <button type="button" class="btn inject" id="faultSpike">Spike now (+1 s)</button>
+        <button type="button" class="btn inject" id="faultDrops">Drop replies 1 s</button>
+        <button type="button" class="btn inject" id="faultOutage">Outage 1.5 s</button>
+      </div>
+    </div>
+    <div class="field">
+      <span class="lbl">Control</span>
+      <div class="btn-row">
+        <button type="button" class="btn" id="stopBtn">Stop run</button>
+      </div>
+    </div>
+    <div class="field">
+      <label for="savedSelect">Saved runs</label>
+      <div class="btn-row">
+        <select id="savedSelect" aria-label="Saved run file"></select>
+        <button type="button" class="btn" id="playSavedBtn">Play saved run</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="stage">
+    <section class="stage-card" aria-label="Camera input">
+      <div class="stage-head">
+        <h2>Camera input (recorded episode)</h2>
+        <span class="stage-meta" id="camMeta">idle</span>
+      </div>
+      <div class="cam-box">
+        <img id="camImg" alt="Latest recorded camera input frame" hidden>
+        <div class="cam-empty" id="camEmpty">Waiting for camera frames…</div>
+      </div>
+    </section>
+
+    <section class="stage-card" aria-label="Commanded arm schematic">
+      <div class="stage-head">
+        <h2>Commanded arm (schematic)</h2>
+        <span class="stage-meta" id="armMeta">no command</span>
+      </div>
+      <div class="arm-box">
+        <canvas id="armCanvas" aria-label="2D side view of the commanded robot arm"></canvas>
+      </div>
+      <p class="stage-caption">moves only with the commands the client sends; the camera keeps playing the recording</p>
+    </section>
+  </div>
+
+  <div class="lanes" id="lanes"></div>
+
+  <div class="key" aria-label="Key">
+    <span><i class="sw" style="background:var(--accent)"></i>actions in the queue</span>
+    <span><i class="sw" style="border-top:2px dashed var(--muted);height:0"></i>trigger: queue level that sends the next request</span>
+    <span><i class="sw" style="background:var(--accent);opacity:.8"></i>request in flight</span>
+    <span><i class="sw" style="background:var(--ink)"></i>request answered</span>
+    <span><i class="sw" style="background:var(--alert)"></i>request or reply lost</span>
+    <span><i class="sw" style="background:var(--muted);opacity:.55"></i>replaced (↻) or cancelled</span>
+    <span><i class="sw" style="background:var(--accent);opacity:.9;height:6px"></i>arm moving</span>
+    <span><i class="sw" style="background:var(--alert);opacity:.35"></i>arm stalled</span>
+    <span><i class="sw" style="background:var(--ink)"></i>run ended</span>
+    <span><i class="sw" style="background:var(--fault);border:1px solid var(--alert)"></i>network fault</span>
+  </div>
+
+  <div class="notes">
+    <section>
+      <h2>What is real here</h2>
+      <p>The client and the policy are real: the actual LeRobot and DRTC scheduling code runs against SmolVLA on this
+        machine's GPU. The network delay of 250 ms per reply and the faults are injected in the client's transport, as
+        on the bench. The robot is a replayed sorting episode rather than live hardware.</p>
+    </section>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const DEFAULT_DUR = 14;
+  const DT = 1 / 30;
+  const LANES = [
+    { client: "shipped", title: "LeRobot as shipped", sub: "gives up after 1 s without actions" },
+    { client: "patient", title: "LeRobot, patient", sub: "stall limits raised to the whole trial" },
+    { client: "drtc", title: "DRTC", sub: "early trigger, latency estimator, cooldown re-request" },
+  ];
+  const LANE_MAP = Object.create(null);
+
+  const $ = id => document.getElementById(id);
+  const serverBadge = $("serverBadge");
+  const serverMsg = $("serverMsg");
+  const actionMsg = $("actionMsg");
+  const camImg = $("camImg");
+  const camEmpty = $("camEmpty");
+  const camMeta = $("camMeta");
+  const armCanvas = $("armCanvas");
+  const armMeta = $("armMeta");
+  const savedSelect = $("savedSelect");
+
+  let activeClient = null;
+  let lastArm = { cmd: null, moved: false, client: null, t: null };
+  let drawPending = false;
+
+  function makeLaneState(L) {
+    L.duration = DEFAULT_DUR;
+    L.episode = null;
+    L.script = false;
+    L.saved = false;
+    L.started = false;
+    L.maxQ = 50;
+    L.ticks = [];
+    L.requests = Object.create(null);
+    L.faults = [];
+    L.ended = null;
+    L.now = 0;
+  }
+
+  for (const L of LANES) {
+    makeLaneState(L);
+    LANE_MAP[L.client] = L;
+    const el = document.createElement("article");
+    el.className = "lane";
+    el.innerHTML =
+      `<div class="lane-main">` +
+        `<div class="lane-head">` +
+          `<div class="lane-title"><h3>${L.title}</h3><span class="saved-tag" hidden>saved run</span></div>` +
+          `<span class="sub">${L.sub}</span>` +
+        `</div>` +
+        `<canvas aria-label="${L.title}: queue, requests and arm state over time"></canvas>` +
+      `</div>` +
+      `<div class="lane-side">` +
+        `<span class="state idle">Waiting</span>` +
+        `<div class="why">Ready to run.</div>` +
+        `<dl>` +
+          `<dt>Arm stalled</dt><dd class="v-stall">–</dd>` +
+          `<dt>Requests sent</dt><dd class="v-sent">0</dd>` +
+          `<dt>Lost on the way</dt><dd class="v-lost">0</dd>` +
+          `<dt>Replaced, cancelled</dt><dd class="v-repl">0</dd>` +
+          `<dt>Recovery, last fault</dt><dd class="v-rec">–</dd>` +
+        `</dl>` +
+        `<div class="progress-wrap"><dl><dt>Time moving</dt><dd class="v-prog">0%</dd></dl><div class="progress"><i></i></div></div>` +
+      `</div>`;
+    $("lanes").append(el);
+    L.el = el;
+    L.canvas = el.querySelector("canvas");
+    L.savedTag = el.querySelector(".saved-tag");
+  }
+
+  // --- theme colours ---
+  let C = {};
+  function readColors() {
+    const cs = getComputedStyle(document.documentElement);
+    for (const k of ["bg", "panel", "ink", "muted", "grid", "accent", "accent-soft", "alert", "alert-soft", "good", "fault"]) {
+      C[k] = cs.getPropertyValue(`--${k}`).trim();
+    }
+  }
+  readColors();
+  if (window.matchMedia) {
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { readColors(); scheduleDraw(); });
+  }
+  new MutationObserver(() => { readColors(); scheduleDraw(); })
+    .observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  // --- drawing: lanes ---
+  function drawLane(L) {
+    const cv = L.canvas;
+    if (!cv) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = cv.clientWidth, h = cv.clientHeight;
+    if (!w || !h) return;
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) {
+      cv.width = Math.round(w * dpr);
+      cv.height = Math.round(h * dpr);
+    }
+    const g = cv.getContext("2d");
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, w, h);
+
+    const DUR = L.duration > 0 ? L.duration : DEFAULT_DUR;
+    const H = L.maxQ > 0 ? L.maxQ : 50;
+    const now = L.now;
+    const left = 58, right = 8, axisH = 16, armH = 12, reqH = 20, gap = 6;
+    const qTop = 4, qBot = h - axisH - armH - reqH - 2 * gap;
+    const reqY = qBot + gap, armY = reqY + reqH + gap;
+    const X = t => left + (Math.max(0, Math.min(DUR, t)) / DUR) * (w - left - right);
+    const Y = q => qBot - (Math.max(0, Math.min(H, q)) / H) * (qBot - qTop);
+
+    g.font = `500 10px ${getComputedStyle(document.body).fontFamily}`;
+
+    // faults
+    for (const f of L.faults) {
+      if (typeof f.start !== "number" || f.start > DUR) continue;
+      const a = Math.max(0, f.start);
+      const dur = typeof f.dur === "number" ? Math.max(0, f.dur) : 0;
+      const b = Math.min(DUR, a + dur);
+      g.fillStyle = C.fault;
+      g.fillRect(X(a), qTop, Math.max(2, X(b) - X(a)), armY + armH - qTop);
+      g.fillStyle = C.alert;
+      g.fillRect(X(a), qTop, 1.5, armY + armH - qTop);
+      const label = f.kind === "drops" ? "drops" : (f.kind || "fault");
+      g.fillText(label, X(a) + 4, qTop + 10);
+    }
+
+    // grid + axis
+    g.strokeStyle = C.grid;
+    g.lineWidth = 1;
+    g.fillStyle = C.muted;
+    for (let s = 0; s <= DUR; s += 2) {
+      g.beginPath();
+      g.moveTo(X(s) + 0.5, qTop);
+      g.lineTo(X(s) + 0.5, armY + armH);
+      g.stroke();
+      g.textAlign = "center";
+      g.fillText(`${s} s`, X(s), h - 3);
+    }
+    g.textAlign = "right";
+    g.fillText(`${Math.round(H)} queued`, left - 5, qTop + 8);
+    g.fillText("0", left - 5, qBot);
+    g.textAlign = "left";
+    g.beginPath();
+    g.moveTo(left, qBot + 0.5);
+    g.lineTo(w - right, qBot + 0.5);
+    g.stroke();
+
+    // queue up to playhead
+    const ticks = L.ticks;
+    if (ticks.length) {
+      g.beginPath();
+      g.moveTo(X(ticks[0].t), qBot);
+      for (const k of ticks) g.lineTo(X(k.t), Y(k.q));
+      g.lineTo(X(ticks[ticks.length - 1].t), qBot);
+      g.closePath();
+      g.fillStyle = C["accent-soft"];
+      g.fill();
+
+      g.beginPath();
+      for (let i = 0; i < ticks.length; i++) {
+        const x = X(ticks[i].t), y = Y(ticks[i].q);
+        if (i === 0) g.moveTo(x, y);
+        else g.lineTo(x, y);
+      }
+      g.strokeStyle = C.accent;
+      g.lineWidth = 1.6;
+      g.stroke();
+
+      // trigger level
+      g.setLineDash([4, 3]);
+      g.strokeStyle = C.muted;
+      g.lineWidth = 1;
+      g.beginPath();
+      let startedThr = false;
+      for (const k of ticks) {
+        if (typeof k.thr === "number" && Number.isFinite(k.thr)) {
+          const y = Y(Math.min(H, k.thr));
+          if (!startedThr) { g.moveTo(X(k.t), y); startedThr = true; }
+          else g.lineTo(X(k.t), y);
+        } else {
+          startedThr = false;
+        }
+      }
+      g.stroke();
+      g.setLineDash([]);
+    }
+
+    // requests
+    const reqEndFallback = L.ended && typeof L.ended.t === "number" ? L.ended.t : now;
+    for (const r of Object.values(L.requests)) {
+      if (typeof r.sent !== "number") continue;
+      const end = typeof r.endAt === "number" ? r.endAt : Math.max(r.sent, reqEndFallback);
+      const x0 = X(r.sent);
+      const x1 = Math.max(x0 + 2, X(end));
+      let col = C.muted, alpha = 0.55;
+      if (r.lost || r.fate === "lost") { col = C.alert; alpha = 1; }
+      else if (r.fate === "accepted") { col = C.ink; alpha = 1; }
+      else if (r.fate === "pending" || r.endAt === undefined) { col = C.accent; alpha = 0.8; }
+      g.globalAlpha = alpha;
+      g.fillStyle = col;
+      g.fillRect(x0, reqY + 4, x1 - x0, reqH - 8);
+      g.globalAlpha = 1;
+      if (r.fate === "replaced" || r.fate === "busy") {
+        g.fillStyle = C.ink;
+        g.fillText("↻", x1 + 1, reqY + reqH - 5);
+      }
+    }
+
+    g.fillStyle = C.muted;
+    g.textAlign = "right";
+    g.fillText("requests", left - 5, reqY + reqH - 6);
+    g.fillText("arm", left - 5, armY + armH - 2);
+    g.textAlign = "left";
+
+    // arm state
+    for (let i = 0; i < ticks.length; i++) {
+      const k = ticks[i];
+      const nextT = i + 1 < ticks.length ? ticks[i + 1].t : Math.min(DUR, k.t + DT);
+      const x0 = X(k.t);
+      const x1 = X(Math.max(k.t, nextT));
+      g.fillStyle = k.moved ? C.accent : C.alert;
+      g.globalAlpha = k.moved ? 0.9 : 0.35;
+      g.fillRect(x0, armY, Math.max(1, x1 - x0) + 0.5, armH);
+    }
+    g.globalAlpha = 1;
+
+    // run ended bar (when outcome !== "completed")
+    if (L.ended && L.ended.outcome !== "completed") {
+      const tEnd = typeof L.ended.t === "number" ? L.ended.t : now;
+      const xe = X(tEnd);
+      g.fillStyle = C.ink;
+      g.fillRect(xe, armY, Math.max(0, w - right - xe), armH);
+      g.fillRect(xe - 1, qTop, 2, armY + armH - qTop);
+      g.fillStyle = C.bg;
+      if (w - right - xe > 44) g.fillText("run ended", xe + 5, armY + armH - 2);
+    }
+
+    // playhead while running
+    if (L.started && !L.ended && now > 0 && now < DUR) {
+      g.fillStyle = C.ink;
+      g.globalAlpha = 0.6;
+      g.fillRect(X(now), qTop, 1, armY + armH - qTop);
+      g.globalAlpha = 1;
+    }
+  }
+
+  function computeLastRecovery(L) {
+    const DUR = L.duration > 0 ? L.duration : DEFAULT_DUR;
+    const ticks = L.ticks;
+    let lastRec = null;
+    for (const f of L.faults) {
+      if (typeof f.start !== "number") continue;
+      const dur = typeof f.dur === "number" ? f.dur : 0;
+      const end = f.start + dur;
+      if (end > DUR || L.now < end) continue;
+      const during = ticks.filter(k => k.t >= f.start && k.t <= end);
+      if (!during.length || !during.some(k => !k.moved)) continue;
+      const mv = ticks.find(k => k.t >= end && k.moved);
+      lastRec = { end, recovery: mv ? Math.max(0, mv.t - end) : null };
+    }
+    return lastRec;
+  }
+
+  function updateSide(L) {
+    const el = L.el;
+    if (!el) return;
+    L.savedTag.hidden = !L.saved;
+
+    const DUR = L.duration > 0 ? L.duration : DEFAULT_DUR;
+    const ticks = L.ticks;
+    const first = ticks.findIndex(k => k.moved);
+    let moved = 0, counted = 0;
+    if (first >= 0) {
+      for (let i = first; i < ticks.length; i++) {
+        counted++;
+        if (ticks[i].moved) moved++;
+      }
+    }
+    const reqs = Object.values(L.requests);
+    const lost = reqs.filter(r => r.lost || r.fate === "lost").length;
+    const repl = reqs.filter(r => r.fate === "replaced" || r.fate === "busy" || r.fate === "cancelled").length;
+    const last = ticks[ticks.length - 1];
+
+    const pill = el.querySelector(".state");
+    const why = el.querySelector(".why");
+    if (L.ended && L.ended.outcome !== "completed") {
+      const tEnd = typeof L.ended.t === "number" ? L.ended.t : L.now;
+      const reason = L.ended.reason || L.ended.outcome || "stopped";
+      pill.className = "state ended";
+      pill.textContent = "Run ended";
+      why.textContent = `At ${tEnd.toFixed(1)} s: ${reason}.`;
+    } else if (L.ended && L.ended.outcome === "completed") {
+      const tEnd = typeof L.ended.t === "number" ? L.ended.t : L.now;
+      pill.className = "state completed";
+      pill.textContent = "Completed";
+      why.textContent = `Finished ${tEnd.toFixed(1)} s trial.`;
+    } else if (!L.started || !last) {
+      pill.className = "state idle";
+      pill.textContent = L.started ? "Starting" : "Waiting";
+      why.textContent = L.started ? "Waiting for the first control tick…" : "Ready to run.";
+    } else if (last.moved) {
+      pill.className = "state moving";
+      pill.textContent = "Moving";
+      why.textContent = `${last.q} actions queued${last.pending ? ", next chunk requested" : ""}.`;
+    } else {
+      pill.className = "state stalled";
+      pill.textContent = "Stalled";
+      why.textContent = last.pending ? "Queue empty, waiting for a reply." : "Queue empty, no request in flight.";
+    }
+
+    el.querySelector(".v-stall").textContent = counted ? `${Math.round(100 * (1 - moved / counted))}%` : "–";
+    el.querySelector(".v-sent").textContent = String(reqs.length);
+    el.querySelector(".v-lost").textContent = String(lost);
+    el.querySelector(".v-repl").textContent = String(repl);
+
+    const lastRec = computeLastRecovery(L);
+    let recText = "–";
+    if (lastRec) {
+      if (lastRec.recovery === null) recText = L.ended ? (L.ended.outcome && L.ended.outcome !== "completed" ? "run ended" : "never") : "not yet";
+      else recText = `${lastRec.recovery.toFixed(1)} s`;
+    }
+    el.querySelector(".v-rec").textContent = recText;
+
+    const prog = Math.min(100, 100 * ticks.filter(k => k.moved).length / (DUR * 30));
+    el.querySelector(".v-prog").textContent = `${Math.round(prog)}%`;
+    el.querySelector(".progress > i").style.width = `${prog}%`;
+  }
+
+  // --- drawing: commanded arm schematic ---
+  function drawArm() {
+    const cv = armCanvas;
+    if (!cv) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = cv.clientWidth, h = cv.clientHeight;
+    if (!w || !h) return;
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) {
+      cv.width = Math.round(w * dpr);
+      cv.height = Math.round(h * dpr);
+    }
+    const g = cv.getContext("2d");
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, w, h);
+
+    const pad = 14;
+    const uw = Math.max(40, w - 2 * pad);
+    const uh = Math.max(40, h - 2 * pad);
+    const scale = Math.min((uw * 0.68) / 2.6, (uh * 0.82) / 2.6);
+    const bx = pad + uw * 0.32;
+    const by = h - pad - uh * 0.16;
+
+    // table / base support
+    g.strokeStyle = C.grid;
+    g.lineWidth = 2;
+    g.beginPath();
+    g.moveTo(pad, by + 12);
+    g.lineTo(w - pad, by + 12);
+    g.stroke();
+
+    g.fillStyle = C.grid;
+    g.beginPath();
+    g.moveTo(bx - 20, by + 12);
+    g.lineTo(bx + 20, by + 12);
+    g.lineTo(bx + 13, by);
+    g.lineTo(bx - 13, by);
+    g.closePath();
+    g.fill();
+
+    const cmd = Array.isArray(lastArm.cmd) && lastArm.cmd.length >= 4 ? lastArm.cmd.map(Number) : null;
+    const valid = cmd && cmd.slice(0, 4).every(Number.isFinite);
+    const sLift = valid ? cmd[1] : 0;
+    const eFlex = valid ? cmd[2] : 0;
+    const wFlex = valid ? cmd[3] : 0;
+    const grip = valid && cmd.length >= 6 && Number.isFinite(cmd[5]) ? cmd[5] : 30;
+
+    // absolute angles in degrees from horizontal
+    const a1 = 90 - sLift;
+    const a2 = a1 - eFlex - 90;
+    const a3 = a2 - wFlex;
+
+    const rad = d => (d * Math.PI) / 180;
+    const step = (pt, deg, len) => ({
+      x: pt.x + len * scale * Math.cos(rad(deg)),
+      y: pt.y - len * scale * Math.sin(rad(deg)),
+    });
+
+    const p0 = { x: bx, y: by };
+    const p1 = step(p0, a1, 1.0);
+    const p2 = step(p1, a2, 1.0);
+    const p3 = step(p2, a3, 0.6);
+
+    const armCol = !valid ? C.muted : (lastArm.moved ? C.accent : C.alert);
+    g.lineCap = "round";
+    g.lineJoin = "round";
+
+    const segs = [[p0, p1, 9], [p1, p2, 7], [p2, p3, 5]];
+    for (const [a, b, lw] of segs) {
+      g.strokeStyle = armCol;
+      g.lineWidth = lw;
+      g.beginPath();
+      g.moveTo(a.x, a.y);
+      g.lineTo(b.x, b.y);
+      g.stroke();
+    }
+
+    // gripper jaws at tip
+    const open = Math.max(0.06, Math.min(0.22, (Math.max(0, Math.min(100, grip)) / 100) * 0.20 + 0.05));
+    const nx = -Math.sin(rad(a3)), ny = -Math.cos(rad(a3));
+    const fx = Math.cos(rad(a3)), fy = -Math.sin(rad(a3));
+    const jawLen = 0.18 * scale;
+    const halfGap = open * scale * 0.6;
+    g.strokeStyle = armCol;
+    g.lineWidth = 3;
+    for (const sgn of [-1, 1]) {
+      const gx = p3.x + sgn * halfGap * nx;
+      const gy = p3.y + sgn * halfGap * ny;
+      g.beginPath();
+      g.moveTo(p3.x, p3.y);
+      g.lineTo(gx, gy);
+      g.lineTo(gx + jawLen * fx, gy + jawLen * fy);
+      g.stroke();
+    }
+
+    // joint hubs
+    for (const [pt, r] of [[p0, 5.5], [p1, 4.5], [p2, 4]]) {
+      g.fillStyle = C.panel;
+      g.strokeStyle = C.ink;
+      g.lineWidth = 2;
+      g.beginPath();
+      g.arc(pt.x, pt.y, r, 0, Math.PI * 2);
+      g.fill();
+      g.stroke();
+    }
+
+    // status label inside canvas
+    g.font = `600 11px ${getComputedStyle(document.body).fontFamily}`;
+    g.textAlign = "right";
+    g.fillStyle = armCol;
+    const statusTxt = !valid ? "waiting" : (lastArm.moved ? "moving" : "stalled");
+    g.fillText(statusTxt, w - pad, pad + 6);
+    g.textAlign = "left";
+
+    if (valid) {
+      const label = LANE_MAP[lastArm.client] ? LANE_MAP[lastArm.client].title : "";
+      const tStr = typeof lastArm.t === "number" ? ` · ${lastArm.t.toFixed(1)} s` : "";
+      armMeta.textContent = `${label}${tStr}`;
+    } else {
+      armMeta.textContent = "no command";
+    }
+  }
+
+  function drawAll() {
+    drawPending = false;
+    for (const L of LANES) {
+      drawLane(L);
+      updateSide(L);
+    }
+    drawArm();
+  }
+
+  function scheduleDraw() {
+    if (drawPending) return;
+    drawPending = true;
+    requestAnimationFrame(drawAll);
+  }
+
+  window.addEventListener("resize", scheduleDraw);
+
+  // --- SSE message handling ---
+  function handleMessage(msg) {
+    if (!msg || typeof msg !== "object") return;
+    const type = msg.type;
+
+    if (type === "status") {
+      const srv = typeof msg.server === "string" ? msg.server : "off";
+      serverBadge.dataset.server = srv;
+      serverBadge.textContent = srv;
+      serverMsg.textContent = typeof msg.message === "string" && msg.message ? msg.message : `Server: ${srv}`;
+      return;
+    }
+
+    const client = msg.client;
+    const L = typeof client === "string" ? LANE_MAP[client] : null;
+    if (!L) return;
+
+    if (msg.saved === true) L.saved = true;
+
+    if (type === "start") {
+      makeLaneState(L);
+      L.started = true;
+      L.saved = msg.saved === true;
+      if (typeof msg.duration === "number" && msg.duration > 0) L.duration = msg.duration;
+      L.episode = msg.episode !== undefined ? msg.episode : null;
+      L.script = Boolean(msg.script);
+      activeClient = client;
+      lastArm = { cmd: null, moved: false, client, t: 0 };
+      camImg.hidden = true;
+      camImg.removeAttribute("src");
+      camEmpty.hidden = false;
+      camMeta.textContent = `${L.title}${L.saved ? " (saved)" : ""}`;
+      scheduleDraw();
+      return;
+    }
+
+    if (type === "tick") {
+      const t = typeof msg.t === "number" && Number.isFinite(msg.t) ? msg.t : L.now;
+      const q = typeof msg.q === "number" && Number.isFinite(msg.q) ? msg.q : 0;
+      const thr = typeof msg.thr === "number" && Number.isFinite(msg.thr) ? msg.thr : null;
+      const moved = Boolean(msg.moved);
+      const pending = Boolean(msg.pending);
+      const held = Boolean(msg.held);
+      L.started = true;
+      L.now = Math.max(L.now, t);
+      L.maxQ = Math.max(L.maxQ, q, thr !== null ? thr : 0);
+      L.ticks.push({ t, q, thr, moved, pending, held });
+      if (Array.isArray(msg.cmd) || lastArm.client === client || activeClient === client) {
+        lastArm = {
+          cmd: Array.isArray(msg.cmd) ? msg.cmd : lastArm.cmd,
+          moved,
+          client,
+          t,
+        };
+      }
+      scheduleDraw();
+      return;
+    }
+
+    if (type === "req") {
+      if (msg.id === undefined || msg.id === null) return;
+      const t = typeof msg.t === "number" && Number.isFinite(msg.t) ? msg.t : L.now;
+      L.requests[String(msg.id)] = { id: msg.id, sent: t, fate: "pending", lost: false };
+      scheduleDraw();
+      return;
+    }
+
+    if (type === "req_end") {
+      if (msg.id === undefined || msg.id === null) return;
+      const key = String(msg.id);
+      const r = L.requests[key];
+      const t = typeof msg.t === "number" && Number.isFinite(msg.t) ? msg.t : L.now;
+      if (r) {
+        r.endAt = t;
+        r.fate = typeof msg.fate === "string" ? msg.fate : "ended";
+      }
+      scheduleDraw();
+      return;
+    }
+
+    if (type === "lost") {
+      if (msg.id !== undefined && msg.id !== null) {
+        const r = L.requests[String(msg.id)];
+        if (r) r.lost = true;
+      }
+      scheduleDraw();
+      return;
+    }
+
+    if (type === "fault") {
+      const start = typeof msg.start === "number" && Number.isFinite(msg.start) ? msg.start : L.now;
+      const dur = typeof msg.dur === "number" && Number.isFinite(msg.dur) ? msg.dur : 0;
+      const kind = typeof msg.kind === "string" ? msg.kind : "fault";
+      L.faults.push({ kind, start, dur });
+      scheduleDraw();
+      return;
+    }
+
+    if (type === "frame") {
+      if (typeof msg.img === "string" && msg.img.length > 0) {
+        camImg.src = `data:image/jpeg;base64,${msg.img}`;
+        camImg.hidden = false;
+        camEmpty.hidden = true;
+        camMeta.textContent = L.title;
+      }
+      return;
+    }
+
+    if (type === "end") {
+      const t = typeof msg.t === "number" && Number.isFinite(msg.t) ? msg.t : L.now;
+      const outcome = typeof msg.outcome === "string" ? msg.outcome : "completed";
+      const reason = typeof msg.reason === "string" && msg.reason ? msg.reason : null;
+      L.now = Math.max(L.now, t);
+      L.ended = { t, outcome, reason };
+      for (const r of Object.values(L.requests)) {
+        if (r.endAt === undefined) r.endAt = t;
+      }
+      scheduleDraw();
+      setTimeout(refreshSaved, 350);
+    }
+  }
+
+  function connectEvents() {
+    const es = new EventSource("/events");
+    es.onmessage = ev => {
+      if (!ev || typeof ev.data !== "string") return;
+      try {
+        handleMessage(JSON.parse(ev.data));
+      } catch (_) {
+        // ignore malformed frames
+      }
+    };
+    es.onerror = () => {
+      if (es.readyState === EventSource.CLOSED) {
+        serverMsg.textContent = "Event stream disconnected.";
+      }
+    };
+  }
+
+  // --- API actions ---
+  function showActionError(msg) {
+    actionMsg.textContent = msg || "";
+  }
+
+  async function postJson(url, body) {
+    showActionError("");
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body || {}),
+      });
+      let data = null;
+      try { data = await res.json(); } catch (_) { data = null; }
+      if (!res.ok) {
+        showActionError((data && data.message) || `Request failed (${res.status}).`);
+        return;
+      }
+      if (data && data.ok === false) {
+        showActionError(data.message || "Request rejected.");
+      }
+    } catch (err) {
+      showActionError(err && err.message ? err.message : "Network error.");
+    }
+  }
+
+  async function refreshSaved() {
+    try {
+      const res = await fetch("/saved");
+      if (!res.ok) return;
+      const list = await res.json();
+      if (!Array.isArray(list)) return;
+      const prev = savedSelect.value;
+      savedSelect.innerHTML = "";
+      if (!list.length) {
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "No saved runs yet";
+        savedSelect.append(opt);
+        $("playSavedBtn").disabled = true;
+        return;
+      }
+      for (const name of list) {
+        const opt = document.createElement("option");
+        opt.value = String(name);
+        opt.textContent = String(name);
+        savedSelect.append(opt);
+      }
+      if (prev && list.includes(prev)) savedSelect.value = prev;
+      else savedSelect.value = String(list[list.length - 1]);
+      $("playSavedBtn").disabled = false;
+    } catch (_) {
+      // ignore fetch errors while server restarts
+    }
+  }
+
+  $("runShipped").addEventListener("click", () => postJson("/run", { clients: ["shipped"], script: false }));
+  $("runPatient").addEventListener("click", () => postJson("/run", { clients: ["patient"], script: false }));
+  $("runDrtc").addEventListener("click", () => postJson("/run", { clients: ["drtc"], script: false }));
+  $("runAll").addEventListener("click", () => postJson("/run", { clients: ["shipped", "patient", "drtc"], script: true }));
+
+  $("faultSpike").addEventListener("click", () => postJson("/fault", { kind: "spike" }));
+  $("faultDrops").addEventListener("click", () => postJson("/fault", { kind: "drops" }));
+  $("faultOutage").addEventListener("click", () => postJson("/fault", { kind: "outage" }));
+
+  $("stopBtn").addEventListener("click", () => postJson("/stop", {}));
+  $("playSavedBtn").addEventListener("click", () => {
+    if (!savedSelect.value) {
+      showActionError("Choose a saved run.");
+      return;
+    }
+    postJson("/play", { name: savedSelect.value });
+  });
+
+  scheduleDraw();
+  refreshSaved();
+  connectEvents();
+})();
+</script>
+</body>
+</html>
