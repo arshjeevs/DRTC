@@ -750,6 +750,18 @@ def s_v2_smoothing(prs, n):
 
 def s_v2_results(prs, n):
     s = S.content(prs, n, "Results · setup v2, DRTC (E1, E2) and the robot (E4)", "DRTC against a patient client")
+    fig = FIGS / "fig_v2_e1_sort_one.png"
+    if fig.is_file():  # E1 is in: the figure, with E2 and E4 still to come underneath
+        pic = picture(s, fig, M, TOP - Inches(0.1), w=CW)
+        if pic.height > Inches(3.9):
+            pic.width = int(pic.width * Inches(3.9) / pic.height)
+            pic.height = Inches(3.9)
+        text(s, M, TOP + Inches(4.0), CW, Inches(0.5),
+             "Sorting, replay bench, 8 runs per point: each policy's stall fraction with patient upstream (orange) "
+             "and DRTC (green), per fault type.", size=13, color=S.muted, font=S.body)
+        notes(s, "E1: DRTC against the client that waits, per fault type, every policy. A line going down means "
+                 "DRTC stalls less.")
+        return
     bw, gap = Inches(3.7), Inches(0.3)
     items = [("E1", "DRTC vs patient upstream, per fault: stalls, recovery"),
              ("E2", "DRTC without each part: which piece matters"),
