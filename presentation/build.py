@@ -655,7 +655,7 @@ def s_redesign(prs, n):
     x2 = M + half + Inches(0.6)
     items = [("Baseline:", "upstream patient, LeRobot's scheduler with both give-up limits raised to the whole "
               "trial."),
-             ("Bench E1–E2:", "2 tasks, 5 policies, 7 fault types; DRTC without each of its parts."),
+             ("Bench E1–E2:", "2 tasks, 7 policies, 7 fault types; DRTC without each of its parts."),
              ("Bench E3:", "each smoothing method alone, then the chosen stack."),
              ("Robot E4:", "patient upstream with and without faults, DRTC, DRTC + stack.")]
     t2 = text(s, x2, TOP, half, Inches(0.3), "SETUP V2", size=11, bold=True, color=S.accent, spacing=1.4,
@@ -672,12 +672,87 @@ def s_redesign(prs, n):
              "that waits as long as the trial lasts, and takes DRTC apart on the bench to see which piece matters.")
 
 
+def stack_medians(ds: str) -> dict:
+    """E3b from results/bench: (policy, 'drtc' | 'stack') -> (median stall %, median jerk), both stack plans."""
+    import csv
+    import statistics
+
+    out: dict = {}
+    for name in (f"bench_v2_stack_{ds}", f"bench_v2_stack_nortc_{ds}"):
+        f = REPO / "results" / "bench" / name / "metrics.csv"
+        if not f.is_file():
+            continue
+        for r in csv.DictReader(open(f)):
+            c = {"drtc__mix": "drtc", "stack__mix": "stack", "stack_nortc__mix": "stack"}.get(r["condition"])
+            if c:
+                out.setdefault((r["model"].split("_")[0], c), []).append(r)
+    med = lambda rs, k: statistics.median(float(x[k]) for x in rs if x.get(k) not in (None, ""))  # noqa: E731
+    return {k: (med(v, "M2_stall_pct"), med(v, "M7_jerk_k")) for k, v in out.items()}
+
+
+POLICY_LABELS = {"act": "ACT", "smolvla": "SmolVLA", "pi05": "π0.5", "diffusion": "Diffusion Policy",
+                 "molmoact2": "MolmoAct 2", "groot": "GR00T N1.5", "grootn17": "GR00T N1.7"}
+
+
+def s_v2_smoothing(prs, n):
+    s = S.content(prs, n, "Results · setup v2, smoothing (E3)", "Smoother for every policy, fewer stalls for the slow")
+    data = stack_medians("sort_one")
+    pols = sorted({m for m, _ in data}, key=lambda m: data.get((m, "drtc"), (0, 0))[0])
+    if not pols:
+        pending_box(s, M, TOP, CW, Inches(3.5), "E3b: the stack against DRTC alone")
+        return
+    lx, x0, x1 = M, M + Inches(1.9), M + Inches(7.4)
+    sx = lambda v: x0 + int((x1 - x0) * v / 75)  # noqa: E731
+    row = Inches(0.56)
+    y0 = TOP + Inches(0.45)
+    axis = [text(s, x0, TOP - Inches(0.05), Inches(5.5), Inches(0.3), "time standing still under the fault mix (%)",
+                 size=11, color=S.muted, font=S.body)]
+    for v in (0, 25, 50, 75):
+        axis.append(line(s, sx(v), y0 - Inches(0.15), sx(v), y0 + row * len(pols) - Inches(0.2), color=S.grid,
+                         weight=Pt(0.75)))
+        axis.append(text(s, sx(v) - Inches(0.3), y0 + row * len(pols) - Inches(0.15), Inches(0.6), Inches(0.3),
+                         str(v), size=11, color=S.muted, font=S.body, align=PP_ALIGN.CENTER))
+    axis.append(text(s, x1 + Inches(0.35), TOP - Inches(0.05), Inches(1.2), Inches(0.3), "jerk", size=11,
+                     color=S.muted, font=S.body))
+    rows = []
+    for i, m in enumerate(pols):
+        d, st = data.get((m, "drtc")), data.get((m, "stack"))
+        if not d or not st:
+            continue
+        yc = y0 + row * i
+        g = [text(s, lx, yc - Inches(0.16), Inches(1.8), Inches(0.32), POLICY_LABELS.get(m, m), size=13, bold=True,
+                  color=S.ink, font=S.body)]
+        g.append(line(s, sx(d[0]), yc, sx(st[0]), yc, color=S.muted, weight=Pt(2)))
+        dot = Inches(0.17)
+        g.append(box(s, sx(d[0]) - dot // 2, yc - dot // 2, dot, dot, fill=S.muted, radius=0.5))
+        g.append(box(s, sx(st[0]) - dot // 2, yc - dot // 2, dot, dot, fill=S.series["smooth"], radius=0.5))
+        g.append(text(s, x1 + Inches(0.35), yc - Inches(0.2), Inches(1.2), Inches(0.4), f"÷ {d[1] / st[1]:.0f}",
+                      size=18, bold=True, font=S.heading, color=S.accent))
+        rows.append(g)
+    rx = M + Inches(9.0)
+    facts = [stat(s, rx, TOP + Inches(0.1), Inches(3.3), "3–20×", "less jerk with the stack, every policy, both tasks",
+                  size=30, small_size=13),
+             stat(s, rx, TOP + Inches(1.45), Inches(3.3), "−18 to −25 pts",
+                  "stalls of the slow policies: adaptive playback slows down instead of stopping", size=30,
+                  small_size=13),
+             stat(s, rx, TOP + Inches(2.8), Inches(3.3), "RTC hurt",
+                  "SmolVLA's stalls doubled with it; without RTC the stack stalled 16–20 points less", size=30,
+                  small_size=13, color=S.alert)]
+    text(s, M, TOP + Inches(4.45), CW, Inches(0.4),
+         "Sorting, replay bench, 8 runs per point. Grey: DRTC alone. Orange: DRTC + the stack.", size=12,
+         color=S.muted, font=S.body)
+    builds(s, [axis + sum(rows, []), facts[0], facts[1], facts[2]])
+    notes(s, "Each method was first tested alone (E3a), then the stack chosen by a rule fixed in advance (E3b). The "
+             "Butterworth filter removes most of the jerk, adaptive playback the stalls of the slow policies. RTC was "
+             "chosen by the rule on a thin margin, and the ablation shows it is the part that hurts: each request is "
+             "slower, and on a network-dominated round trip that costs more stalls than the smoother seams save.")
+
+
 def s_v2_results(prs, n):
-    s = S.content(prs, n, "Outlook · setup v2 results", "DRTC against a patient client")
-    bw, gap = Inches(2.75), Inches(0.28)
+    s = S.content(prs, n, "Results · setup v2, DRTC (E1, E2) and the robot (E4)", "DRTC against a patient client")
+    bw, gap = Inches(3.7), Inches(0.3)
     items = [("E1", "DRTC vs patient upstream, per fault: stalls, recovery"),
              ("E2", "DRTC without each part: which piece matters"),
-             ("E3", "smoothing methods alone, then the stack"),
              ("E4", "the robot: the three claims, task success")]
     groups = []
     for i, (e, what) in enumerate(items):
@@ -687,7 +762,8 @@ def s_v2_results(prs, n):
     text(s, M, TOP + Inches(3.5), CW, Inches(0.6), "These panels fill in from the results as the runs finish.",
          size=15, color=S.muted, font=S.body, italic=True)
     builds(s, groups)
-    notes(s, "Setup v2 is built and frozen; the runs are in progress. (This slide is replaced by the results.)")
+    notes(s, "E1 and E2 run on the bench now (2 x 2,912 runs); E4 runs on the robot. (This slide is replaced by "
+             "the results.)")
 
 
 def s_edge(prs, n):
@@ -766,7 +842,7 @@ SLIDES = [s_title, s_outline,
           s_section(2), s_drtc, s_fixes, s_smoothing,
           s_section(3), s_platform, s_data, s_models, s_protocol, s_design,
           s_section(4), s_success, s_videos, s_motion, s_timeline, s_recovery, s_bench, s_offline,
-          s_section(5), s_redesign, s_v2_results, s_edge, s_limits, s_conclusion, s_thanks]
+          s_section(5), s_redesign, s_v2_smoothing, s_v2_results, s_edge, s_limits, s_conclusion, s_thanks]
 
 
 def preview(pptx: Path) -> None:

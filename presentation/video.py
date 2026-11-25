@@ -436,7 +436,7 @@ def scene_v2():
                  ("A fair baseline", "LeRobot with its time limits raised to the whole run, so DRTC is compared "
                   "with a client that waits instead of giving up."),
                  ("Smoothing, part by part", "The Butterworth filter cut jerk 4–9×; adaptive playback cut the slow "
-                  "policies' stalls by 15–25 points; the final stack lowered jerk 3–20×.")]
+                  "policies' stalls by 15–27 points; the final stack lowered jerk 3–20×.")]
         cw = (W - 2 * M - 3 * 32) // 4
         for i, (a_, b) in enumerate(cards):
             a, dy = rise(t, 0.4 + 0.3 * i)
