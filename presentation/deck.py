@@ -141,8 +141,8 @@ def poster(video: Path, at: float = 1.0) -> Path:
     return out
 
 
-def movie(slide, video: Path, x, y, w, h):
-    return slide.shapes.add_movie(str(video), x, y, w, h, poster_frame_image=str(poster(video)),
+def movie(slide, video: Path, x, y, w, h, *, poster_at: float = 1.0):
+    return slide.shapes.add_movie(str(video), x, y, w, h, poster_frame_image=str(poster(video, poster_at)),
                                   mime_type="video/mp4")
 
 

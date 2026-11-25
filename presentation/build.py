@@ -322,6 +322,40 @@ def s_drtc(prs, n):
              "observation instead of waiting. And it never ends the run: the arm holds and resumes.")
 
 
+def s_simulator(prs, n):
+    s = S.content(prs, n, "Method · try it", "The DRTC Fault Simulator")
+    clip = OUT / "drtc_simulator_clip.mp4"
+    vh = Inches(4.45)
+    vw = int(vh * 1280 / 948)
+    if clip.is_file():
+        movie(s, clip, M, TOP - Inches(0.1), vw, vh, poster_at=29.0)  # the poster: the finished trial
+    else:
+        pending_box(s, M, TOP - Inches(0.1), vw, vh, "the simulator clip (python presentation/simulator/build.py, "
+                                                      "then node presentation/simulator/record.js)")
+    x = M + vw + Inches(0.45)
+    tw = CW - vw - Inches(0.45)
+    items = [("Three clients, one network", "LeRobot as shipped, LeRobot made patient and DRTC run side by side "
+                                            "on the same faults: spike, dropped replies, outage."),
+             ("Break it live", "the orange buttons hit the network at any moment; untick a DRTC part to see what "
+                               "it adds."),
+             ("Checked against the bench", "the model follows the client code; DRTC's stall times land within a "
+                                           "few points of the measured ones.")]
+    groups = [para(s, x, TOP + Inches(0.05) + Inches(1.15) * i, tw, who, what, size=15, h=Inches(1.05),
+                   marker=S.accent) for i, (who, what) in enumerate(items)]
+    link = text(s, x, TOP + Inches(3.75), tw, Inches(0.7),
+                [[("Open the simulator", {"color": S.accent, "bold": True}),
+                  ("  drtc_simulator.html, beside this deck; works offline", {"color": S.muted})]],
+                size=14, font=S.body)
+    run = link.text_frame.paragraphs[0].runs[0]
+    run.hyperlink.address = "drtc_simulator.html"
+    builds(s, groups + [link])
+    notes(s, "Before the results, a way to see the mechanism. This simulator runs the three clients on the same "
+             "network. Here SmolVLA goes through the spike, the dropped replies and the outage: LeRobot as shipped "
+             "ends its run at the drops, the patient client loses its one fresh request and is stuck until its "
+             "10-second limit, and DRTC replaces each lost request and keeps moving. The rules come from the client "
+             "code, and DRTC's stall times match the bench within a few points. Click the link to open it live.")
+
+
 def s_fixes(prs, n):
     s = S.content(prs, n, "Method · making it work on the arm", "Four fixes, each found on the real setup")
     rows = [["GR00T never got a chunk", "the cooldown was capped at H/2 = 0.27 s; replies take 0.4–0.7 s",
@@ -851,7 +885,7 @@ def s_thanks(prs, n):
 
 SLIDES = [s_title, s_outline,
           s_section(1), s_problem, s_setting, s_shipped, s_claim,
-          s_section(2), s_drtc, s_fixes, s_smoothing,
+          s_section(2), s_drtc, s_simulator, s_fixes, s_smoothing,
           s_section(3), s_platform, s_data, s_models, s_protocol, s_design,
           s_section(4), s_success, s_videos, s_motion, s_timeline, s_recovery, s_bench, s_offline,
           s_section(5), s_redesign, s_v2_smoothing, s_v2_results, s_edge, s_limits, s_conclusion, s_thanks]

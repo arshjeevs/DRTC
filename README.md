@@ -33,7 +33,7 @@ method and every design decision are in the report (`report/`, about 75 pages).
 | `plugins/` | LeRobot plugins: GR00T N1.5 on LeRobot 0.7, and a replay robot for the bench |
 | `lab/` | the registry (datasets, recipes, models, rigs, conditions, evaluation plans) and the guides |
 | `report/` | the project report (LaTeX), built from `results/` |
-| `presentation/` | the slides (.pptx) and the project video, built from the same numbers |
+| `presentation/` | the slides (.pptx), the project video and the DRTC Fault Simulator, built from the same numbers |
 | `viva/` | viva preparation: likely questions with answers from the results |
 | `tests/` | the test suite (CPU; run in CI) |
 
@@ -50,6 +50,16 @@ uv sync --extra gpu --extra sim      # a Linux machine with an NVIDIA GPU (lapto
 ```
 
 A Raspberry Pi as the robot computer: `lab/bin/pi-setup` (CPU PyTorch). Servers: `lab/docs/SERVERS.md`.
+
+## Try it in a browser
+
+The **DRTC Fault Simulator** shows LeRobot's client and DRTC side by side on the same network faults, with buttons
+to break the network while it plays. It is a simplified model of the client's scheduling rules, checked against the
+bench (`presentation/simulator/`):
+
+```bash
+python presentation/simulator/build.py     # then open presentation/out/drtc_simulator.html (works offline)
+```
 
 ## Try it without a robot
 

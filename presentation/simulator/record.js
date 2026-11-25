@@ -12,7 +12,7 @@ const faults = process.argv[3] || "mix";
 const ROOT = path.resolve(__dirname, "..");
 const out = path.resolve(process.argv[4] || path.join(ROOT, "out", "drtc_simulator_clip.mp4"));
 const page = path.join(ROOT, "out", "drtc_simulator.html");
-const FPS = 25, SPEED = 0.5, DUR = 14, W = 1280, H = 1180;   // half speed: 28 s of video for the 14 s trial
+const FPS = 25, SPEED = 0.5, DUR = 14, W = 1280, H = 1800;   // half speed: 28 s of video for the 14 s trial
 const PORT = 9300 + Math.floor(Math.random() * 400);
 
 async function main() {
@@ -36,11 +36,14 @@ async function main() {
     await send("Emulation.setDeviceMetricsOverride", { width: W, height: H, deviceScaleFactor: 1, mobile: false });
     await send("Page.navigate", { url: `file://${page}?policy=${policy}&faults=${faults}&t=0` });
     await new Promise(r => setTimeout(r, 2500));
+    // the region: from the play controls to the end of the three lanes
+    const box = JSON.parse((await send("Runtime.evaluate", { returnByValue: true, expression:
+      `JSON.stringify((() => { const a = document.querySelector(".transport").getBoundingClientRect(), b = document.querySelector(".lanes").getBoundingClientRect(); return { y: Math.floor(a.top) - 12, h: Math.ceil(b.bottom - a.top) + 24 }; })())` })).result.result.value);
     const n = Math.round(DUR / SPEED * FPS);
     for (let k = 0; k <= n; k++) {
       const t = Math.min(DUR, k / FPS * SPEED);
       await send("Runtime.evaluate", { expression: `window.DRTCSimPage.setTime(${t})` });
-      const shot = await send("Page.captureScreenshot", { format: "png", clip: { x: 0, y: 0, width: W, height: H, scale: 1 } });
+      const shot = await send("Page.captureScreenshot", { format: "png", clip: { x: 0, y: box.y, width: W, height: box.h, scale: 1 } });
       fs.writeFileSync(path.join(frames, `f${String(k).padStart(5, "0")}.png`), Buffer.from(shot.result.data, "base64"));
     }
     // hold the last frame for 2 s
