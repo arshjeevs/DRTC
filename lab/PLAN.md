@@ -97,17 +97,17 @@ the laptop for every official experiment (the Pi is set up and tested).
 
 | # | What | Who | Status |
 |---|---|---|---|
-| 1 | Trainings (table above) | the user | ▶ π0.5 x2 and MolmoAct 2 cubebox v1 left |
+| 1 | Trainings (table above) | the user | ✓ all 7 x 2 (π0.5 stopped at 15k, MolmoAct 2 at 30k) |
 | 2 | Offline M9/M10 for every model | the user (WORKFLOW Step 6) | ✓ 10 models (SmolVLA, GR00T N1.5 x3 datasets; ACT, Diffusion x2); GR00T N1.7 x2 ready to run; the rest as they finish |
 | 3 | Setup v2 build and eval setup (metrics v3), tested on the laptop's replay robot | Claude | ✓ 2026-11-22 |
-| 4 | V0: freeze the bench evals | the user | · next |
-| 5 | V1 + V2: E1 + E2 and E3a on the bench | the user, on a GPU server (WORKFLOW Setup v2) | · |
+| 4 | V0: freeze the bench evals | the user | ✓ |
+| 5 | V1 + V2: E1 + E2 and E3a on the bench | the H200 (`lab/bin/bench-v2`) | E3a ✓ 2026-11-25; E1 + E2 ▶ both tasks in parallel |
 | 6 | V3: choose the stack, write E3b and E4 | Claude (from the stack command's output) | ✓ 2026-11-25 (written; to freeze) |
-| 7 | V4: E3b on the bench | the user | · |
+| 7 | V4: E3b on the bench | the H200 | ✓ 2026-11-25 (RTC is the weak part: the user decides E4's stack) |
 | 8 | Baselines on the robot (5 models now, sort_one + cubebox v1) | the user (WORKFLOW Step 5) | · ready to freeze any time |
 | 9 | V5: E4 on the robot | the user | · after the stack |
 | 10 | Growth when there is time (list above) | the user | · |
-| 11 | The report (`report/`, LaTeX, built from the results) and the slides | Claude | ▶ extended as results come in |
+| 11 | The report (`report/`, LaTeX, built from the results), the slides, the video, the viva prep | Claude | ▶ E3 in; E1/E2 when the bench ends |
 
 Side results already in [REPORT.md](REPORT.md): the first DRTC run (`sort_one_drtc_main`, 80 trials) and its four
 benches (`bench_main_*`), recomputed with metrics v3; offline M9/M10 of 10 models; the Raspberry Pi test.
