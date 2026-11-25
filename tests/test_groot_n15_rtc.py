@@ -4,12 +4,15 @@ Runs without the 3B weights: the policy is built without __init__ and the action
 with a toy velocity field, exactly as `FlowmatchingActionHead.get_action` calls the guidance.
 """
 
+import pytest
 import torch
 
-from lerobot.inference.rtc import supports_rtc_inference
-from lerobot.policies.rtc.configuration_rtc import RTCConfig
-from lerobot_policy_groot_n15.configuration_groot_n15 import GrootN15Config
-from lerobot_policy_groot_n15.modeling_groot_n15 import GrootN15Policy
+pytest.importorskip("lerobot_policy_groot_n15", reason="the GPU extra (uv sync --extra gpu) installs the plugin")
+
+from lerobot.inference.rtc import supports_rtc_inference  # noqa: E402
+from lerobot.policies.rtc.configuration_rtc import RTCConfig  # noqa: E402
+from lerobot_policy_groot_n15.configuration_groot_n15 import GrootN15Config  # noqa: E402
+from lerobot_policy_groot_n15.modeling_groot_n15 import GrootN15Policy  # noqa: E402
 
 H, WIDTH, PADDED, STEPS = 16, 6, 32, 4
 

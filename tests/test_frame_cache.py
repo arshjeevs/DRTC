@@ -43,7 +43,9 @@ def test_recipes_with_frames_are_valid():
         assert any(isinstance(n, prepare.FrameCache) for n in prepare.needs(r.flags, r.policy, r.data))
 
 
-def test_variant_names_combine_and_keep_the_relative_stats_name():
+def test_variant_names_combine_and_keep_the_relative_stats_name(monkeypatch):
+    # The decoder recorded in the marker is the machine's; this test is about the names, so pin it.
+    monkeypatch.setattr(prepare, "video_backend", lambda: "torchcodec")
     rel = prepare.RelativeStats(50, ("gripper",))
     fc = prepare.FrameCache(240, 320)
     single = prepare.variant_root("u/ds", "3ef1f445d952ae6b", rel)
