@@ -25,3 +25,8 @@ comparisons:
 - stack_minus_ramp__mix vs stack__mix
 video: false
 robot: replay
+
+# Written by `lab eval freeze`: the Hub commit each model is served at. Do not edit by hand.
+frozen:
+  smolvla_cubebox_v1_full: 'c0daf0502099c07ce5f74d79cb493338baacdc50'
+  groot_cubebox_v1_full: 'b873dec480a25ad2d47d00bf2cbfdd49b092b9f0'
