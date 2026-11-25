@@ -64,10 +64,12 @@ the recipe and never change what is learnt.
     \smolvla & the authors~\cite{shukor2025smolvla}: action expert only, VLM frozen & 20k $\times$ 64 \\
     GR00T N1.5 & NVIDIA's SO-101 recipe: projector and diffusion transformer; LLM and vision frozen & 10k $\times$ 32 \\
     GR00T N1.7 & NVIDIA / LeRobot SO-101 recipe: projector, DiT and VLLN; relative arm actions & 20k $\times$ 64 \\
-    \pizerofive & openpi \texttt{pi05\_aloha\_pen\_uncap}: full fine-tune, relative joints & 20k $\times$ 64 \\
-    MolmoAct 2 & the authors~\cite{molmoact2}: LoRA (rank 64) on the VLM; connector and action expert trained & 50k $\times$ 16 \\
+    \pizerofive & openpi \texttt{pi05\_aloha\_pen\_uncap}: full fine-tune, relative joints & 20k $\times$ 64$^{b}$ \\
+    MolmoAct 2 & the authors~\cite{molmoact2}: LoRA (rank 64) on the VLM; connector and action expert trained & 50k $\times$ 16$^{b}$ \\
     \bottomrule
   \end{tabularx}
+  \par\smallskip\raggedright\footnotesize $^{b}$ Stopped early for time: \pizerofive{} at 15k and MolmoAct~2 at 30k steps. The
+  learning-rate schedule keeps the recipe's length, so the stopped run is the recipe's run up to that step.
 \end{table}
 
 \section{Training infrastructure}\label{sec:training-infra}
@@ -104,7 +106,7 @@ and diffusion models~\cite{valloss2026}, the offline evaluation reports the acti
 
 \begin{table}[htbp]
   \centering
-  \caption{Training status (trained: on the Hub; training: running; planned: not yet started).}
+  \caption{Training status (trained: on the Hub; $^{b}$ stopped early, Table~\ref{tab:recipes}).}
   \label{tab:training}
   \small
   \begin{tabular}{l c c c}
@@ -116,12 +118,15 @@ and diffusion models~\cite{valloss2026}, the offline evaluation reports the acti
     GR00T N1.7 & -- & trained & trained \\
     ACT & -- & trained & trained \\
     Diffusion Policy & -- & trained & trained \\
-    \pizerofive & -- & planned & planned \\
-    MolmoAct 2 & -- & planned & training \\
+    \pizerofive & -- & trained$^{b}$ & trained$^{b}$ \\
+    MolmoAct 2 & -- & trained$^{b}$ & trained$^{b}$ \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-Table~\ref{tab:training} gives the state of the trainings. The cube-in-box v0 dataset was used only for the first two
-policies. Every evaluation in Chapter~\ref{ch:results} starts with the trained policies and adds the others as their
-trainings finish, without redoing any trial (Section~\ref{sec:growth}).
+Table~\ref{tab:training} gives the state of the trainings: all seven policies are trained on both tasks. The
+cube-in-box v0 dataset was used only for the first two policies. Two runs were stopped before the end of their
+recipe to fit the project's time: \pizerofive{} after 15k of its 20k steps and MolmoAct~2 after 30k of its 50k. A
+run is stopped by a step limit set in the recipe, which saves, pushes and ends the run at that step; the number of
+steps that sizes the learning-rate schedule is left at the recipe's value, so the stopped run is identical to the
+full one up to that step. Neither run logged a held-out loss, so the checkpoint served is the last one.

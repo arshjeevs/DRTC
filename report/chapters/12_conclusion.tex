@@ -15,7 +15,7 @@ With \drtc{} under the same faults success was \R{main/smolvla/drtc/M1} and \R{m
 a fault, and the arm moved again within about a second and a half of every fault. Smoothing reduced the jerk by factors
 of \R{main/smolvla/jerkratio} and \R{main/groot/jerkratio} without lowering success. Because the shipped client gives up
 by design, the experiments were redesigned (setup~v2) to compare \drtc{} with a client that waits, to take \drtc{} and
-the smoothing apart, and to cover two tasks and five policies on the bench; its results are reported in
+the smoothing apart, and to cover two tasks and seven policies on the bench; its results are reported in
 Sections~\ref{sec:v2bench} and~\ref{sec:v2robot} as they arrive.
 
 \section{Future work}
@@ -23,8 +23,8 @@ Sections~\ref{sec:v2bench} and~\ref{sec:v2robot} as they arrive.
 \begin{itemize}
 \item \textbf{Complete setup~v2} and the baselines, and grow the robot plans to twenty trials where differences are
       close.
-\item \textbf{More policies and tasks}: \pizerofive{} and MolmoAct~2 when trained, and the robot DRTC experiment on
-      cube in box.
+\item \textbf{More tasks}: the robot DRTC experiment on cube in box, and \pizerofive{} and MolmoAct~2 trained to
+      the end of their recipes.
 \item \textbf{The edge}: official runs with the Raspberry Pi~5 as the robot computer (Chapter~\ref{ch:edge}).
 \item \textbf{Compression} of the camera images to shorten the round trip.
 \item \textbf{RTC for relative-action policies} such as GR00T~N1.7, which needs the previous chunk's actions re-anchored

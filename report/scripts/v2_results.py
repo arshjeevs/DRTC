@@ -93,6 +93,11 @@ def bench_v2(results, write, setn, names) -> None:
         frames = [pd.read_csv(p).assign(_src=p.parent.name) for p in smooth if p.is_file()]
         if frames:
             _e3a(frames, ds, write, names)
+        stack = [results / "bench" / f"bench_v2_stack_{ds}" / "metrics.csv",
+                 results / "bench" / f"bench_v2_stack_nortc_{ds}" / "metrics.csv"]
+        frames = [_stack_frame(pd.read_csv(p)) for p in stack if p.is_file()]
+        if frames:
+            _e3b(pd.concat(frames, ignore_index=True), ds, write, setn, names)
     try:  # the stack, by the fixed rule
         from drtc.evals import stack
 
@@ -185,6 +190,82 @@ def _e3a(frames, ds, write, names) -> None:
         write(f"tab_v2_e3a_{ds}.tex", "\n".join([
             "\\begin{tabular}{l l rrrr}", "\\toprule",
             "Method & Policy & Jerk vs \\drtc{} & Largest step ($^\\circ$) & Deviation ($^\\circ$) & Stall (\\%) \\\\",
+            "\\midrule", *rows[:-1], "\\bottomrule", "\\end{tabular}", ""]))
+
+
+PARTS = [("adaptive", "adaptive playback"), ("seam", "RTC / ensembling"), ("butterworth", "Butterworth"),
+         ("ramp", "resume ramp")]
+
+
+def _stack_frame(df: pd.DataFrame) -> pd.DataFrame:
+    """One E3b eval with uniform names: `stack`, `stack__none`, `minus_<part>`, `drtc`; `seam` = rtc or ensemble."""
+    nortc = df["condition"].str.startswith("stack_nortc").any()
+    def norm(c: str) -> str:
+        c = c.replace("stack_nortc", "stack")
+        if c == "stack__mix":
+            return "stack"
+        if c.startswith("stack_minus_"):
+            part = c[len("stack_minus_"):].split("__")[0]
+            return "minus_" + ("seam" if part in ("rtc", "ensemble") else part)
+        return {"drtc__mix": "drtc"}.get(c, c)
+    return df.assign(cond=df["condition"].map(norm), seam="ensembling" if nortc else "RTC")
+
+
+def _e3b(df, ds, write, setn, names) -> None:
+    """E3b: the final stack against DRTC alone (per policy), and what removing each part does."""
+    mix = ["spike", "drops", "outage"]
+    rows = []
+    for model in sorted(df["model"].unique()):
+        g = {c: df[(df["cond"] == c) & (df["model"] == model)] for c in ("drtc", "stack", "stack__none")}
+        if g["drtc"].empty or g["stack"].empty:
+            continue
+        j = _med(g["stack"]["M7_jerk_k"]) / _med(g["drtc"]["M7_jerk_k"])
+        seam = g["stack"]["seam"].iloc[0]
+        pol = _policy(model, names)
+        setn(f"v2/{ds}/e3b/{model.split('_')[0]}/jerkratio", f"{1 / j:.0f}" if j else "--")
+        rows.append(" & ".join([
+            pol, seam,
+            _f(_med(g["drtc"]["M2_stall_pct"])), _f(_med(g["stack"]["M2_stall_pct"])),
+            _f(_med(g["stack__none"]["M2_stall_pct"])),
+            _f(j, 2), _f(_med(g["drtc"]["M8b_largest_step_deg"])), _f(_med(g["stack"]["M8b_largest_step_deg"])),
+            _f(_med(g["stack"]["M12_plan_deviation_deg"]), 2),
+            _f(_rec_time(g["drtc"], mix), 2), _f(_rec_time(g["stack"], mix), 2)]) + " \\\\")
+    if rows:
+        write(f"tab_v2_e3b_{ds}.tex", "\n".join([
+            "\\begin{tabular}{l l rrr r rr r rr}", "\\toprule",
+            " & & \\multicolumn{3}{c}{Stall (\\%)} & Jerk & \\multicolumn{2}{c}{Largest step ($^\\circ$)} & "
+            "Deviation & \\multicolumn{2}{c}{Recovery (s)} \\\\",
+            "\\cmidrule(lr){3-5}\\cmidrule(lr){7-8}\\cmidrule(lr){10-11}",
+            "Policy & Seam & \\drtc{} & stack & stack, no faults & vs \\drtc{} & \\drtc{} & stack & ($^\\circ$) & "
+            "\\drtc{} & stack \\\\", "\\midrule", *rows, "\\bottomrule", "\\end{tabular}", ""]))
+    rows = []
+    for part, pname in PARTS:
+        first = True
+        for seam in ("RTC", "ensembling"):
+            jr, ds2, rec = [], [], []
+            for model in sorted(df["model"].unique()):
+                st = df[(df["cond"] == "stack") & (df["model"] == model) & (df["seam"] == seam)]
+                mi = df[(df["cond"] == f"minus_{part}") & (df["model"] == model) & (df["seam"] == seam)]
+                if st.empty or mi.empty:
+                    continue
+                jr.append(_med(mi["M7_jerk_k"]) / _med(st["M7_jerk_k"]))
+                ds2.append(_med(mi["M2_stall_pct"]) - _med(st["M2_stall_pct"]))
+                rec.append(_rec_time(mi, mix) - _rec_time(st, mix))
+            if not jr:
+                continue
+            n = len(jr)
+            rows.append(" & ".join([
+                pname if first else "", f"{seam} ({n})",
+                f"{sum(x > 1 for x in jr)}/{n}", _f(_med(jr), 2),
+                f"{sum(x > 0 for x in ds2)}/{n}", _f(_med(ds2), 1), _f(_med(rec), 2)]) + " \\\\")
+            first = False
+        rows.append("\\addlinespace")
+    if any("&" in r for r in rows):
+        write(f"tab_v2_e3b_abl_{ds}.tex", "\n".join([
+            "\\begin{tabular}{l l cr cr r}", "\\toprule",
+            " & & \\multicolumn{2}{c}{Jerk without it} & \\multicolumn{2}{c}{Stall without it} & Recovery \\\\",
+            "\\cmidrule(lr){3-4}\\cmidrule(lr){5-6}",
+            "Part removed & Policies & higher & $\\times$ (median) & higher & $\\Delta$ pp (median) & $\\Delta$ s (median) \\\\",
             "\\midrule", *rows[:-1], "\\bottomrule", "\\end{tabular}", ""]))
 
 

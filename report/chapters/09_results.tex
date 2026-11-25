@@ -185,8 +185,8 @@ followed by Diffusion Policy (\R{offline/sortone/diffusion/M9arm}\degree), \groo
 and ACT (\R{offline/sortone/act/M9arm}\degree). ACT was the fastest (\R{offline/sortone/act/M10} per chunk,
 \R{offline/sortone/act/M10gb}), \groot{} the largest (\R{offline/sortone/groot/M10gb}). For two policies the last
 checkpoint had a lower held-out error than the one selected by held-out loss (Table~\ref{tab:offline}), so the two
-criteria do not always agree. On cube in box v1 the order of speed is the same, ACT being the fastest. GR00T~N1.7 is
-trained and its offline evaluation is next; \pizerofive{} and MolmoAct~2 are added as their trainings finish.
+criteria do not always agree. On cube in box v1 the order of speed is the same, ACT being the fastest. GR00T~N1.7,
+\pizerofive{} and MolmoAct~2 are trained; their offline evaluation is added when it has run.
 
 \begin{table}[htbp]
   \centering
@@ -255,11 +255,44 @@ are tested in the plans' reports.
   \gentable{tab_v2_e2_cubebox_v1}
 \end{table}
 
-\subsection{The smoothing methods and the stack (E3a, E3b)}
+\subsection{The smoothing methods alone (E3a)}
 
 Tables~\ref{tab:v2e3asort} and~\ref{tab:v2e3acube} give each smoothing method alone on \drtc{} under the mix: the jerk
-relative to \drtc{} alone, the largest step, the deviation from the policy's plan and the stall fraction. By the rule
-of Section~\ref{sec:stackrule}, the stack is \R{v2/stack}.
+relative to \drtc{} alone, the largest step, the deviation from the policy's plan and the stall fraction. Each method
+did one job, and the same one on both tasks.
+
+\paragraph{Two groups of policies.} With \drtc{} alone under the mix, ACT stalled for about 3\% of the run and
+\smolvla{} for 12--15\%, while \pizerofive{} (about 38\%), Diffusion Policy (48--53\%), MolmoAct~2 (55--57\%),
+\groot{} (64\%) and GR00T~N1.7 (68\%) stalled for a third to two thirds of it: their chunk runs out before the next
+one arrives. This split decides which methods help.
+
+\paragraph{The Butterworth filter} lowered the jerk for every policy, to between 0.12 and 0.28 of \drtc{} alone on
+sorting, and roughly halved the largest step. Its cost is a deviation of 0.9--1.6\degree{} from the policy's plan; it
+did not change the stalls.
+
+\paragraph{Adaptive playback} lowered the stalls of the slow policies, which is what it is for: \groot{} from 64 to
+40\%, MolmoAct~2 from 55--57 to 30--35\%, Diffusion Policy from 48--53 to 29--30\% and GR00T~N1.7 from 68 to
+53--55\%. It did not help \pizerofive, and ACT and \smolvla{} had little stalling to remove. It also roughly halved
+the jerk of the slow policies, because the arm stops and restarts less often, and it never moves the arm off the plan.
+Combined with the Butterworth filter (the first run's condition~4) it gave both effects: MolmoAct~2 on cube in box went
+from 57\% stalls and a jerk of 232 to 32\% and 15 ($10^3$\degree/s$^3$).
+
+\paragraph{The resume ramp} helps where the arm restarts often: \groot's jerk fell to 0.18 of \drtc{} alone, at a
+deviation of 2\degree. \textbf{Zero-lag smoothing} halved the jerk of the fast policies (ACT, \smolvla) but raised it
+for \groot{} and MolmoAct~2. \textbf{Temporal ensembling} changed little except for ACT.
+
+\paragraph{RTC} did not help. It more than doubled \smolvla's stalls (from about 14 to 36--38\%): each RTC request
+is slower, and the longer turnaround outweighs the smoother joins. For \groot{} the jerk changed by $-19\%$ on sorting
+and $+11\%$ on cube in box, within the run-to-run spread.
+
+\paragraph{The stack.} By the rule of Section~\ref{sec:stackrule}, fixed before E3a ran, the stack is \R{v2/stack}.
+Both choices were close. The seam choice was decided by one pair (\groot{} on sorting, where RTC lowered the jerk and
+ensembling slowed the recovery from the spike); in the other three RTC-capable pairs both candidates were ruled out.
+Of the fourteen pairs for the jitter choice, the Butterworth filter won two (ACT on both tasks) and zero-lag smoothing
+one; in the other eleven both were ruled out, the filter mostly by the deviation guard (1.0--1.6\degree{} against a
+limit of 1\degree) and zero-lag smoothing by slower recovery. Eight runs per cell also leave a wide spread: the same
+\drtc{} cell of \groot{} on sorting had a median jerk of 178 in one plan and 219 in the other, so differences below
+about 20\% are not reliable.
 
 \begin{table}[htbp]
   \centering
@@ -281,6 +314,81 @@ of Section~\ref{sec:stackrule}, the stack is \R{v2/stack}.
   \end{adjustbox}
 \end{table}
 
+\subsection{The stack on the bench (E3b)}\label{sec:v2e3b}
+
+Tables~\ref{tab:v2e3bsort} and~\ref{tab:v2e3bcube} compare the stack with \drtc{} alone under the mix, and
+Tables~\ref{tab:v2e3bablsort} and~\ref{tab:v2e3bablcube} remove one part at a time. \smolvla{} and \groot{} ran the
+stack as chosen, with RTC; the five policies without RTC ran it with temporal ensembling as the seam method.
+
+\paragraph{The stack against \drtc{} alone.} The stack lowered the jerk for every policy on both tasks, to between
+0.05 and 0.31 of \drtc{} alone (3 to 20 times smoother), and the largest single step by a factor of 2 to 6. It cut the
+stalls of the slow policies: on sorting Diffusion Policy from 50 to 27\%, MolmoAct~2 from 57 to 32\%, \groot{} from 65
+to 41\% and GR00T~N1.7 from 68 to 49\%, with the same pattern on cube in box. Recovery after the faults was as fast or
+faster for five of the seven policies. Three costs remain. The arm deviated from the policy's plan by 0.7 to
+2.3\degree, more than any single method, because the filter, ensembling and the ramp each add their share. \smolvla's
+stalls doubled (15 to 33\% on sorting, 14 to 31\% on cube in box). And \pizerofive{} recovered more slowly on sorting
+(1.0 to 2.2~s), with more stalls there (40 to 46\%) but fewer on cube in box (40 to 33\%).
+
+\paragraph{The parts.} Adaptive playback is what removes the stalls: without it the stall fraction rose by 11 to 19
+percentage points (median per group) in 12 of the 14 policy-task pairs. The Butterworth filter is what removes most of
+the jerk: without it the jerk was 1.7 to 2.4 times higher, in 14 of 14 pairs. The resume ramp mattered little in the
+stack (median change of the jerk $-4$ to $+22\%$), because adaptive playback already removes most of the restarts it
+smooths. The seam method behaved differently by kind. Removing RTC \emph{lowered} the stalls on both tasks, of \smolvla{} by 16 to
+20 points and of \groot{} by 3, at no cost in jerk (1.01 to 1.03 times); \smolvla{} without RTC stalled no more than with
+\drtc{} alone, and on cube in box \groot{} recovered from the latency spike in 0.7~s without RTC against 2.3~s with it.
+Removing ensembling changed little on sorting and raised the jerk by 1.28 times on cube in box.
+
+\paragraph{What this means for the stack.} By its pre-registered rule the stack includes RTC, but E3b shows that RTC is
+the one part that does not earn its place on this setup: it makes each request slower, and with a round trip
+dominated by the network the extra delay costs more stalls than the smoother seams save. The stack without RTC
+(adaptive playback, the Butterworth filter and the resume ramp) stalled less than the chosen stack on all four RTC
+policy-task pairs (\smolvla{} 16 to 20 points, \groot{} 3), at the same jerk. The rule is kept as it was fixed, and this result is reported as its correction; the stack used on
+the robot is stated in Section~\ref{sec:v2robot}.
+
+Without faults the stack still stalled \groot{} (20--23\%) and GR00T~N1.7 (36\%): the chunk of these policies is barely
+longer than their round trip even on a good network (Section~\ref{sec:shortchunk}). The other policies stalled for
+less than 13\% of a fault-free run, \smolvla{} excepted (22\%, with RTC).
+
+\begin{table}[htbp]
+  \centering
+  \caption{E3b on sorting: the stack against \drtc{} alone under the fault mix, and the stack without faults (medians
+           over 8 runs; jerk: the stack's median over \drtc's; recovery: median over the mix's three faults). Seam: the
+           stack's seam method, RTC where the policy supports it and temporal ensembling otherwise.}
+  \label{tab:v2e3bsort}
+  \small
+  \begin{adjustbox}{max width=\textwidth}
+  \gentable{tab_v2_e3b_sort_one}
+  \end{adjustbox}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \caption{E3b on cube in box v1, as Table~\ref{tab:v2e3bsort}.}
+  \label{tab:v2e3bcube}
+  \small
+  \begin{adjustbox}{max width=\textwidth}
+  \gentable{tab_v2_e3b_cubebox_v1}
+  \end{adjustbox}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \caption{E3b ablations on sorting: the stack without one part, against the full stack under the mix (number of
+           policies in which the jerk or the stalls were higher without the part; median ratio of the jerk, median
+           change of the stall fraction and of the recovery time).}
+  \label{tab:v2e3bablsort}
+  \small
+  \gentable{tab_v2_e3b_abl_sort_one}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \caption{E3b ablations on cube in box v1, as Table~\ref{tab:v2e3bablsort}.}
+  \label{tab:v2e3bablcube}
+  \small
+  \gentable{tab_v2_e3b_abl_cubebox_v1}
+\end{table}
+
 \section{Setup v2 on the robot (E4)}\label{sec:v2robot}
 
 Table~\ref{tab:e4} gives E4: \smolvla{} and \groot{} on sorting, upstream patient without faults and under the mix,
@@ -297,7 +405,7 @@ Table~\ref{tab:e4} gives E4: \smolvla{} and \groot{} on sorting, upstream patien
 \section{Baselines of all policies}\label{sec:baselines}
 
 Tables~\ref{tab:basesort} and~\ref{tab:basecube} give the baseline of every trained policy on the robot (patient
-upstream, normal network, ten trials each). The plans grow as \pizerofive{} and MolmoAct~2 finish training.
+upstream, normal network, ten trials each). The plans grow to \pizerofive{} and MolmoAct~2 by adding them to the frozen plans.
 
 \begin{table}[htbp]
   \centering

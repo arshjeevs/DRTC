@@ -41,7 +41,7 @@ spike (Section~\ref{sec:main}). Three things followed.
 \end{itemize}
 Setup~v2 therefore compares \drtc{} with a \emph{patient} upstream that has the same limits (Section~\ref{sec:baseline}),
 adds the ablations that take \drtc{} apart, tests each smoothing method on its own before combining them, runs the bench
-on both tasks and five policies, and moves the faults by a seeded shift so they also hit the grasp.
+on both tasks and seven policies, and moves the faults by a seeded shift so they also hit the grasp.
 
 \section{Setup v2}\label{sec:setupv2}
 
@@ -53,8 +53,8 @@ on both tasks and five policies, and moves the faults by a seeded shift so they 
   \label{fig:design}
 \end{figure}
 
-\paragraph{The bench} runs on the sorting and the cube-in-box v1 tasks for the five trained policies (\smolvla, \groot,
-GR00T~N1.7, ACT, Diffusion Policy; \pizerofive{} and MolmoAct~2 join when trained), eight runs per cell, 14~s each.
+\paragraph{The bench} runs on the sorting and the cube-in-box v1 tasks for all seven policies (\smolvla, \groot,
+GR00T~N1.7, ACT, Diffusion Policy, \pizerofive{} and MolmoAct~2), eight runs per cell, 14~s each.
 \begin{itemize}
 \item \textbf{E1, \drtc{} against upstream:} upstream patient, upstream as shipped and \drtc, under every fault type of
       Table~\ref{tab:faults} (as shipped without the fault-free cell).
@@ -97,8 +97,8 @@ else is exploratory (Section~\ref{sec:stats}).
 \section{Baselines}\label{sec:baselines-design}
 
 Every trained policy is also evaluated on the robot on both tasks without faults, with patient upstream (the same
-reference condition as E4), ten trials each. The baseline plans start with the five trained policies and grow as the
-others are trained (Section~\ref{sec:growth}); the cube-in-box v0 baseline of the first two policies is optional.
+reference condition as E4), ten trials each. The baseline plans start with the first five trained policies and grow to
+\pizerofive{} and MolmoAct~2 (Section~\ref{sec:growth}); the cube-in-box v0 baseline of the first two policies is optional.
 
 \section{Protocol}\label{sec:protocol}
 

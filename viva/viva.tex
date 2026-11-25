@@ -297,12 +297,12 @@ estimator, A3 upstream trigger, A4 the $H/2$ cap, A5 $s_{\min}$.} Expectation st
 (A1) matters under dropped replies and outages, where nothing else replaces a lost reply; the $H/2$ cap (A4) breaks
 the short-chunk policies.}
 
-\q{What did the final stack do? (E3b)}{Against \drtc{} alone it lowered the jerk 4--19$\times$ and the largest step
-2--5$\times$ for every policy, and cut the stalls of the slow policies (Diffusion 50\,$\to$\,27\%, MolmoAct~2
-57\,$\to$\,32\%, GR00T~N1.7 68\,$\to$\,49\% on sorting). Costs: 1--2.3\degree{} deviation from the plan, more stalls for
-\smolvla{} (because of RTC) and \pizerofive, and slower recovery from the latency spike for MolmoAct~2. Removing a part:
-without adaptive playback the stalls come back; without Butterworth the jerk rises 1.5--4$\times$; the ramp and the
-seam method matter little; RTC hurts.}
+\q{What did the final stack do? (E3b)}{Against \drtc{} alone it lowered the jerk 3--20$\times$ and the largest step
+2--6$\times$ for every policy, and cut the stalls of the slow policies (Diffusion 50\,$\to$\,27\%, MolmoAct~2
+57\,$\to$\,32\%, GR00T~N1.7 68\,$\to$\,49\% on sorting). Costs: 0.7--2.3\degree{} deviation from the plan, more stalls for
+\smolvla{} (because of RTC) and \pizerofive, and slower recovery for \pizerofive{} on sorting (1.0 to 2.2~s). Removing a part:
+without adaptive playback the stalls come back; without Butterworth the jerk is about twice as high; the ramp matters little;
+removing RTC lowered the stalls (\smolvla{} by 16--20 points, \groot{} by 3) at no cost in jerk.}
 
 \q{What did the Raspberry Pi test show?}{The Pi~5 holds the 30~Hz loop (\R{edge/hz}, no dropped frames), so the
 robot side fits on it. But the round trip roughly doubles (\R{edge/smolvla/rtt} and \R{edge/groot/rtt}) because each
