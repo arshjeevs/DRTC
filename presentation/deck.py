@@ -2,8 +2,8 @@
 
 Shapes: text boxes, boxes, lines and arrows, pictures, embedded videos with poster frames, and a bar chart drawn from
 native shapes (so every bar can be animated on its own and takes the style's colours). Animations are PowerPoint's
-own: slide transitions (fade, fade through black, push) and click-by-click builds (fade, wipe up, wipe right), with an
-optional stagger inside a click. The styles themselves live in themes.py.
+own: slide transitions (fade, fade through black, push) and click-by-click builds (rise, fade, wipe up, wipe right), with an
+optional stagger inside a click. The style itself lives in style.py.
 """
 
 from __future__ import annotations
@@ -209,13 +209,15 @@ def transition(slide, kind: str = "fade", speed: str = "med") -> None:
 
 # entrance effects: (presetID, presetSubtype, filter); a wipe's filter names the side the shape is revealed from
 EFFECTS = {"fade": ("10", "0", "fade"), "wipe_up": ("22", "4", "wipe(down)"), "wipe_right": ("22", "8", "wipe(left)"),
-           "wipe_left": ("22", "2", "wipe(right)")}
+           "wipe_left": ("22", "2", "wipe(right)"),
+           "rise": ("42", "0", "fade")}  # PowerPoint's Float In: a fade while the shape moves up a little
+RISE = "0.04"  # how far a rising shape starts below its place, as a fraction of the slide height
 
 
 def _item(item):
     if not isinstance(item, tuple):
-        return item, "fade", 0
-    return (item + ("fade", 0)[len(item) - 1:])[:3]  # fill in the missing effect / delay
+        return item, "rise", 0
+    return (item + ("rise", 0)[len(item) - 1:])[:3]  # fill in the missing effect / delay
 
 
 def builds(slide, steps, *, dur: int = 450) -> None:
@@ -268,6 +270,19 @@ def builds(slide, steps, *, dur: int = 450) -> None:
             b2.append(ctn(dur=str(dur)))
             tg2 = etree.SubElement(b2, qn("p:tgtEl"))
             etree.SubElement(tg2, qn("p:spTgt"), spid=str(sh.shape_id))
+            if effect == "rise":
+                an = etree.SubElement(l3, qn("p:anim"), calcmode="lin", valueType="num")
+                b3 = etree.SubElement(an, qn("p:cBhvr"))
+                b3.append(ctn(dur=str(dur + 150), decel="100000", fill="hold"))
+                tg3 = etree.SubElement(b3, qn("p:tgtEl"))
+                etree.SubElement(tg3, qn("p:spTgt"), spid=str(sh.shape_id))
+                al3 = etree.SubElement(b3, qn("p:attrNameLst"))
+                etree.SubElement(al3, qn("p:attrName")).text = "ppt_y"
+                tav = etree.SubElement(an, qn("p:tavLst"))
+                for tm, val in (("0", f"#ppt_y+{RISE}"), ("100000", "#ppt_y")):
+                    tv = etree.SubElement(tav, qn("p:tav"), tm=tm)
+                    vv = etree.SubElement(tv, qn("p:val"))
+                    etree.SubElement(vv, qn("p:strVal"), val=val)
         clicks.append(outer)
 
     sld = slide._element

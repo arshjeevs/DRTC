@@ -1,4 +1,4 @@
-"""The presentation: one .pptx in the minimal serif style, built from the results.
+"""The presentation: one .pptx in the style of the first browser deck (style.py), built from the results.
 
     cd report && make data            # refresh numbers + figures from results/ (when results change)
     .venv/bin/python presentation/build.py          # -> presentation/out/presentation.pptx (+ .pdf, PNG previews)
@@ -67,15 +67,18 @@ def stat(s, x, y, w, big, small, *, color=None, size=34, small_size=15):
 
 
 def card(s, x, y, w, h, num, title, body, *, num_color=None):
-    shapes = [box(s, x, y, w, h, fill=S.panel, radius=0.04)]
+    shapes = [box(s, x, y, w, h, fill=S.panel, line=S.panel_line, weight=Pt(1), radius=S.card_radius)]
     pad = Inches(0.25)
     if num:
         shapes.append(text(s, x + pad, y + pad, w - 2 * pad, Inches(0.5), num, size=24, font=S.heading,
                            color=num_color or S.accent))
     ty = y + pad + (Inches(0.6) if num else 0)
-    shapes.append(text(s, x + pad, ty, w - 2 * pad, Inches(0.45), title, size=18, bold=True, font=S.body,
-                       color=S.ink, line=1.05))
-    shapes.append(text(s, x + pad, ty + Inches(0.5), w - 2 * pad, h - (ty - y) - Inches(0.6), body, size=14,
+    per_line = max(1, int((w - 2 * pad) / 12700 / (0.58 * 18)))  # characters per line at 18 pt bold
+    lines = -(-len(title) // per_line)
+    shapes.append(text(s, x + pad, ty, w - 2 * pad, Inches(0.3) * lines + Inches(0.15), title, size=18, bold=True,
+                       font=S.body, color=S.ink, line=1.05))
+    by = ty + Inches(0.3) * lines + Inches(0.2)
+    shapes.append(text(s, x + pad, by, w - 2 * pad, h - (by - y) - Inches(0.1), body, size=14,
                        color=S.muted, font=S.body, line=1.15))
     return shapes
 
@@ -131,7 +134,7 @@ def trial_video(cond_dir: str, model_dir: str, want_success: bool | None, prefer
 
 
 def pending_box(s, x, y, w, h, what):
-    return box(s, x, y, w, h, line=S.panel_line, dash=True, weight=Pt(1.25), radius=0.04,
+    return box(s, x, y, w, h, line=S.panel_line, dash=True, weight=Pt(1.25), radius=S.card_radius,
                runs=[[("pending", {"bold": True, "color": S.muted})], [(what, {"color": S.muted, "size": 13})]],
                size=16, font=S.body)
 
@@ -140,9 +143,6 @@ def pending_box(s, x, y, w, h, what):
 
 def s_title(prs, n):
     meta = {"kind": "Major project", **title_page()}
-    words = meta["title"].split()  # two balanced lines
-    cut = min(range(1, len(words)), key=lambda i: abs(len(" ".join(words[:i])) - len(" ".join(words[i:]))))
-    meta["title"] = [" ".join(words[:cut]), " ".join(words[cut:])]
     s = S.title_slide(prs, meta)
     notes(s, "Introduce yourselves and the guide. One sentence: we make remote robot inference survive network "
              "faults, on a low-cost arm, and show it with robot trials.")
@@ -205,7 +205,7 @@ def s_problem(prs, n):
 
 def s_setting(prs, n):
     s = S.content(prs, n, "The problem · the setting", "Remote inference, and where it breaks")
-    bw, bh = Inches(3.2), Inches(1.5)
+    bw, bh = Inches(3.0), Inches(1.5)
     y = TOP + Inches(0.35)
     xs = [M, (W - bw) // 2, W - M - bw]
     names = [("Robot client", "SO-101 arm · laptop, 30 Hz"), ("Network", "Wi-Fi and the local network"),
@@ -220,9 +220,9 @@ def s_setting(prs, n):
         x1, x2 = xs[i] + bw + gap, xs[i + 1] - gap
         a = line(s, x1, y + Inches(0.5), x2, y + Inches(0.5), color=S.ink, weight=Pt(1.75), arrow=True)
         b = line(s, x2, y + Inches(1.0), x1, y + Inches(1.0), color=S.ink, weight=Pt(1.75), arrow=True)
-        la = text(s, x1, y + Inches(0.12), x2 - x1, Inches(0.3), "observation", size=11, color=S.muted,
+        la = text(s, x1, y + Inches(0.12), x2 - x1, Inches(0.3), "observation", size=10, color=S.muted,
                   font=S.body, align=PP_ALIGN.CENTER)
-        lb = text(s, x1, y + Inches(1.08), x2 - x1, Inches(0.3), "actions", size=11, color=S.muted,
+        lb = text(s, x1, y + Inches(1.08), x2 - x1, Inches(0.3), "actions", size=10, color=S.muted,
                   font=S.body, align=PP_ALIGN.CENTER)
         flow += [(a, "wipe_right", 250 * i), (la, "fade", 250 * i), (b, "wipe_left", 500 + 250 * (1 - i)),
                  (lb, "fade", 500 + 250 * (1 - i))]
@@ -284,20 +284,20 @@ def s_shipped(prs, n):
 
 
 def s_claim(prs, n):
-    s = S.content(prs, n, "The problem · our claim", "What we set out to show")
+    s = S.statement_slide(prs, n, "The problem · our claim")
     items = [("Network faults lower the task score", "of client-server robot inference, even when the client "
               "waits instead of giving up."),
              ("DRTC recovers it,", "more than just waiting does."),
              ("Smoothing then improves the motion", "without lowering success.")]
     groups = []
     for i, (a, b) in enumerate(items):
-        y = TOP + Inches(0.2) + Inches(1.35) * i
-        g = [text(s, M, y - Inches(0.08), Inches(0.9), Inches(0.8), str(i + 1), size=40, font=S.heading,
-                  color=S.accent)]
-        g.append(text(s, M + Inches(0.9), y, CW - Inches(0.9), Inches(1.0),
-                      [[(a + " ", {"bold": True, "color": S.ink}), (b, {"color": S.muted})]], size=22,
-                      font=S.body, line=1.15))
-        groups.append(g)
+        y = Inches(1.85) + Inches(1.45) * i
+        groups.append([text(s, M, y, Inches(0.9), Inches(0.9), str(i + 1), size=40, bold=True, font=S.heading,
+                            color=S.on_accent_muted),
+                       text(s, M + Inches(0.9), y, CW - Inches(0.9), Inches(1.2),
+                            [[(a, {"bold": True, "color": S.on_accent})], [(b, {"color": S.on_accent_muted,
+                                                                                 "size": 20})]],
+                            size=30, font=S.heading, line=1.15)])
     builds(s, groups)
     notes(s, "Three claims, each tested against a named comparison. The first run tested all three against "
              "LeRobot as shipped; setup v2 tests them against a patient client.")
@@ -407,7 +407,7 @@ def s_data(prs, n):
           ("so101_cubebox_v1", "Cube in box v1", "baselines, bench"),
           ("so101_cubebox_v0", "Cube in box v0", "early tests")]
     rows = [[name, R(f"data/{d}/episodes"), R(f"data/{d}/held"), R(f"data/{d}/frames")] for d, name, _ in ds]
-    groups = table(s, x, TOP, [Inches(1.6), Inches(1.0), Inches(1.0), w - Inches(3.6)],
+    groups = table(s, x, TOP, [Inches(1.5), Inches(0.95), Inches(0.95), w - Inches(3.4)],
                    ["DATASET", "EPISODES", "HELD OUT", "FRAMES"], rows, size=14, row_h=Inches(0.55), highlight=(0,))
     text(s, x, TOP + Inches(2.5), w, Inches(1.4),
          "Recorded with the leader arm at 30 fps; idle starts and ends trimmed automatically. Held-out episodes "
@@ -757,11 +757,7 @@ def s_conclusion(prs, n):
 
 
 def s_thanks(prs, n):
-    s = S.slide(prs)
-    text(s, M, Inches(2.6), CW, Inches(1.2), "Thank you", size=60, font=S.heading, color=S.ink)
-    line(s, M, Inches(3.95), M + Inches(0.9), Inches(3.95), color=S.accent, weight=Pt(2.25))
-    text(s, M, Inches(4.2), CW, Inches(0.6), "Questions?", size=26, color=S.muted, font=S.body)
-    S.footer(s, n)
+    s = S.closing_slide(prs, n, "Thank you", "Questions?")
     notes(s, "Questions.")
 
 
