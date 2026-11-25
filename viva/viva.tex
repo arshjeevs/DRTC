@@ -151,7 +151,7 @@ rule to combine them; (d) the fault injector, the evaluation framework and all t
 replies; one slow reply then inflates the estimate for 100 requests. Jacobson--Karels tracks the mean and the spread
 and recovers in a few replies, the same reason TCP uses it. We kept a guard on the slowest of the last 10 for the
 cooldown (fix 2), so we get a responsive estimate without giving up on replies that are merely slow. Ablation A2
-replaces our estimator with upstream's: \todo{fill from Table E2 when the bench is done}.}
+replaces our estimator with upstream's, and on sorting it changed the stall by a median of \R{v2/sort_one/e2/a2_upstream_estimator/mix/delta} points under the fault mix: on the bench's steady link the two estimates are nearly the same. Be honest that the estimator is the part that did not matter here; it should matter on a link whose latency drifts.}
 
 \q{How did you choose $s_{\min}$, $k$, the margins?}{$s_{\min}=20$ steps for 50-action policies and 8 for 16- and
 24-action ones, so the request leaves about one round trip of actions; $k=1.5$ and $\alpha=1/8$, $\beta=1/4$ as in
@@ -289,13 +289,27 @@ cost something: a stall in the middle of a grasp can move the cube. Smoothing br
 the normal network. This is chunk length versus latency, not the faults. Adaptive playback cut it to
 \R{main/groot/smooth/M2}, at the cost of a slightly slower trial (\R{main/groot/drtc/M1t} vs \R{main/groot/smooth/M1t}).}
 
-\q{What did setup v2 show about \drtc{} against a patient client? (E1)}{\todo{fill when bench\_v2\_drtc finishes:
-stall fraction and recovery per fault type, both tasks, 7 policies; primary tests with Holm.}}
+\q{What did setup v2 show about \drtc{} against a patient client? (E1)}{On sorting, 2{,}912 bench runs: no
+difference without faults; under the fault mix \drtc{} cut the stall from \R{v2/sort_one/e1/mix/act/patient} to \R{v2/sort_one/e1/mix/act/drtc}\,\% for ACT and \R{v2/sort_one/e1/mix/smolvla/patient} to \R{v2/sort_one/e1/mix/smolvla/drtc}\,\% for \smolvla{}, and recovered from every fault for six of seven policies, while the patient client recovered \R{v2/sort_one/e1/mix/smolvla/patientrec} times (\smolvla). After an outage the patient client mostly never recovered (\R{v2/sort_one/e1/outage/smolvla/patientrec}): it re-sends once when the queue runs dry, and if that request is lost too it waits for the 10\,s startup deadline. \push{The honest negative: under a rising latency \drtc{} stalled more for every policy (\smolvla{} \R{v2/sort_one/e1/rise/smolvla/patient} vs \R{v2/sort_one/e1/rise/smolvla/drtc}\,\%), because the cooldown gives up replies that are only slow.} Cube in box is \todo{fill when bench\_v2\_drtc\_cubebox\_v1 finishes}.}
 
-\q{Which part of \drtc{} matters most? (E2)}{\todo{fill from the ablation tables: A1 no cooldown, A2 upstream
-estimator, A3 upstream trigger, A4 the $H/2$ cap, A5 $s_{\min}$.} Expectation stated before the data: the cooldown
-(A1) matters under dropped replies and outages, where nothing else replaces a lost reply; the $H/2$ cap (A4) breaks
-the short-chunk policies.}
+\q{Which part of \drtc{} matters most? (E2)}{The cooldown, as expected before the data. Without it the stall rose
+by a median of \R{v2/sort_one/e2/a1_no_cooldown/mix/delta} points under the fault mix (\R{v2/sort_one/e2/a1_no_cooldown/mix/worse} policies), \R{v2/sort_one/e2/a1_no_cooldown/outage/delta} under outages. The estimator made no difference (\R{v2/sort_one/e2/a2_upstream_estimator/mix/delta}), the early trigger a little (\R{v2/sort_one/e2/a3_upstream_trigger/mix/delta}). \drtc's original $H/2$ cap raised the stall by \R{v2/sort_one/e2/a4_half_chunk_cap/none/delta} points even without faults: our first fix holds for all seven policies. The same cooldown is what hurts under a rising latency (\R{v2/sort_one/e2/a1_no_cooldown/rise/delta} points without it): mention it yourself.}
+
+\q{After a 1--1.5~s fault, the next chunk comes from an old observation. Is it not safer to pause than to execute
+stale actions?}{The cooldown sends a \emph{fresh} observation, so the first chunk after a fault is planned from the
+current scene; the aligned merge skips the steps the arm already executed while the request was in flight; and LeRobot
+refuses any chunk whose observation is older than 5~s. What \drtc{} never does is execute an old chunk after a long
+stall: it holds instead.}
+
+\q{Your simulator and bench measure stalls. Does less stalling mean more task success?}{Not necessarily, which is why
+the robot experiments measure success: in the first robot run \drtc{} brought success under faults back to the
+fault-free level for both policies. The bench and the simulator explain the mechanism; success is judged on the arm
+(E4), and possibly in simulation (LIBERO, proposed).}
+
+\q{When the cooldown fires, what happens to the request still running on the GPU?}{It keeps running: a forward pass
+cannot be cancelled. The replacement gets a BUSY reply, backs off one step and is sent again when the server is free,
+so a cooldown that fires too early wastes server time. That is exactly why the cooldown is never shorter than the
+measured latency and covers the slowest of the last ten replies (fixes 1--2), and why a rising latency still hurts.}
 
 \q{What did the final stack do? (E3b)}{Against \drtc{} alone it lowered the jerk 3--20$\times$ and the largest step
 2--6$\times$ for every policy, and cut the stalls of the slow policies (Diffusion 50\,$\to$\,27\%, MolmoAct~2
