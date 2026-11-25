@@ -214,7 +214,7 @@ Current status of every training: [PLAN.md](PLAN.md), "Trainings".
   them). A fault before the first action is a setup problem and the trial is repeated.
 - A trial is voided only for a setup mistake, never for a model's failure; voided trials are listed in the report.
 
-### 8.5 Setup v2: the redesigned experiment (locked 2026-11-22, pending)
+### 8.5 Setup v2: the redesigned experiment (locked 2026-11-22; E3 done 2026-11-25, E1 + E2 running, E4 pending)
 
 Why: in the first run every faulted baseline trial was ended by LeRobot's own 1 s give-up at the first fault, so
 DRTC was compared with a client that gave up by design, and DRTC differed from it in two things at once (its
@@ -223,7 +223,7 @@ scheduling and its patience). Details: [PLAN.md](PLAN.md).
 | Part | What |
 |---|---|
 | Baseline | **upstream patient**: LeRobot's scheduler with both give-up limits (1 s starvation grace, 5 s request deadline) raised to the whole trial |
-| Bench E1 + E2 | sort_one and cubebox v1, 5 models, 8 runs per cell: upstream patient, as shipped and DRTC under none, spike, drops, outage, mix, rise, loss; DRTC without each of its parts (cooldown, estimator, trigger, our H/2 fix, `s_min` x0.5 / x1.5) |
+| Bench E1 + E2 | sort_one and cubebox v1, 7 models, 8 runs per cell: upstream patient, as shipped and DRTC under none, spike, drops, outage, mix, rise, loss; DRTC without each of its parts (cooldown, estimator, trigger, our H/2 fix, `s_min` x0.5 / x1.5) |
 | Bench E3a, E3b | each smoothing method alone on DRTC + mix; then the chosen stack and the stack without each part |
 | Robot E4 | sort_one, SmolVLA + GR00T N1.5, 10 trials: upstream patient (none, mix), DRTC + mix, DRTC + stack + mix |
 | Primary comparisons | bench: DRTC against upstream patient per fault (stalls, recovery); robot: the three claims (success) |
@@ -385,7 +385,31 @@ M10 on the busy H200 is higher than M6 on the A100 during the robot runs (SmolVL
 On cubebox v1, SmolVLA has the lowest error and ACT is again the fastest. The other models are added when their
 offline evaluation has run (GR00T N1.7 on both tasks: trained, ready to run; π0.5 and MolmoAct 2 after training).
 
-### 9.4 Baselines on every model
+### 9.4 Setup v2 on the bench: smoothing (E3a, E3b; done 2026-11-25)
+
+Sources: `results/bench/bench_v2_smooth{,_rtc}_<ds>/` and `bench_v2_stack{,_nortc}_<ds>/`; report Sections 9.4.2 and
+9.4.3 (tables generated), discussion 11.4. 7 policies x 2 tasks, DRTC + the fault mix, 8 runs per cell.
+
+- **Two groups.** DRTC alone stalls ACT 3%, SmolVLA 12-15%; pi0.5 ~38%, Diffusion 48-53%, MolmoAct 2 55-57%,
+  GR00T N1.5 64%, GR00T N1.7 68% (the chunk runs out before the next arrives).
+- **E3a, each method alone:** Butterworth cuts jerk to 0.12-0.28 of DRTC for every policy (deviation 0.9-1.6 deg,
+  stalls unchanged); adaptive playback cuts the slow policies' stalls by 15-27 points (GR00T N1.5 64 -> 40%,
+  MolmoAct 2 55-57 -> 30-35%, Diffusion 48-53 -> 29-30%, N1.7 68 -> 53-55%), zero deviation, not pi0.5; the ramp
+  helps where the arm restarts often (GR00T N1.5 jerk x0.18); zero-lag only the fast policies; ensembling little;
+  **RTC doubled SmolVLA's stalls** (14 -> 36-38%), GR00T N1.5 within noise.
+- **Stack rule (fixed before E3a):** adaptive + **RTC** + **Butterworth** + ramp, on thin wins (RTC 1 pair of 4, the
+  rest ruled out; Butterworth 2 of 14, zero-lag 1, 11 ruled out mostly by the 1 deg deviation guard).
+- **E3b, the stack vs DRTC alone:** jerk x0.05-0.31 (3-20x smoother) for every policy on both tasks, largest step
+  2-6x smaller; stalls of the slow policies down 18-25 points on sorting; deviation 0.7-2.3 deg. Costs: SmolVLA's
+  stalls doubled (RTC), pi0.5 slower recovery on sorting (1.0 -> 2.2 s).
+- **E3b ablations:** without adaptive playback +11-19 points of stalls (12 of 14 pairs); without Butterworth jerk
+  x1.7-2.4 (14 of 14); the ramp matters little; **without RTC the stalls fall (SmolVLA -16 to -20 points, GR00T
+  N1.5 -3) at the same jerk**, and GR00T N1.5's spike recovery on cubebox is 0.7 s instead of 2.3 s.
+- **Open decision (the user's, after the bench):** E4 is frozen with the rule's stack (with RTC); the evidence
+  favours the stack without RTC for the robot. Spread: the same DRTC cell gave jerk 178 and 219 in two plans, so
+  differences under ~20% are noise.
+
+### 9.5 Baselines on every model
 
 **pending** (run by the user; [PLAN.md](PLAN.md)). Condition: upstream patient, normal network (setup v2's reference).
 The evals start with the trained models and grow as the others are trained:
@@ -430,16 +454,27 @@ The evals start with the trained models and grow as the others are trained:
 **Report (LaTeX):** `report/` (`make` there: results -> numbers, tables, figures -> `report/report.pdf`). How to
 add things: [report/README.md](../report/README.md). Photos to add: [report/assets/README.md](../report/assets/README.md).
 
-**Presentation (PowerPoint):** `presentation/` (style locked 2026-11-23: minimal serif). Build:
+**Presentation (PowerPoint):** `presentation/` (style since 2026-11-25: the first browser deck's look, paper and
+ink slides, Space Grotesk + Inter from `presentation/fonts/`, which must be installed on the presenting computer). Build:
 `.venv/bin/python presentation/build.py` -> `presentation/out/presentation.pptx` (+ a LibreOffice PDF and PNG
 previews; the previews show no animations and substitute the fonts). It reads the same numbers as the report
 (`report/generated/numbers.tex`, so run `make data` in `report/` first when results change), the report's slide
 figures, the title-page details in `report/config.tex`, photos in `report/assets/` (until then a video still or a
 framed placeholder), and embeds real trial videos. Every slide fades in; parts appear click by click; each slide
-has speaker notes. 32 slides in five parts: the problem (4), method (3), experiments (5), results (7), outlook
-(setup v2, its results (pending panels), the Pi, limits, conclusion), plus title, outline, dividers and thanks. To
+has speaker notes. 33 slides in five parts: the problem (4), method (3), experiments (5), results (7), outlook
+(setup v2, its smoothing results, E1/E2/E4 (pending panels), the Pi, limits, conclusion), plus title, outline,
+dividers and thanks. To
 change a slide: its function in `build.py`; to add one: a new function listed in `SLIDES`. The old browser deck
 (claude.ai Slides) is retired.
+
+**Project video:** `.venv/bin/python presentation/video.py` -> `presentation/out/drtc_video.mp4` (about 2:15,
+1080p, offline): the real first-run trials side by side with the fault timeline, an animated explainer of DRTC, the
+bench and setup v2 results, all numbers from the report. `--preview` writes one still per scene.
+
+**Viva preparation:** `viva/` (`make` there -> `viva/viva.pdf`): likely examiner questions with short answers built
+on the same numbers; setup v2 E1/E2 answers to fill when the bench finishes.
+
+**LeRobot contribution:** prepared locally, not submitted: [docs/LEROBOT-PR.md](docs/LEROBOT-PR.md).
 
 ## 13. Where everything is
 

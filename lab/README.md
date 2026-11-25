@@ -15,6 +15,9 @@ Our layer on top of LeRobot 0.7 (pinned in `pyproject.toml`). The minor's setup 
 
 **Setting up a second robot laptop:** [docs/SETUP-LAPTOP.md](docs/SETUP-LAPTOP.md).
 
+**Deliverables:** the report (`report/`), the slides and the project video (`presentation/`), the viva preparation
+(`viva/`), and the LeRobot pull request prepared locally ([docs/LEROBOT-PR.md](docs/LEROBOT-PR.md)).
+
 **New here? Start with [docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md)**: the whole path (record, train, the three kinds of
 evaluation, report) explained.
 
