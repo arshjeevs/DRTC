@@ -67,8 +67,13 @@ uses the startup budget before the first reply.
 **Evidence** (our project on LeRobot 0.7, SO-101, sorting task, 10 trials per cell): under a fault mix of a 1 s
 latency spike, 1 s of lost replies and a 1.5 s outage, the client as shipped ended every faulted trial (success 0%
 for SmolVLA and GR00T N1.5); with these scheduling changes success was 60% and 80%, and the arm moved again within
-about 1.5 s of every fault. A replay bench with 7 policies compares it with the client given whole-trial limits
-(TODO: add E1/E2 numbers from report Chapter 9 when the bench finishes).
+about 1.5 s of every fault. On a replay bench with 7 policies (2,912 runs, sorting), against the
+same client given whole-trial limits instead of giving up: under the same fault mix the arm stood still for 3% of a
+run instead of 50% (ACT), 15% instead of 61% (SmolVLA), 35% instead of 69% (pi0.5), and recovered from every fault for
+6 of 7 policies (the patient client: 6-15 of 24). Removing the cooldown re-request costs a median 25 points of stall
+under the fault mix; the estimator makes no measurable difference on a steady link. One trade-off, also in the docs:
+when the link only gets slower (+0.4 s for 5 s), the cooldown gives up replies that are late but coming, and the
+stall is higher than without it.
 
 **How it was tested**: `tests/inference/test_unreliable_network_scheduling.py` (trigger, estimator, cooldown before
 and after the first reply, replacement and stale late reply, BUSY backoff, validation); the existing inference and
