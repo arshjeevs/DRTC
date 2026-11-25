@@ -124,6 +124,13 @@ def _e1(df, ds, write, setn, names) -> None:
             fs = _faults_of(fault)
             shipped = g["upstream_shipped"]
             ended = f"{int(shipped['M1f_fault'].sum())}/{len(shipped)}" if not shipped.empty else "--"
+            m = model.split("_")[0]  # the policy (act, smolvla, groot, grootn17, ...): keys for the text
+            setn(f"v2/{ds}/e1/{fault}/{m}/patient", _f(_med(g["upstream_patient"]["M2_stall_pct"])))
+            setn(f"v2/{ds}/e1/{fault}/{m}/drtc", _f(_med(g["drtc"]["M2_stall_pct"])))
+            setn(f"v2/{ds}/e1/{fault}/{m}/patientrec", _recovered(g["upstream_patient"], fs))
+            setn(f"v2/{ds}/e1/{fault}/{m}/drtcrec", _recovered(g["drtc"], fs))
+            setn(f"v2/{ds}/e1/{fault}/{m}/drtcrectime", _f(_rec_time(g["drtc"], fs), 2))
+            setn(f"v2/{ds}/e1/{fault}/{m}/ended", ended)
             rows.append(" & ".join([
                 fname if first else "", _policy(model, names),
                 _f(_med(g["upstream_patient"]["M2_stall_pct"])), _f(_med(g["drtc"]["M2_stall_pct"])), ended,
@@ -159,6 +166,8 @@ def _e2(df, ds, write, setn) -> None:
                 n += 1
                 worse += int(x > 0)
             if n:
+                setn(f"v2/{ds}/e2/{a}/{fault}/delta", _f(_med(d2), 1))
+                setn(f"v2/{ds}/e2/{a}/{fault}/worse", f"{worse}/{n}")
                 rows.append(" & ".join([aname if first else "", fname, f"{worse}/{n}", _f(_med(d2), 1)]) + " \\\\")
                 first = False
         rows.append("\\addlinespace")

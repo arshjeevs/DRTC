@@ -217,6 +217,36 @@ Tables~\ref{tab:v2e2sort} and~\ref{tab:v2e2cube} give the ablations: for each pa
 policies the stalls rose and by how much. The primary comparisons (\drtc{} against patient upstream, each fault type)
 are tested in the plans' reports.
 
+\paragraph{\drtc{} against the patient client (E1).} On sorting (Table~\ref{tab:v2e1sort}), without faults the two
+clients stalled about equally: both keep one request in flight, the long-chunk policies rarely run dry, and the
+short-chunk ones stall as before. The faults separate them. Under the fault mix \drtc{} cut the stall fraction from
+\R{v2/sort_one/e1/mix/act/patient} to \R{v2/sort_one/e1/mix/act/drtc}\,\% for ACT, from \R{v2/sort_one/e1/mix/smolvla/patient} to \R{v2/sort_one/e1/mix/smolvla/drtc}\,\% for
+\smolvla{} and from \R{v2/sort_one/e1/mix/pi05/patient} to \R{v2/sort_one/e1/mix/pi05/drtc}\,\% for \pizerofive{}, and it recovered from every
+fault for six of the seven policies (GR00T N1.7: \R{v2/sort_one/e1/mix/grootn17/drtcrec}), against \R{v2/sort_one/e1/mix/smolvla/patientrec} for
+\smolvla{} and \R{v2/sort_one/e1/mix/groot/patientrec} for \groot{} with the patient client. The difference comes from lost
+replies. After an outage the patient client recovered in \R{v2/sort_one/e1/outage/smolvla/patientrec} \smolvla{} runs and
+\R{v2/sort_one/e1/outage/groot/patientrec} \groot{} runs, \drtc{} in all of them, \R{v2/sort_one/e1/outage/smolvla/drtcrectime} and
+\R{v2/sort_one/e1/outage/groot/drtcrectime}\,s after the outage ended. The patient client sends a fresh request only once, when its
+queue runs dry; when that request is lost too, nothing more is sent until LeRobot's 10\,s startup deadline ends the
+run. A latency spike alone was absorbed by both clients.
+
+\paragraph{Where \drtc{} was worse: a rising latency.} When every reply became 0.4\,s slower for 5\,s (rise),
+\drtc{} stalled more than the patient client for every policy, for example \smolvla{} \R{v2/sort_one/e1/rise/smolvla/patient} against
+\R{v2/sort_one/e1/rise/smolvla/drtc}\,\% and ACT \R{v2/sort_one/e1/rise/act/patient} against \R{v2/sort_one/e1/rise/act/drtc}\,\%. The cooldown is the cause. It
+is set from the replies seen so far, so a reply that is only slower than the recent ones is given up and a new request
+sent; the server, still computing the abandoned one, answers BUSY, and the replacement starts late. Without the
+cooldown the stall under rise changed by \R{v2/sort_one/e2/a1_no_cooldown/rise/delta} points (Table~\ref{tab:v2e2sort}). A cooldown
+that adapts faster to a slower link is future work (Section~\ref{sec:limits}).
+
+\paragraph{Which part matters (E2).} The cooldown carries almost all of \drtc's benefit. Without it the stall rose in
+\R{v2/sort_one/e2/a1_no_cooldown/mix/worse} policies under the fault mix, by a median of \R{v2/sort_one/e2/a1_no_cooldown/mix/delta} points (outage
+\R{v2/sort_one/e2/a1_no_cooldown/outage/delta}, drops \R{v2/sort_one/e2/a1_no_cooldown/drops/delta}). The latency estimator made no measurable
+difference (median change \R{v2/sort_one/e2/a2_upstream_estimator/mix/delta} points under the mix, \R{v2/sort_one/e2/a2_upstream_estimator/rise/delta}
+under rise): on the bench's steady link the maximum of recent turnarounds and the Jacobson--Karels estimate are nearly
+the same. The early trigger helped a little (\R{v2/sort_one/e2/a3_upstream_trigger/mix/delta} points under the mix). \drtc's original
+cap of the cooldown at half a chunk, which our first fix removed, raised the stall by \R{v2/sort_one/e2/a4_half_chunk_cap/none/delta}
+points even without faults and by \R{v2/sort_one/e2/a4_half_chunk_cap/mix/delta} under the mix: the fix holds for all seven policies.
+
 \begin{figure}[htbp]
   \centering
   \genfigure{fig_v2_e1_sort_one}

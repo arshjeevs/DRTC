@@ -10,8 +10,8 @@ enough (Section~\ref{sec:bench}). The failures therefore came from the client's 
 succeeded in most trials on the normal network.
 
 Raising the limits removes the give-up but not the weakness behind it. The client still keeps only half a second of
-actions in reserve, and it never sends a second request: a lost reply leaves it waiting, with the arm still, until the
-end of the run. In our local replay checks a patient client stalled for more than half of a faulted run, with a single
+actions in reserve, and it replaces a lost request only once, when its queue runs dry: if that fresh request is lost
+too, nothing more is sent, and the arm waits until LeRobot's 10~s startup deadline ends the run. In our local replay checks a patient client stalled for more than half of a faulted run, with a single
 stall of 7.5~s after the dropped replies. This is why setup~v2 compares \drtc{} with the patient client, and why its
 primary comparisons use the stall fraction and the recovery time rather than whether the run was ended.
 
@@ -22,9 +22,10 @@ delay is absorbed by the queue; it holds the arm when the queue is empty instead
 replaces an overdue reply with a fresh request, so the first chunk after a fault is computed from the current scene.
 Because the policies are closed-loop, they continue the task from wherever the arm stopped. In the first run this
 brought success back to a level not significantly different from the fault-free baseline for both policies, and the
-arm moved again within 0.4--1.5~s of every fault's end (Table~\ref{tab:mainrecovery}). Setup~v2 separates these parts:
-E1 measures \drtc{} against a client that also waits, and the ablations of E2 remove the cooldown, the estimator and
-the trigger one at a time.
+arm moved again within 0.4--1.5~s of every fault's end (Table~\ref{tab:mainrecovery}). Setup~v2 separated these parts
+(Section~\ref{sec:v2bench}): against a client that also waits, \drtc's advantage comes almost entirely from the
+cooldown re-request, and the same rule makes it worse when the link only slows down, because it gives up replies that
+are late but coming.
 
 \section{Short-chunk policies}\label{sec:shortchunk}
 
@@ -100,6 +101,9 @@ experiment E4 is the test that matters for the stack: it is the only one with ta
 \item \textbf{Operator judgement.} Success is judged by the operator, who knows the condition; the success rule is
       written down before the first trial to limit this.
 \item \textbf{Shared servers.} Other users' jobs run on the A100 and H200, so inference times include contention.
+\item \textbf{A slower link.} \drtc's cooldown gives up replies that are only slower than recent ones; under a rising
+      latency it stalled more than the patient client (Section~\ref{sec:v2bench}). A cooldown that adapts faster is
+      open.
 \item \textbf{Simulated faults.} The faults follow fixed shapes, shifted per trial, rather than a recorded real network,
       and the bench simulates the latency.
 \item \textbf{Uncompressed images.} About 260~ms of each round trip is the network share, mostly the 2.9~MB of raw
