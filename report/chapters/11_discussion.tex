@@ -22,7 +22,7 @@ delay is absorbed by the queue; it holds the arm when the queue is empty instead
 replaces an overdue reply with a fresh request, so the first chunk after a fault is computed from the current scene.
 Because the policies are closed-loop, they continue the task from wherever the arm stopped. In the first run this
 brought success back to a level not significantly different from the fault-free baseline for both policies, and the
-arm moved again within 0.4--1.5~s of every fault's end (Table~\ref{tab:mainrecovery}). Setup~v2 separated these parts
+arm moved again within 0--1.5~s of every fault's end (Table~\ref{tab:mainrecovery}). Setup~v2 separated these parts
 (Section~\ref{sec:v2bench}): against a client that also waits, \drtc's advantage comes almost entirely from the
 cooldown re-request, and the same rule makes it worse when the link only slows down, because it gives up replies that
 are late but coming.

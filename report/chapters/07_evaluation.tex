@@ -21,7 +21,7 @@ experiments run with it.
     Operator & no & yes: sets the layout, judges success & no \\
     Network & none & the real one (WiFi) & simulated, as measured on the robot \\
     Policy input & held-out recorded frames & the live cameras & held-out episodes, played as if live \\
-    Metrics & M9, M10 & M1 and M2--M12 & M2--M8, M11, M12 \\
+    Metrics & M9, M10 & M1 and M2--M8, M11, M12 & M2--M8, M11, M12 \\
     \bottomrule
   \end{tabularx}
 \end{table}
@@ -132,7 +132,7 @@ of a window shows only when the queue runs dry), and 0 when there is none. A run
 or which the system ended before the fault did, is \emph{not recovered}. A run that the operator's key or success ended
 first is not counted for that fault.
 
-\paragraph{Deviation from the plan (M12).} Smoothing changes what the arm is sent; M12 measures how far from what the
+\paragraph{Deviation from the plan (M12).} Smoothing changes what the arm is sent; M12 measures how far it is from what the
 policy asked for. On every executed tick it is the mean over the five arm joints of the distance between the commanded
 position and the newest accepted chunk's raw action for that step, before any smoothing. It is 0 without smoothing, and
 grows with a filter's lag.

@@ -40,7 +40,7 @@ project, from a recorded dataset to the report; the following chapters take its 
 \end{table}
 
 Table~\ref{tab:hardware} lists the hardware and Figures~\ref{fig:setup} and~\ref{fig:robot} show it. The two cameras
-have fixed roles: the wrist camera sees the object and the gripper at close range, the scene camera sees the whole
+have fixed roles: the wrist camera sees the object and the gripper at close range; the scene camera sees the whole
 task area. Both are read at $800\times600$, and every request to a policy server carries both images uncompressed
 ($2\times800\times600\times3$~bytes $\approx$~2.9~MB) together with the six joint positions. The phone is bridged
 to a virtual video device at every boot so that it appears to LeRobot like any other camera; the arms, their serial
@@ -120,7 +120,7 @@ Every object an experiment depends on is a small file in the repository, and eve
 \end{table}
 
 Because a model names its recipe and dataset, and the dataset names its revision, a model's name determines exactly
-what it was trained on and how. A condition composes the shared defaults, the rig and the model, so the same condition
+what it was trained on and how. A condition is combined with the shared defaults, the rig and the model, so the same condition
 file is used for every policy. Generated files are made by small scripts in the registry itself; the conditions of the
 main experiments (Chapter~\ref{ch:design}) are generated this way, so their systems and faults are identical
 everywhere.

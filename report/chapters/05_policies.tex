@@ -8,7 +8,7 @@ models and large VLAs. The strongest evidence came from three SO-101 studies. In
 $\pi_0$~35.1\%, GR00T~N1.7~29.4\%, Diffusion~Policy~26.7\%, ACT~19.2\%, MolmoAct~2~18.9\% and \smolvla{}~15.0\%. A
 failure-and-recovery benchmark~\cite{so101failure} (four tasks, 100 demonstrations each) found \pizerofive{}~56\%,
 ACT~34\% and \smolvla{}~33\%. A study of whether validation loss predicts robot success~\cite{valloss2026} found
-\pizerofive{} at 73\% and \smolvla{} at 38\% with 200 demonstrations, showed that trimming the idle start of episodes
+\pizerofive{} at 73\% and \smolvla{} at 38\% with 200 demonstrations, and showed that trimming the idle start of episodes
 removes most \enquote{never started} failures, and that held-out loss is a weak guide for flow and diffusion models,
 whose loss can rise while their action error falls.
 
@@ -125,7 +125,7 @@ and diffusion models~\cite{valloss2026}, the offline evaluation reports the acti
 \end{table}
 
 Table~\ref{tab:training} gives the state of the trainings: all seven policies are trained on both tasks. The
-cube-in-box v0 dataset was used only for the first two policies. Two runs were stopped before the end of their
+cube-in-box v0 dataset was used only for the first two policies. The runs of two policies were stopped before the end of their
 recipe to fit the project's time: \pizerofive{} after 15k of its 20k steps and MolmoAct~2 after 30k of its 50k. A
 run is stopped by a step limit set in the recipe, which saves, pushes and ends the run at that step; the number of
 steps that sizes the learning-rate schedule is left at the recipe's value, so the stopped run is identical to the
