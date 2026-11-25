@@ -672,8 +672,92 @@ def scene_three_smolvla():
     return dur, draw
 
 
-SCENES = [scene_title, scene_setup, scene_failure, scene_how, scene_drtc, scene_bench_faults, scene_three,
-          scene_three_smolvla, scene_motion, scene_success, scene_v2, scene_stack, scene_edge, scene_close]
+def scene_simulator():
+    """The DRTC Fault Simulator (presentation/simulator): its clip, the whole 14 s trial in about 12 s."""
+    import cv2
+
+    clip = OUT / "drtc_simulator_clip.mp4"
+    cap = cv2.VideoCapture(str(clip)) if clip.is_file() else None
+    n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) if cap is not None else 0
+    state = {"pos": -1, "img": None}
+    bh = 630
+    bw = int(bh * 1280 / 948)
+
+    def frame_at(i):
+        if cap is None:
+            return None
+        if i < state["pos"] or state["pos"] < 0:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, i)
+            state["pos"] = i - 1
+        while state["pos"] < i:
+            ok, img = cap.read()
+            if not ok:
+                break
+            state["pos"] += 1
+            state["img"] = img
+        if state["img"] is None:
+            return None
+        return Image.fromarray(cv2.cvtColor(cv2.resize(state["img"], (bw, bh)), cv2.COLOR_BGR2RGB))
+
+    def draw(t):
+        fr = Frame(PAPER)
+        header(fr, t, "Method · try it", "The DRTC Fault Simulator")
+        a, dy = rise(t, 0.3)
+        img = frame_at(min(n - 1, int(max(0.0, t - 0.6) * 2.35 * 25))) if n else None
+        if img is not None:
+            fr.rect((M - 4, 300 - 4 + dy, M + bw + 4, 300 + bh + 4 + dy), outline=LINE, radius=18, alpha=a)
+            fr.paste(img, (M, 300 + dy), alpha=a)
+        x = M + bw + 64
+        lines = [("Three clients, one network", "LeRobot as shipped, LeRobot made patient and DRTC, on the same "
+                  "spike, dropped replies and outage."),
+                 ("As shipped gives up", "its 1 s limit ends the run during the dropped replies."),
+                 ("Patient gets stuck", "its one fresh request is lost in the outage."),
+                 ("DRTC keeps moving", "the cooldown replaces each lost request.")]
+        for i, (lead, rest) in enumerate(lines):
+            a2, dy2 = rise(t, 1.0 + 2.2 * i)
+            y = 320 + i * 170 + dy2
+            fr.text((x, y), lead, font("h", 34), INK, a2, width=W - x - M)
+            fr.text((x, y + 50), rest, font("b", 26), MUTED, a2, width=W - x - M)
+        fr.footer("sim")
+        return fr.im
+    return 13.0, draw
+
+
+def scene_e1():
+    """Setup v2, E1 on sorting: the slope chart and the headline numbers (from the report's numbers)."""
+    fig = REPO / "report" / "generated" / "slides" / "fig_v2_e1_sort_one.png"
+    img = Image.open(fig).convert("RGB") if fig.is_file() else None
+    if img is not None:
+        img = img.resize((1180, int(1180 * img.height / img.width)))
+
+    def k(key):
+        return R(f"v2/sort_one/e1/{key}")
+
+    def draw(t):
+        fr = Frame(PAPER)
+        header(fr, t, "Results · setup v2 · E1", "Against a client that waits, DRTC recovers")
+        a, dy = rise(t, 0.3)
+        if img is not None:
+            fr.paste(img, (M, 300 + dy), alpha=a, radius=12)
+        x = M + 1180 + 56
+        items = [(f"{k('mix/act/patient')} → {k('mix/act/drtc')} %", "ACT, stall under the fault mix"),
+                 (f"{k('mix/smolvla/patient')} → {k('mix/smolvla/drtc')} %", "SmolVLA, stall under the fault mix"),
+                 (f"{k('outage/smolvla/patientrec')} vs {k('outage/smolvla/drtcrec')}", "SmolVLA runs recovered after an outage"),
+                 ("Rising latency", "DRTC stalls more: its cooldown gives up replies that are late but coming")]
+        for i, (big, small) in enumerate(items):
+            a2, dy2 = rise(t, 1.0 + 1.4 * i)
+            y = 320 + i * 165 + dy2
+            fr.text((x, y), big, font("h", 40), ALERT if i == 3 else ACC, a2, width=W - x - M)
+            fr.text((x, y + 58), small, font("b", 24), MUTED, a2, width=W - x - M)
+        fr.text((M, 940), "Sorting, replay bench, 8 runs per point: each line is one policy, patient (left) to DRTC "
+                "(right), per fault type.", font("b", 22), MUTED, a)
+        fr.footer("e1")
+        return fr.im
+    return 9.5, draw
+
+
+SCENES = [scene_title, scene_setup, scene_failure, scene_how, scene_simulator, scene_drtc, scene_bench_faults, scene_three,
+          scene_three_smolvla, scene_motion, scene_success, scene_v2, scene_e1, scene_stack, scene_edge, scene_close]
 
 
 def render(preview: bool = False) -> Path:
