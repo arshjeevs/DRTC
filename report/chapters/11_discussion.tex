@@ -49,6 +49,28 @@ moving time. Second, smoothing can lag behind the policy: a causal filter delays
 success to show the cost. Setup~v2 therefore measures the deviation from the policy's plan (M12) and refuses a smoothing
 method that adds more than one degree of it.
 
+\section{Smoothing on a slow link}\label{sec:smoothdisc}
+
+Setup~v2 separated the smoothing methods (Sections~\ref{sec:v2bench} and~\ref{sec:v2e3b}), and three lessons stand out.
+
+\paragraph{Match the method to the source.} Each method removed the source it was designed for and little else: the
+Butterworth filter the jitter and the seams (most of the jerk), adaptive playback the stalls of the policies whose
+chunk is barely longer than their round trip. Which policies need what is decided by the ratio of chunk length to
+round trip, not by the model's size: ACT (100 actions) and \smolvla{} (50) stalled for 3\% and 12--15\% of a faulted
+run, the two GR00T models (16 actions) for about two thirds of it without adaptive playback.
+
+\paragraph{RTC is for inference-bound links.} Guided real-time chunking makes the seam smooth at the source, but it
+asks the server for more work per request. When the round trip is mostly network (about 260~ms of our 300--450~ms),
+the extra time per request costs more stalls than the smoother seam saves: \smolvla's stalls doubled. RTC was chosen
+by the pre-registered rule on a single policy-task pair, and the ablation of E3b shows that the stack is better
+without it. We keep the rule as fixed and report the ablation as its correction; on a link where inference dominates
+the round trip, the trade-off may well reverse.
+
+\paragraph{Smoothness has a price, and it has to be measured.} The full stack moves the arm 0.7 to 2.3\degree{} away
+from the policy's own plan on average. On the bench this cannot cost a task, because the replay robot does not grasp;
+on the robot it might. This is why the deviation (M12) is measured and limited in the stack rule, and why the robot
+experiment E4 is the test that matters for the stack: it is the only one with task success.
+
 \section{Lessons from the implementation}
 
 \begin{itemize}
