@@ -203,10 +203,11 @@ th { font-weight: 600; color: var(--muted); }
       <h2>How close is this to the real thing?</h2>
       <p>The scheduling rules are taken from the project's client code and LeRobot 0.7. The rest is simplified: one
         server that computes one request at a time, a fixed network delay, and the bench's fault shapes. There is no
-        arm, camera or task success in this model. For DRTC under spike + drops + outage, its stall times come out close
-        to those measured on the replay bench:</p>
+        arm, camera or task success in this model. Under spike + drops + outage, its stall times come out close to those
+        measured on the replay bench, for DRTC and for the patient client. The patient client's bench results arrived
+        after this model was built, so that column is a prediction.</p>
       <div class="tbl"><table id="validation">
-        <thead><tr><th>Policy</th><th>Chunk</th><th>Simulator</th><th>Bench</th></tr></thead>
+        <thead><tr><th>Policy</th><th>Chunk</th><th>DRTC sim.</th><th>bench</th><th>Patient sim.</th><th>bench</th></tr></thead>
         <tbody></tbody>
       </table></div>
       <p>Share of a 14 s trial in which the arm stood still, median of 8 trials. Bench: the real client and policy
@@ -222,8 +223,9 @@ th { font-weight: 600; color: var(--muted); }
 (function () {
   "use strict";
   const S = window.DRTCSim, DUR = 14;
-  // Bench medians (drtc__mix stall %, sort_one; results/bench/*/metrics.csv), for the validation table.
-  const BENCH = { act: 3.2, smolvla: 12.1, pi05: 38.5, molmoact2: 55.2, diffusion: 47.9, groot: 64.0, grootn17: 67.6 };
+  // Bench medians under the fault mix, sorting (E1: results/bench/bench_v2_drtc_sort_one/metrics.csv): stall %.
+  const BENCH = { act: [3.3, 50.4], smolvla: [14.6, 60.5], pi05: [35.0, 68.7], molmoact2: [54.9, 67.4],
+                  diffusion: [48.8, 77.9], groot: [64.2, 84.1], grootn17: [68.1, 83.9] };   // [DRTC, patient]
   const LANES = [
     { client: "shipped", title: "LeRobot as shipped", sub: "gives up after 1 s without actions" },
     { client: "patient", title: "LeRobot, patient", sub: "stall limits raised to the whole trial" },
@@ -434,12 +436,15 @@ th { font-weight: 600; color: var(--muted); }
   // validation table: the simulator recomputed here, the bench as measured
   const tb = document.querySelector("#validation tbody");
   for (const [k, p] of Object.entries(S.POLICIES)) {
-    const st = [];
-    for (let n = 1; n <= 8; n++) st.push(S.runTrial({ policy: k, client: "drtc", faults: S.FAULTS.mix, shift: 4 * ((n * 0.6180339887) % 1), seed: n }).stats().stallPct);
-    st.sort((a, b) => a - b);
-    const med = (st[3] + st[4]) / 2;
+    const med = client => {
+      const st = [];
+      for (let n = 1; n <= 8; n++) st.push(S.runTrial({ policy: k, client, faults: S.FAULTS.mix, shift: 4 * ((n * 0.6180339887) % 1), seed: n }).stats().stallPct);
+      st.sort((a, b) => a - b);
+      return (st[3] + st[4]) / 2;
+    };
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${p.name}</td><td>${p.H}</td><td>${med.toFixed(0)}%</td><td>${BENCH[k].toFixed(0)}%</td>`;
+    tr.innerHTML = `<td>${p.name}</td><td>${p.H}</td><td>${med("drtc").toFixed(0)}%</td><td>${BENCH[k][0].toFixed(0)}%</td>` +
+      `<td>${med("patient").toFixed(0)}%</td><td>${BENCH[k][1].toFixed(0)}%</td>`;
     tb.append(tr);
   }
 
