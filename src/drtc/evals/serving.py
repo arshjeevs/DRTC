@@ -210,6 +210,9 @@ def connect(reg: Registry, spec: S.EvalSpec, server: str, models: list[str] | No
         return Connection(server, {m: f"tcp/{address}:{port(spec, m)}" for m in chosen})
     ssh, container = _ssh_target(reg, server)
     sock = Path.home() / ".ssh" / f"lab-{server}.sock"
+    if sock.exists() and subprocess.run(["ssh", "-S", str(sock), "-O", "check", ssh],
+                                        capture_output=True).returncode != 0:
+        sock.unlink()  # a dead connection file left by a reboot or a dropped network: reconnect below
     if not sock.exists():
         print(f"connecting to {server} ({ssh})" + (": type the server password if asked" if server == "h200" else ""),
               flush=True)
