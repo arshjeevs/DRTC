@@ -21,12 +21,11 @@ success.
 
 \begin{table}[htbp]
   \centering
-  \caption{Task success, its 95\% interval, and the trials ended by a fault.}
-  \label{tab:success}
   \small
   \begin{adjustbox}{max width=\textwidth}
   \gentable{tab_main_success}
   \end{adjustbox}
+  \caption{Task success, its 95\% interval, and the trials ended by a fault.}\label{tab:success}
 \end{table}
 
 \subsection{Network faults break the shipped client}
@@ -79,13 +78,12 @@ Table~\ref{tab:tests} collects these comparisons.
 
 \begin{table}[htbp]
   \centering
-  \caption{Comparisons between conditions (Fisher's exact test for success, Mann--Whitney $U$ for the others; values
-           are the medians of the per-trial values, the later condition first).}
-  \label{tab:tests}
   \small
   \begin{adjustbox}{max width=\textwidth}
   \gentable{tab_main_tests}
   \end{adjustbox}
+  \caption{Comparisons between conditions (Fisher's exact test for success, Mann--Whitney $U$ for the others; values
+           are the medians of the per-trial values, the later condition first).}\label{tab:tests}
 \end{table}
 
 \subsection{Recovery after each fault}
@@ -99,13 +97,12 @@ earlier trigger left enough actions in the queue. With smoothing, \groot's recov
 
 \begin{table}[htbp]
   \centering
-  \caption{The first run: recovery after each fault of the mix (recovered runs out of the counted ones, and the median
-           time from the end of the fault until the arm moved again).}
-  \label{tab:mainrecovery}
   \small
   \begin{adjustbox}{max width=\textwidth}
   \gentable{tab_main_recovery}
   \end{adjustbox}
+  \caption{The first run: recovery after each fault of the mix (recovered runs out of the counted ones, and the median
+           time from the end of the fault until the arm moved again).}\label{tab:mainrecovery}
 \end{table}
 
 \subsection{Behaviour over time}
@@ -136,12 +133,11 @@ turnaround by \R{main/groot/drtc/M5}; with smoothing they were \R{main/groot/smo
 
 \begin{table}[htbp]
   \centering
-  \caption{Timing and smoothness, medians over trials. Condition numbers as in Table~\ref{tab:conditions1}.}
-  \label{tab:motion}
   \small
   \begin{adjustbox}{max width=\textwidth}
   \gentable{tab_main_motion}
   \end{adjustbox}
+  \caption{Timing and smoothness, medians over trials. Condition numbers as in Table~\ref{tab:conditions1}.}\label{tab:motion}
 \end{table}
 
 \section{The first benches: each fault on its own}\label{sec:bench}
@@ -168,12 +164,11 @@ conditions as the first run, so they share its limitation: the faulted baseline 
 
 \begin{table}[htbp]
   \centering
-  \caption{Bench results per fault type: runs ended by a fault (out of 8), stall fraction and jerk (medians).}
-  \label{tab:bench}
   \small
   \begin{adjustbox}{max width=\textwidth}
   \gentable{tab_bench}
   \end{adjustbox}
+  \caption{Bench results per fault type: runs ended by a fault (out of 8), stall fraction and jerk (medians).}\label{tab:bench}
 \end{table}
 
 \section{Offline evaluation of the policies}\label{sec:offline}
@@ -190,13 +185,12 @@ criteria do not always agree. On cube in box v1 the order of speed is the same, 
 
 \begin{table}[htbp]
   \centering
-  \caption{Offline evaluation: held-out action error of the served and the last checkpoint (sorting in degrees; cube in
-           box in LeRobot's normalised units), and inference time and peak GPU memory over 200 requests.}
-  \label{tab:offline}
   \small
   \begin{adjustbox}{max width=\textwidth}
   \gentable{tab_offline}
   \end{adjustbox}
+  \caption{Offline evaluation: held-out action error of the served and the last checkpoint (sorting in degrees; cube in
+           box in LeRobot's normalised units), and inference time and peak GPU memory over 200 requests.}\label{tab:offline}
 \end{table}
 
 \begin{figure}[htbp]
@@ -259,40 +253,36 @@ points even without faults and by \R{v2/sort_one/e2/a4_half_chunk_cap/mix/delta}
 
 \begin{table}[htbp]
   \centering
-  \caption{E1 on sorting: \drtc{} against patient upstream (medians over 8 runs; recovered: runs that moved again
-           after each timed fault, summed over the faults of the type).}
-  \label{tab:v2e1sort}
   \small
   \begin{adjustbox}{max width=\textwidth}
   \gentable{tab_v2_e1_sort_one}
   \end{adjustbox}
+  \caption{E1 on sorting: \drtc{} against patient upstream (medians over 8 runs; recovered: runs that moved again
+           after each timed fault, summed over the faults of the type).}\label{tab:v2e1sort}
 \end{table}
 
 \begin{table}[htbp]
   \centering
-  \caption{E1 on cube in box v1, as Table~\ref{tab:v2e1sort}.}
-  \label{tab:v2e1cube}
   \small
   \begin{adjustbox}{max width=\textwidth}
   \gentable{tab_v2_e1_cubebox_v1}
   \end{adjustbox}
+  \caption{E1 on cube in box v1, as Table~\ref{tab:v2e1sort}.}\label{tab:v2e1cube}
 \end{table}
 
 \begin{table}[htbp]
   \centering
-  \caption{E2 on sorting: each ablation against \drtc{} (policies whose median stall fraction rose, and the median
-           change in percentage points).}
-  \label{tab:v2e2sort}
   \small
   \gentable{tab_v2_e2_sort_one}
+  \caption{E2 on sorting: each ablation against \drtc{} (policies whose median stall fraction rose, and the median
+           change in percentage points).}\label{tab:v2e2sort}
 \end{table}
 
 \begin{table}[htbp]
   \centering
-  \caption{E2 on cube in box v1, as Table~\ref{tab:v2e2sort}.}
-  \label{tab:v2e2cube}
   \small
   \gentable{tab_v2_e2_cubebox_v1}
+  \caption{E2 on cube in box v1, as Table~\ref{tab:v2e2sort}.}\label{tab:v2e2cube}
 \end{table}
 
 \subsection{The smoothing methods alone (E3a)}
@@ -336,22 +326,20 @@ about 20\% are not reliable.
 
 \begin{table}[htbp]
   \centering
-  \caption{E3a on sorting: each smoothing method alone on \drtc{} under the fault mix (medians over 8 runs).}
-  \label{tab:v2e3asort}
   \small
   \begin{adjustbox}{max width=\textwidth}
   \gentable{tab_v2_e3a_sort_one}
   \end{adjustbox}
+  \caption{E3a on sorting: each smoothing method alone on \drtc{} under the fault mix (medians over 8 runs).}\label{tab:v2e3asort}
 \end{table}
 
 \begin{table}[htbp]
   \centering
-  \caption{E3a on cube in box v1, as Table~\ref{tab:v2e3asort}.}
-  \label{tab:v2e3acube}
   \small
   \begin{adjustbox}{max width=\textwidth}
   \gentable{tab_v2_e3a_cubebox_v1}
   \end{adjustbox}
+  \caption{E3a on cube in box v1, as Table~\ref{tab:v2e3asort}.}\label{tab:v2e3acube}
 \end{table}
 
 \subsection{The stack on the bench (E3b)}\label{sec:v2e3b}
@@ -400,42 +388,38 @@ less than 13\% of a fault-free run, \smolvla{} excepted (22\%, with RTC).
 
 \begin{table}[htbp]
   \centering
-  \caption{E3b on sorting: the stack against \drtc{} alone under the fault mix, and the stack without faults (medians
-           over 8 runs; jerk: the stack's median over \drtc's; recovery: median over the mix's three faults). Seam: the
-           stack's seam method, RTC where the policy supports it and temporal ensembling otherwise.}
-  \label{tab:v2e3bsort}
   \small
   \begin{adjustbox}{max width=\textwidth}
   \gentable{tab_v2_e3b_sort_one}
   \end{adjustbox}
+  \caption{E3b on sorting: the stack against \drtc{} alone under the fault mix, and the stack without faults (medians
+           over 8 runs; jerk: the stack's median over \drtc's; recovery: median over the mix's three faults). Seam: the
+           stack's seam method, RTC where the policy supports it and temporal ensembling otherwise.}\label{tab:v2e3bsort}
 \end{table}
 
 \begin{table}[htbp]
   \centering
-  \caption{E3b on cube in box v1, as Table~\ref{tab:v2e3bsort}.}
-  \label{tab:v2e3bcube}
   \small
   \begin{adjustbox}{max width=\textwidth}
   \gentable{tab_v2_e3b_cubebox_v1}
   \end{adjustbox}
+  \caption{E3b on cube in box v1, as Table~\ref{tab:v2e3bsort}.}\label{tab:v2e3bcube}
 \end{table}
 
 \begin{table}[htbp]
   \centering
-  \caption{E3b ablations on sorting: the stack without one part, against the full stack under the mix (number of
-           policies in which the jerk or the stalls were higher without the part; median ratio of the jerk, median
-           change of the stall fraction and of the recovery time).}
-  \label{tab:v2e3bablsort}
   \small
   \gentable{tab_v2_e3b_abl_sort_one}
+  \caption{E3b ablations on sorting: the stack without one part, against the full stack under the mix (number of
+           policies in which the jerk or the stalls were higher without the part; median ratio of the jerk, median
+           change of the stall fraction and of the recovery time).}\label{tab:v2e3bablsort}
 \end{table}
 
 \begin{table}[htbp]
   \centering
-  \caption{E3b ablations on cube in box v1, as Table~\ref{tab:v2e3bablsort}.}
-  \label{tab:v2e3bablcube}
   \small
   \gentable{tab_v2_e3b_abl_cubebox_v1}
+  \caption{E3b ablations on cube in box v1, as Table~\ref{tab:v2e3bablsort}.}\label{tab:v2e3bablcube}
 \end{table}
 
 \section{Setup v2 on the robot (E4)}\label{sec:v2robot}
@@ -445,10 +429,9 @@ Table~\ref{tab:e4} gives E4: \smolvla{} and \groot{} on sorting, patient upstrea
 
 \begin{table}[htbp]
   \centering
-  \caption{E4: task success on the robot with Wilson 95\% intervals.}
-  \label{tab:e4}
   \small
   \gentable{tab_e4}
+  \caption{E4: task success on the robot with Wilson 95\% intervals.}\label{tab:e4}
 \end{table}
 
 \section{Baselines of all policies}\label{sec:baselines}
@@ -478,16 +461,14 @@ plan and metrics v1, four models) are archived the same way; they predate setup 
 
 \begin{table}[htbp]
   \centering
-  \caption{Baselines on sorting: task success with Wilson 95\% intervals.}
-  \label{tab:basesort}
   \small
   \gentable{tab_base_sort_one}
+  \caption{Baselines on sorting: task success with Wilson 95\% intervals.}\label{tab:basesort}
 \end{table}
 
 \begin{table}[htbp]
   \centering
-  \caption{Baselines on cube in box v1, as Table~\ref{tab:basesort}.}
-  \label{tab:basecube}
   \small
   \gentable{tab_base_cubebox_v1}
+  \caption{Baselines on cube in box v1, as Table~\ref{tab:basesort}.}\label{tab:basecube}
 \end{table}

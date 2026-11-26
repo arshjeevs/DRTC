@@ -2,28 +2,43 @@
 % text, links, tables and headings stay black.
 
 % --- page and type ---------------------------------------------------------------------------------------------------
-\usepackage[a4paper,left=30mm,right=25mm,top=25mm,bottom=25mm,headheight=15pt]{geometry}
+% Layout of the NIT Calicut final-year project report (Final-Year-Project-Report.docx, 2026-11-26): A4, text about
+% 1 inch from each side, Times New Roman 12 pt, justified, line spacing 1.15, no running header, page number centred.
+\usepackage[a4paper,left=25.4mm,right=25.4mm,top=24mm,bottom=22mm,footskip=12mm]{geometry}
 \usepackage[T1]{fontenc}
 \usepackage{mathptmx}          % Times for text and mathematics
 \usepackage{textcomp}
 \usepackage{microtype}
 \usepackage{setspace}
-\onehalfspacing
+\setstretch{1.15}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{8pt plus 2pt minus 1pt}
 \usepackage{amsmath,amssymb,bm}
 \usepackage{csquotes}
 
 % --- headings, headers ------------------------------------------------------------------------------------------------
 \usepackage{titlesec}
-\titleformat{\chapter}[display]{\normalfont\bfseries}{\large\MakeUppercase{\chaptertitlename}\ \thechapter}{8pt}{\LARGE}
-\titlespacing*{\chapter}{0pt}{0pt}{24pt}
-\titleformat{\section}{\normalfont\large\bfseries}{\thesection}{0.8em}{}
-\titleformat{\subsection}{\normalfont\normalsize\bfseries}{\thesubsection}{0.8em}{}
+% Chapters: "CHAPTER 1" over the title, both centred, bold, 16 pt, upper case. Sections 14 pt bold upper case (1.1),
+% subsections 12 pt bold upper case (1.1.1), subsubsections 12 pt bold (1.1.1.1). Every heading is left in the text's
+% own case and upper-cased here, so the contents list keeps normal case.
+\titleformat{\chapter}[display]{\normalfont\fontsize{16}{20}\selectfont\bfseries\filcenter}%
+  {\MakeUppercase{\chaptertitlename}\ \thechapter}{6pt}{\MakeUppercase}
+\titleformat{name=\chapter,numberless}{\normalfont\fontsize{16}{20}\selectfont\bfseries\filcenter}{}{0pt}%
+  {\MakeUppercase}
+\titlespacing*{\chapter}{0pt}{0pt}{18pt}
+\titleformat{\section}{\normalfont\fontsize{14}{17}\selectfont\bfseries}{\thesection}{0.8em}{\MakeUppercase}
+\titleformat{\subsection}{\normalfont\normalsize\bfseries}{\thesubsection}{0.8em}{\MakeUppercase}
+\titleformat{\subsubsection}{\normalfont\normalsize\bfseries}{\thesubsubsection}{0.8em}{}
+\titlespacing*{\section}{0pt}{14pt}{6pt}
+\titlespacing*{\subsection}{0pt}{12pt}{4pt}
+\titlespacing*{\subsubsection}{0pt}{10pt}{2pt}
+\setcounter{secnumdepth}{3}
+\setcounter{tocdepth}{2}
 \usepackage{fancyhdr}
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{\small\nouppercase{\leftmark}}
 \fancyfoot[C]{\thepage}
-\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrulewidth}{0pt}
 \fancypagestyle{plain}{\fancyhf{}\fancyfoot[C]{\thepage}\renewcommand{\headrulewidth}{0pt}}
 
 % --- figures and tables -----------------------------------------------------------------------------------------------
@@ -33,7 +48,11 @@
 \usetikzlibrary{arrows.meta,positioning,fit,backgrounds,calc,shapes.geometric}
 \usepackage{float}
 \usepackage{placeins}
-\usepackage[font=small,labelfont=bf,labelsep=period]{caption}
+% Captions as in the template: "Fig 3.1 Title" (10 pt, centred) below a figure; "Table 9.1: Title" below a table.
+\usepackage{caption}
+\captionsetup[figure]{name=Fig,labelsep=space,font=footnotesize,labelfont=normalfont,justification=centering}
+\captionsetup[table]{name=Table,labelsep=colon,font=normalsize,labelfont=normalfont,justification=centering,
+  position=below}
 \usepackage{subcaption}
 \usepackage{booktabs,tabularx,multirow,makecell,array,threeparttable,longtable}
 \usepackage{adjustbox}
@@ -78,3 +97,10 @@
 \newcommand{\pizerofive}{$\pi_{0.5}$}
 \newcommand{\degree}{$^\circ$}
 \newcommand{\jerkunit}{$10^3\,^\circ/\mathrm{s}^3$}
+
+% Headings of the front matter and the lists, as in the template.
+\renewcommand{\contentsname}{Contents}
+\renewcommand{\listfigurename}{List of Figures}
+\renewcommand{\listtablename}{List of Tables}
+\renewcommand{\bibname}{References}
+\renewcommand{\appendixname}{Appendix}

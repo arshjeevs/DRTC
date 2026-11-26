@@ -1,27 +1,27 @@
+% Title page, as in the template: title, degree, guide, students, logo, department, institute, date.
 \begin{titlepage}
 \begin{center}
-\vspace*{0.5cm}
-{\LARGE\bfseries \ReportTitle\par}
-\vspace{0.6cm}
-{\large \ReportSubtitle\par}
-\vspace{1.4cm}
-{\large \ReportKind\par}
-\vspace{0.3cm}
-{\normalsize \ReportDegree\par}
-\vspace{1.2cm}
-{\normalsize by\par}
-\vspace{0.3cm}
-{\large \ReportAuthors\par}
-\vspace{1.2cm}
-{\normalsize Under the guidance of\par}
-\vspace{0.2cm}
-{\large \ReportGuide\par}
-\vfill
-\IfFileExists{assets/logo.png}{\includegraphics[height=3cm]{assets/logo.png}\par\vspace{0.6cm}}{}
-{\large \ReportDepartment\par}
-{\large \ReportInstitution\par}
-{\normalsize \ReportPlace\par}
+\vspace*{0.2cm}
+{\fontsize{22}{27}\selectfont\bfseries \ReportTitle\par}
 \vspace{0.4cm}
-{\normalsize \ReportDate\par}
+{\large\bfseries \ReportSubtitle\par}
+\vspace{1.0cm}
+{\itshape \ReportDegreeLine\par}
+\vspace{0.3cm}
+{\large\bfseries \ReportDegree\par}
+\vspace{1.0cm}
+{\fontsize{14}{17}\selectfont\bfseries \ReportGuideName\ (Project Guide)\par}
+{\itshape \ReportGuideTitle, \ReportDepartment\par}
+\vspace{0.9cm}
+{\itshape By\par}
+\vspace{0.3cm}
+\newcommand{\Student}[2]{{\bfseries #1} (Roll No.: #2)\par\vspace{2pt}}
+\ReportStudents{\Student}
+\vfill
+\includegraphics[height=4.2cm]{assets/nitc_logo.png}\par
+\vspace{0.8cm}
+{\fontsize{14}{17}\selectfont \ReportDepartment\par}
+{\fontsize{14}{17}\selectfont \MakeUppercase{\ReportInstitution}\par}
+{\fontsize{14}{17}\selectfont \ReportDate\par}
 \end{center}
 \end{titlepage}

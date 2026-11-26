@@ -21,10 +21,6 @@ and DOT and SFP (not in LeRobot; they would have needed their own plugins).
 
 \begin{table}[htbp]
   \centering
-  \caption{The seven policies. Chunk: actions per inference (executed actions in brackets where fewer are executed).
-           Actions: absolute joint targets, or relative to the current state. RTC: guided real-time chunking in our
-           setup.}
-  \label{tab:policies}
   \small
   \begin{tabularx}{\textwidth}{l X r c c c}
     \toprule
@@ -41,6 +37,9 @@ and DOT and SFP (not in LeRobot; they would have needed their own plugins).
   \end{tabularx}
   \par\smallskip\raggedright\footnotesize $^{a}$ LeRobot turns the RTC prefix off for relative-action GR00T~N1.7
   models: the leftover actions of the previous chunk are tied to the old observation's state.
+  \caption{The seven policies. Chunk: actions per inference (executed actions in brackets where fewer are executed).
+           Actions: absolute joint targets, or relative to the current state. RTC: guided real-time chunking in our
+           setup.}\label{tab:policies}
 \end{table}
 
 \section{Original recipes}\label{sec:recipes}
@@ -52,8 +51,6 @@ the recipe and never change what is learnt.
 
 \begin{table}[htbp]
   \centering
-  \caption{Training recipes.}
-  \label{tab:recipes}
   \small
   \begin{tabularx}{\textwidth}{l X l}
     \toprule
@@ -70,6 +67,7 @@ the recipe and never change what is learnt.
   \end{tabularx}
   \par\smallskip\raggedright\footnotesize $^{b}$ Stopped early for time: \pizerofive{} at 15k and MolmoAct~2 at 30k steps. The
   learning-rate schedule keeps the recipe's length, so the stopped run is the recipe's run up to that step.
+  \caption{Training recipes.}\label{tab:recipes}
 \end{table}
 
 \section{Training infrastructure}\label{sec:training-infra}
@@ -106,8 +104,6 @@ and diffusion models~\cite{valloss2026}, the offline evaluation reports the acti
 
 \begin{table}[htbp]
   \centering
-  \caption{Training status (trained: on the Hub; $^{b}$ stopped early, Table~\ref{tab:recipes}).}
-  \label{tab:training}
   \small
   \begin{tabular}{l c c c}
     \toprule
@@ -122,6 +118,7 @@ and diffusion models~\cite{valloss2026}, the offline evaluation reports the acti
     MolmoAct 2 & -- & trained$^{b}$ & trained$^{b}$ \\
     \bottomrule
   \end{tabular}
+  \caption{Training status (trained: on the Hub; $^{b}$ stopped early, Table~\ref{tab:recipes}).}\label{tab:training}
 \end{table}
 
 Table~\ref{tab:training} gives the state of the trainings: all seven policies are trained on both tasks. The

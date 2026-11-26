@@ -8,8 +8,6 @@ experiments run with it.
 
 \begin{table}[htbp]
   \centering
-  \caption{The three kinds of evaluation.}
-  \label{tab:evalkinds}
   \small
   \begin{tabularx}{\textwidth}{l X X X}
     \toprule
@@ -24,6 +22,7 @@ experiments run with it.
     Metrics & M9, M10 & M1 and M2--M8, M11, M12 & M2--M8, M11, M12 \\
     \bottomrule
   \end{tabularx}
+  \caption{The three kinds of evaluation.}\label{tab:evalkinds}
 \end{table}
 
 \paragraph{Offline.}\label{sec:offline-design} Without a robot, each trained policy predicts a chunk from every tenth
@@ -89,8 +88,6 @@ range), so long trials do not weigh more than short ones. Times are measured on 
 
 \begin{table}[htbp]
   \centering
-  \caption{Metrics (version 3).}
-  \label{tab:metrics}
   \small
   \begin{tabularx}{\textwidth}{l l X}
     \toprule
@@ -112,6 +109,7 @@ range), so long trials do not weigh more than short ones. Times are measured on 
     M12 & Deviation from the plan & Mean distance between the commanded position and the policy's own action \\
     \bottomrule
   \end{tabularx}
+  \caption{Metrics (version 3).}\label{tab:metrics}
 \end{table}
 
 With $T$ the ticks after the first action and $s_t=1$ when tick $t$ has no new action, the stall fraction is

@@ -78,8 +78,6 @@ experiments required. Each was found as a failure on the real robot and checked 
 
 \begin{table}[htbp]
   \centering
-  \caption{Failure modes of \drtc{} on the real setup and our fixes.}
-  \label{tab:fixes}
   \small
   \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{0.21\textwidth} X X}
     \toprule
@@ -96,6 +94,7 @@ experiments required. Each was found as a failure on the real robot and checked 
       delay at the server's prediction steps \\
     \bottomrule
   \end{tabularx}
+  \caption{Failure modes of \drtc{} on the real setup and our fixes.}\label{tab:fixes}
 \end{table}
 
 \section{Smoothing}\label{sec:smoothing}
@@ -113,9 +112,6 @@ method per source (Section~\ref{sec:stackrule}).
 
 \begin{table}[htbp]
   \centering
-  \caption{The smoothing methods. Where: on the server while the chunk is generated, at the moment a chunk is accepted,
-           or on every command.}
-  \label{tab:smoothing}
   \small
   \begin{tabularx}{\textwidth}{l l l X}
     \toprule
@@ -129,6 +125,8 @@ method per source (Section~\ref{sec:stackrule}).
     Resume ramp & fault restarts & every command & all \\
     \bottomrule
   \end{tabularx}
+  \caption{The smoothing methods. Where: on the server while the chunk is generated, at the moment a chunk is accepted,
+           or on every command.}\label{tab:smoothing}
 \end{table}
 
 \paragraph{Butterworth filter.} Every commanded arm position passes through a causal second-order Butterworth low-pass
@@ -192,8 +190,6 @@ use seven fault types (Table~\ref{tab:faults}, Figure~\ref{fig:faultmix}).
 
 \begin{table}[htbp]
   \centering
-  \caption{The fault types, in seconds from the start of a trial before the shift.}
-  \label{tab:faults}
   \small
   \begin{tabularx}{\textwidth}{l X X}
     \toprule
@@ -208,6 +204,7 @@ use seven fault types (Table~\ref{tab:faults}, Figure~\ref{fig:faultmix}).
     loss & each reply lost with probability 0.1, the whole run & random loss; the re-request \\
     \bottomrule
   \end{tabularx}
+  \caption{The fault types, in seconds from the start of a trial before the shift.}\label{tab:faults}
 \end{table}
 
 \paragraph{The fault shift.} With fixed times, every fault would hit the same phase of the task (the reach) in every

@@ -12,8 +12,6 @@ real network (Table~\ref{tab:conditions1}). Conditions 2--4 added the fault mix 
 
 \begin{table}[htbp]
   \centering
-  \caption{The conditions of the first run.}
-  \label{tab:conditions1}
   \small
   \begin{tabularx}{\textwidth}{c l l X}
     \toprule
@@ -25,6 +23,7 @@ real network (Table~\ref{tab:conditions1}). Conditions 2--4 added the fault mix 
     4 & \drtc{} + smoothing + faults & fault mix & as 3, with the Butterworth filter and adaptive playback \\
     \bottomrule
   \end{tabularx}
+  \caption{The conditions of the first run.}\label{tab:conditions1}
 \end{table}
 
 \section{Why it was redesigned}\label{sec:redesign}
@@ -79,8 +78,6 @@ else is exploratory (Section~\ref{sec:stats}).
 
 \begin{table}[htbp]
   \centering
-  \caption{The claims and their primary comparisons.}
-  \label{tab:claims}
   \small
   \begin{tabularx}{\textwidth}{X l l}
     \toprule
@@ -92,6 +89,7 @@ else is exploratory (Section~\ref{sec:stats}).
     Smoothing improves the motion without lowering success & E4: \drtc{} + stack against \drtc, under the mix & M1 \\
     \bottomrule
   \end{tabularx}
+  \caption{The claims and their primary comparisons.}\label{tab:claims}
 \end{table}
 
 \section{Baselines}\label{sec:baselines-design}

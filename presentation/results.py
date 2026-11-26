@@ -54,7 +54,8 @@ def title_page() -> dict[str, str]:
         m = re.search(r"\\newcommand\{\\" + name + r"\}\{%?\s*(.*?)\}\s*\n\\", tex + "\n\\", re.S)
         return m.group(1).strip() if m else ""
 
-    authors = [re.sub(r"\s*\(.*?\)", "", a).strip() for a in re.split(r"\\\\(?:\{\})?", cmd("ReportAuthors"))]
+    authors = re.findall(r"#1\{([^}]*)\}\{[^}]*\}", tex)  # \ReportStudents: #1{Name}{Roll number}
     return {"title": cmd("ReportTitle"), "subtitle": cmd("ReportSubtitle"),
-            "authors": "  ·  ".join(a for a in authors if a), "guide": "Guide: " + cmd("ReportGuide"),
+            "authors": "  ·  ".join(a for a in authors if a),
+            "guide": f"Guide: {cmd('ReportGuideName')}, {cmd('ReportGuideTitle')}",
             "place": f"{cmd('ReportDepartment')}, {cmd('ReportInstitution')}  ·  {cmd('ReportDate')}"}
