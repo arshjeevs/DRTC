@@ -701,7 +701,7 @@ def t_machines(prs, n):
     pi = node2(s, lx + Inches(0.2), y0 + Inches(0.5), nw, nh, "Raspberry Pi 5", "drives the arm and cameras; "
                "the client at 30 Hz", S.series["baseline"])
     lap = node2(s, lx + Inches(0.2), y0 + Inches(1.85), nw, nh, "Laptop  ·  RTX 4060", "recording, development; "
-                "the Pi's gateway", S.series["baseline"])
+                "routes the Pi's traffic", S.series["baseline"])
     cx = lx + zw / 2
     link1 = [line(s, cx, y0 + Inches(0.5) + nh, cx, y0 + Inches(1.85), color=S.ink, weight=Pt(1.5)),
              text(s, cx + Inches(0.1), y0 + Inches(1.5), Inches(1.5), Inches(0.3), "WiFi or cable", size=10,
@@ -722,7 +722,7 @@ def t_machines(prs, n):
     mx0, mw = lx + zw + Inches(0.25), rx - (lx + zw) - Inches(0.5)
     net.append(text(s, mx0, y0 + Inches(0.45), mw - Inches(0.5), Inches(1.4),
                     [[("Campus network", {"bold": True, "color": S.ink, "size": 16})],
-                     [("SSH tunnel to the policy server", {"color": S.muted})],
+                     [("the Pi's own SSH tunnel, routed through the laptop", {"color": S.muted})],
                      [("↑  2 images + 6 joints, 2.9 MB", {"color": S.accent})],
                      [("↓  a chunk of actions", {"color": S.accent})]], size=13, font=S.body, line=1.3,
                     align=PP_ALIGN.CENTER))
@@ -741,8 +741,9 @@ def t_machines(prs, n):
     builds(s, [robot + pi + lap + link1, gpu + a100 + h200 + net, band + svc + down])
     notes(s, "Left, at the robot: the Raspberry Pi drives the arm; the laptop records and is the Pi's network "
              "gateway. Right: the university's two shared GPU servers train and serve the models and run the bench. "
-             "Between them the campus network: every request carries two images and the joints up, and a chunk of "
-             "actions comes back. Below: GitHub keeps the code and the registry; the Hugging Face Hub keeps datasets, "
+             "Between them the campus network. The Pi opens its own SSH tunnel to the server, with its own key; the laptop "
+             "only routes its traffic (hotspot, or the cable for E4). Every request carries two images and the joints "
+             "up, and a chunk of actions comes back. Below: GitHub keeps the code and the registry; the Hugging Face Hub keeps datasets, "
              "models and every trial's record; wandb and Trackio log every training run.")
 
 
