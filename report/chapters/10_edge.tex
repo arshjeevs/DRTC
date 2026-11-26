@@ -51,9 +51,11 @@ every round trip (Figure~\ref{fig:rttparts}). This matters more for \drtc{} than
 round of E4 over WiFi, the first reply of \pizerofive{} took 2.2~s; \drtc's cooldown, set from the replies seen so far,
 gave up the next requests as lost before their slow replies arrived, accepted one reply in total, and the run ended at
 LeRobot's 10~s deadline for new actions. Diffusion Policy failed the same way, and one \smolvla{} trial with the stack
-froze the control loop for 3~s and was stopped because its observation had become too old. E4 therefore runs with the
-Pi connected to the laptop by an Ethernet cable, which shortens the upload; in the first E4 trial over the cable the
-turnaround was 0.6--1.0~s. The difference between WiFi and cable is itself a result: a cooldown tuned on a fast link can
+froze the control loop for 3~s and was stopped because its observation had become too old. E4 therefore ran with the
+Pi connected to the laptop by an Ethernet cable, which shortens the upload. Over the cable the median turnaround fell
+from 0.87 to 0.64~s across the four E4 policies, by 22--33\% for each (GR00T~N1.7 0.97 to 0.76~s, \smolvla{} 0.68 to
+0.46~s, Diffusion Policy 0.81 to 0.59~s, \pizerofive{} 1.06 to 0.80~s; Figure~\ref{fig:edgertt}); the longest
+turnarounds over the cable are the replies delayed on purpose by the injected faults. The difference between WiFi and cable is itself a result: a cooldown tuned on a fast link can
 abandon every reply on a slow one (Section~\ref{sec:limits}).
 
 \chart{fig_edgertt}{Reply turnaround per policy from the Pi, over WiFi and over the cable.}{fig:edgertt}

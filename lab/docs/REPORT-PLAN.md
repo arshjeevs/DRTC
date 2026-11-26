@@ -1,4 +1,4 @@
-# Report plan (approved 2026-11-26; stages 1-4 done, stage 5 waits for E4)
+# Report plan (approved 2026-11-26; complete: stages 1-5 done, E4 on cube in box only)
 
 The final project report: `report/` (LaTeX, NIT Calicut format, builds to `report/report.pdf`).
 Nothing below is built until the user approves this plan.

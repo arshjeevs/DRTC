@@ -1,7 +1,26 @@
 \chapter{Conclusion and Future Work}\label{ch:conclusion}
 
 \section{Conclusion}
-\textslot{written after E4: what was built, what the baselines and E4 show, and the answer to the problem statement.}
+This project set out to measure how much network faults lower the task success of remote inference on a low-cost
+robot arm, how much of it the scheduling of Distributed Real-Time Chunking recovers against a client that simply waits,
+which of its parts are responsible, and how the motion can be kept smooth.
+
+We built a platform on LeRobot~0.7 that records, trains, serves and evaluates policies across a laptop, a
+Raspberry~Pi~5 and two shared GPU servers; recorded three datasets for two tasks; trained seven policies with their
+authors' recipes; ported \drtc's scheduling into LeRobot's runtime with four fixes; implemented six smoothing methods and
+seven network fault types; and evaluated everything with frozen plans and raw records of every trial. With the Pi as
+the robot computer, the seven policies reached 0 to 90\% task success without faults, GR00T~N1.7 and \smolvla{} the
+strongest.
+
+The answers are clear for the setting tested. A short fault mix lowered the success of LeRobot's patient client from
+68 to 13\% on cube in box, because the client stops replacing lost replies. \drtc's scheduling brought success back to
+65\%, as high as without faults, and on the bench it recovered from every fault of every type for seven policies on two
+tasks. Its cooldown carries almost all of this; the latency estimator and the trigger matter little on a steady link,
+and the same cooldown gives up replies that are only slow, so under a rising latency or over a slow WiFi link it does
+worse than waiting. A stack of adaptive playback, temporal ensembling, a Butterworth filter and a resume ramp made the
+motion about three times smoother on the robot without lowering success; RTC, by contrast, cost more in latency than it
+gained in smoothness on this setup. Finally, a policy whose chunk is shorter than its round trip stalls whatever the
+scheduler does: for those policies the playback and the link, not the client, decide the motion.
 
 \section{Future work}
 \begin{itemize}

@@ -1,7 +1,7 @@
 \chapter{Discussion}\label{ch:discussion}
 
 \section{Introduction}
-This chapter examines what the results mean, what they do not show, and what was learned building the system. It discusses task-dependent baseline results and why short-chunk policies like GR00T~N1.7 run dry whatever the client does, alongside what adaptive playback can and cannot do. The E4 discussion on what faults cost, what \drtc{} wins back, and what the stack adds will be written when the E4 results are complete. It concludes with four implementation lessons and limitations including sample size, shared servers and simulated faults.
+This chapter examines what the results mean, what they do not show, and what was learned building the system. It discusses task-dependent baseline results and why short-chunk policies like GR00T~N1.7 run dry whatever the client does, alongside what adaptive playback can and cannot do. It then discusses what the faults cost on the robot, what \drtc{} wins back and what the stack adds. It concludes with four implementation lessons and limitations including sample size, shared servers and simulated faults.
 
 \section{What the baselines show}
 The baselines (Section~\ref{sec:baselines}) show, first, that size and recency do not order the policies. GR00T~N1.7
@@ -16,8 +16,24 @@ baseline trial was ended by a fault, so every failure was the policy's own, whic
 against which the faults of E4 are measured.
 
 \section{\drtc{} on the robot}
-\resultsslot{the discussion of E4 (what the faults cost, what \drtc{} wins back, what the stack adds), written when
-the E4 results are complete.}
+The robot experiment answers the problem statement for one task and four policies. \textbf{What the faults cost:} a
+fault mix of about 3.5~s in a 30~s trial lowered the patient client's success from 68 to 13\%, not because the policies
+failed but because the client did: after a lost reply it sends one fresh request, and when that is lost too it waits
+until LeRobot's start-up deadline ends the run (32 of 40 faulted runs). \textbf{What \drtc{} wins back:} all of it,
+within the intervals (65\%), because its cooldown replaces a lost reply with a request carrying a fresh observation;
+the arm moved again after the outage in 31 of 40 trials, about a second after the link returned. The bench predicted
+this (E1: \drtc{} recovered from every fault, the patient client from about a fifth
+to a half), and E2 located it in the
+cooldown. \textbf{What the stack adds:} smoother motion, about three times lower jerk, at no cost in success, and fewer
+stalls for the short-chunk policies through adaptive playback; the price is a deviation of about 1--2\degree{} from the
+policy's own actions and, for \pizerofive, a slower recovery after the latency spike.
+
+Two qualifications matter. With ten trials per policy, only one per-policy comparison survives the pre-registered Holm
+correction (GR00T~N1.7, \drtc{} against faults); the pooled effects are large but exploratory. And the benefit depends
+on the policy. \pizerofive{}, whose 50-action chunk outlasts short faults, lost least under faults (8 to 4) and gained
+least from \drtc{} (4 to 6), as Figure~\ref{fig:whendrtc} predicts; the short-chunk GR00T~N1.7 and Diffusion Policy
+lost almost everything and gained the most. \drtc{} matters most where a policy cannot ride out a fault on its own
+queue.
 
 \section{Short-chunk policies and the round trip}\label{sec:shortchunk}
 A policy can only keep the arm moving if a new chunk arrives before the current one is used up, so the chunk must last
@@ -55,7 +71,7 @@ the line.
 \item \textbf{Sample size.} Ten trials per cell give wide intervals (a 50\% success rate over ten trials has a 95\%
       interval of about 24--76\%), so only large differences in success are significant. The robot plans can grow to
       twenty trials.
-\item \textbf{Scope on the robot.} The robot DRTC experiment covers two tasks and four policies; the bench covers two
+\item \textbf{Scope on the robot.} The robot \drtc{} experiment covers one task (cube in box) and four policies; the bench covers two
       tasks and seven policies, without task success.
 \item \textbf{Operator judgement.} Success is judged by the operator, who knows the condition; the success rule is
       written down before the first trial to limit this.
@@ -73,5 +89,6 @@ the line.
 This chapter discussed what the baselines show: neither size nor recency orders the policies, the ranking depends on
 the task, and only large gaps are clear with ten trials. It explained why the short-chunk GR00T policies run dry
 whatever the client does, since their chunk is shorter than their round trip from the Pi, and why adaptive playback
-or a shorter round trip, not the scheduler, is the remedy there. It collected the lessons of building the system and
-its limitations; the discussion of \drtc{} on the robot follows the E4 results.
+or a shorter round trip, not the scheduler, is the remedy there. On the robot, the faults cost the patient client most of its
+successes, \drtc{} recovered them through its cooldown, and the stack made the motion smoother without lowering
+success. It collected the lessons of building the system and its limitations.

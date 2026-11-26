@@ -42,7 +42,8 @@ GR00T~N1.7, ACT, Diffusion Policy, \pizerofive{} and MolmoAct~2), eight runs per
 E1 and E2 share one plan per task (52 conditions), so every ablation is compared with \drtc{} inside the same sessions.
 
 \paragraph{The robot experiment E4} runs the four policies with the best robot baselines (GR00T~N1.7, \smolvla,
-Diffusion and \pizerofive, Section~\ref{sec:baselines}) on both tasks, ten trials per condition (160 trials per task),
+Diffusion and \pizerofive, Section~\ref{sec:baselines}) on cube in box v1, ten trials per condition (160 trials; a
+plan for sorting was prepared but not run),
 on the real network: upstream patient without faults and under the mix, \drtc{} under the mix, and \drtc{} with the
 stack under the mix. The no-fault condition is kept inside E4, although the baselines ran the same condition, so that
 every comparison stays within one interleaved plan. The stack on the robot is the stack without RTC (adaptive playback,
@@ -90,8 +91,8 @@ baseline of the first two policies is optional.
       bench condition and enough for \drtc's cooldown to abandon every reply.
 \item \textbf{Layouts.} One layout per round, rotated over the rounds as in the recording.
 \item \textbf{Warm-up.} Plans with an RTC condition begin with one uncounted warm-up round (Section~\ref{sec:rtcmethod}).
-\item \textbf{Growth.} When there is time, in this order: E4 to 20 trials; E4 with the RTC stack for \smolvla{} and
-      \pizerofive; the baselines to 20 trials; robot runs of a bench fault type that behaved unexpectedly.
+\item \textbf{Growth.} When there is time, in this order: E4 on sorting (its plan is frozen); E4 to 20 trials; E4 with
+      the RTC stack for \smolvla{} and \pizerofive; the baselines to 20 trials; robot runs of a bench fault type that behaved unexpectedly.
 \end{itemize}
 
 \section{Summary}

@@ -297,8 +297,9 @@ def charts(st: dict, b) -> None:
                    bbox_to_anchor=(0.5, 1.0), ncol=4, handlelength=1.0)
         b.save(fig, "fig_e4_success", st)
 
-        cols = [("M2_stall_pct", "stall (%)"), ("M7_jerk_k", "jerk"), ("M11_recovery_outage_s", "recovery after the outage (s)")]
-        fig, axes = plt.subplots(len(have), 3, figsize=(st["width"], st["width"] * 0.34 * len(have)), squeeze=False)
+        cols = [("M2_stall_pct", "stall (% of the run)"), ("M7_jerk_k", "jerk ($10^3$ deg/s$^3$)"),
+                ("M11_recovery_outage_s", "recovery after the outage (s)")]
+        fig, axes = plt.subplots(len(have), 3, figsize=(st["width"], st["width"] * 0.38 * len(have)), squeeze=False)
         for r_i, (t, m) in enumerate(have.items()):
             for c_i, (col, lab) in enumerate(cols):
                 ax = axes[r_i, c_i]
@@ -309,11 +310,62 @@ def charts(st: dict, b) -> None:
                         if g.empty:
                             continue
                         x = i + (j - 1.5) * 0.2
-                        ax.scatter([x], [g.median()], s=st["dot"], color=b.COLORS[ckey], zorder=3)
+                        ax.scatter([x], [g.median()], s=st["dot"] * 1.6, color=b.COLORS[ckey], edgecolor="white",
+                                   lw=0.6, zorder=3)
                 ax.set_xticks(range(len(E4_POLICIES)))
                 ax.set_xticklabels([names[p].replace(" ", "\n", 1) for p in E4_POLICIES], fontsize=st["font"] * 0.75)
-                ax.set_title(f"{dict(TASKS)[t]}: {lab}", fontsize=st["font"] * 0.85)
+                ax.set_title(lab, fontsize=st["font"] * 0.85)
+                ax.set_ylim(bottom=0)
+                ax.grid(axis="x", visible=False)
+        from matplotlib.lines import Line2D
+        fig.legend(handles=[Line2D([], [], marker="o", ls="", color=b.COLORS[c], label=lab) for _, c, lab in E4_CONDS],
+                   loc="lower center", bbox_to_anchor=(0.5, 1.0), ncol=4, handletextpad=0.3)
+        fig.subplots_adjust(wspace=0.35)
         b.save(fig, "fig_e4_motion", st)
+
+    # E4 tables (report only): success per policy and condition, and the motion medians, condition order 1-4
+    if have and st["ext"] == "pdf":
+        names_tex = b.POLICY_NAMES
+        for t, m in have.items():
+            rows = []
+            for p in E4_POLICIES:
+                cells = [names_tex[p]]
+                for cond, _, _ in E4_CONDS:
+                    g = m[(m.model == model_name(p, t)) & (m.condition == cond)]
+                    k, n, f = int((g["M1_success"] == 1).sum()), len(g), int(g["M1f_fault"].sum())
+                    cells.append(f"{k}/{n}" + (f" ({f})" if f else ""))
+                rows.append(" & ".join(cells) + " \\\\")
+            cells = ["\\textbf{All four}"]
+            for cond, _, _ in E4_CONDS:
+                g = m[m.condition == cond]
+                k, n, f = int((g["M1_success"] == 1).sum()), len(g), int(g["M1f_fault"].sum())
+                lo, hi = b.wilson(k, n)
+                cells.append(f"\\textbf{{{k}/{n}}} ({100*lo:.0f}--{100*hi:.0f}\\%)")
+            rows += ["\\midrule", " & ".join(cells) + " \\\\"]
+            b.write(f"tab_e4_wide_{t}.tex", "\n".join([
+                "\\begin{tabular}{l cccc}", "\\toprule",
+                "Policy & 1 Patient LeRobot & 2 + faults & 3 \\drtc{} + faults & 4 \\drtc{} + stack + faults \\\\",
+                "\\midrule", *rows, "\\bottomrule", "\\end{tabular}", ""]))
+            rows = []
+            for p in E4_POLICIES + ["all"]:
+                cells = [names_tex[p] if p != "all" else "\\textbf{All four}"]
+                for col, fmt in (("M2_stall_pct", "{:.0f}"), ("M7_jerk_k", "{:.0f}"), ("M11_recovery_outage_s", "{:.2f}")):
+                    for cond, _, _ in E4_CONDS:
+                        if col == "M11_recovery_outage_s" and cond == "upstream_patient__none":
+                            continue
+                        g = m[m.condition == cond] if p == "all" else m[(m.model == model_name(p, t)) & (m.condition == cond)]
+                        v = g[col].dropna()
+                        cells.append(fmt.format(v.median()) if len(v) else "--")
+                if p == "all":
+                    rows.append("\\midrule")
+                rows.append(" & ".join(cells) + " \\\\")
+            b.write(f"tab_e4_motion_{t}.tex", "\n".join([
+                "\\begin{tabular}{l cccc cccc ccc}", "\\toprule",
+                " & \\multicolumn{4}{c}{Stall (\\% of the run)} & \\multicolumn{4}{c}{Jerk ($10^3\\,^\\circ$/s$^3$)} & "
+                "\\multicolumn{3}{c}{Recovery after the outage (s)} \\\\",
+                "\\cmidrule(lr){2-5}\\cmidrule(lr){6-9}\\cmidrule(lr){10-12}",
+                "Policy & 1 & 2 & 3 & 4 & 1 & 2 & 3 & 4 & 2 & 3 & 4 \\\\", "\\midrule", *rows,
+                "\\bottomrule", "\\end{tabular}", ""]))
 
 
 if __name__ == "__main__":

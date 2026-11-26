@@ -16,7 +16,10 @@ implemented six smoothing methods and seven kinds of network fault, and built an
 seeded rounds, raw records of every trial and primary comparisons named in advance. On the robot, with the Raspberry Pi
 as the robot computer, the baselines of the seven policies range from 0 to 90\% task success; GR00T~N1.7 and \smolvla{}
 reach 90\% on sorting, and Diffusion Policy 90\% on cube in box.
-\textslot{the E4 result in two sentences, when the runs are complete.}
+On the replay bench, \drtc{} recovered from every injected fault for all seven policies on both tasks, where the
+waiting client often did not, and its cooldown carried almost all of the benefit. On the robot, a short fault mix
+lowered the success of LeRobot's waiting client on cube in box from 68 to 13\%; \drtc{} restored it to 65\%, and a
+smoothing stack without RTC kept it (75\%) while making the motion about three times smoother.
 
 \vspace{1em}
 \noindent\textbf{Keywords:} robot learning, vision-language-action models, remote inference, action chunking,
