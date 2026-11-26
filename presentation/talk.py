@@ -481,7 +481,7 @@ def t_e4(prs, n):
     x = M + Inches(8.1)
     sa = stat(s, x, TOP, Inches(3.4), "68 → 13 %", "the fault mix breaks LeRobot's client", color=S.alert)
     sb = stat(s, x, TOP + Inches(1.5), Inches(3.4), "→ 65 %", "DRTC restores it")
-    sc = stat(s, x, TOP + Inches(3.0), Inches(3.4), "75 %, 3× smoother", "with the stack",
+    sc = stat(s, x, TOP + Inches(3.0), Inches(3.4), "→ 75 %", "with the stack, and about 3× smoother",
               color=S.series["smooth"])
     builds(s, [per[0], per[1] + sa, per[2] + sb, per[3] + sc])
     notes(s, "160 robot trials. With the Holm correction only GR00T N1.7's DRTC-vs-faults difference is significant "
