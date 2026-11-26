@@ -103,11 +103,11 @@ reference condition as E4), ten trials each. The baseline plans start with the f
 \section{Protocol}\label{sec:protocol}
 
 \begin{itemize}
-\item \textbf{Machines.} The laptop is the robot computer of every official trial, and one model server serves a whole
-      plan where possible; every trial records its robot computer and server, and the timing metrics are never
-      averaged across them.
-\item \textbf{Sessions.} One session at a time, from one laptop; each session pulls the results store first and pushes
-      at the end.
+\item \textbf{Machines.} One robot computer and one model server serve a whole plan where possible: the robot
+      baselines ran from the Raspberry Pi~5 with every model on the H200; every trial records its robot computer and
+      server, and the timing metrics are never averaged across them.
+\item \textbf{Sessions.} One session at a time, from one robot computer; each session pulls the results store first
+      (or runs offline, as the Pi did over its slow WiFi) and pushes at the end.
 \item \textbf{Layouts.} One layout per round, rotated over the rounds as in the recording.
 \item \textbf{Warm-up.} Plans with an RTC condition begin with one uncounted warm-up round (Section~\ref{sec:rtcmethod}).
 \item \textbf{Growth.} When there is time, in this order: E4 to 20 trials; the robot DRTC experiment on cube in box v1;

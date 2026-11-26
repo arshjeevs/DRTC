@@ -453,8 +453,28 @@ Table~\ref{tab:e4} gives E4: \smolvla{} and \groot{} on sorting, patient upstrea
 
 \section{Baselines of all policies}\label{sec:baselines}
 
-Tables~\ref{tab:basesort} and~\ref{tab:basecube} give the baseline of every trained policy on the robot (patient
-upstream, normal network, ten trials each). The plans grow to \pizerofive{} and MolmoAct~2 by adding them to the frozen plans.
+Tables~\ref{tab:basesort} and~\ref{tab:basecube} give the baseline of all seven trained policies on the robot:
+patient upstream LeRobot, a normal network, ten trials per policy and task, the Raspberry Pi~5 as the robot computer
+and every model served from the H200 (70 trials per task, 2026-11-26).
+
+On sorting, GR00T~N1.7 and \smolvla{} lead (\R{base_sort_one/grootn17/baseline/M1} each), ahead of Diffusion (\R{base_sort_one/diffusion/baseline/M1}), ACT
+(\R{base_sort_one/act/baseline/M1}) and \pizerofive{} (\R{base_sort_one/pi05/baseline/M1}). On cube in box,
+Diffusion is best (\R{base_cubebox_v1/diffusion/baseline/M1}), then GR00T~N1.7
+(\R{base_cubebox_v1/grootn17/baseline/M1}), \pizerofive{} and \smolvla{} (\R{base_cubebox_v1/pi05/baseline/M1}
+each). GR00T~N1.7 and \smolvla{} are the only policies at 60\% or more on both tasks. \groot{} is weak on both
+(\R{base_sort_one/groot/baseline/M1} and \R{base_cubebox_v1/groot/baseline/M1}): its successor N1.7, trained on the
+same data, is far better. No trial on either task was ended by a fault, so every failure
+is the policy's own. With ten trials the 95\% intervals are wide (about $\pm$25 points), so only large gaps, such as
+N1.7 against N1.5, are clear.
+
+MolmoAct~2 (a LoRA fine-tune, the only one) never succeeded: 0 of 20 trials. We treat this fine-tune as broken rather
+than as a measure of the model, and keep it in the tables as recorded.
+
+\paragraph{A discarded run.} The first cube-in-box run (three sessions, 70 trials) was discarded before analysis:
+its success labels were entered by another person and are not reliable. It is archived unchanged in the results store
+(\texttt{evals/\_archive/cubebox\_v1\_baseline/}, with the reason), and the eval was run again from scratch;
+Table~\ref{tab:basecube} is that second run. Two older sorting sessions from 2026-11-20 (23 trials under the first
+plan and metrics v1, four models) are archived the same way; they predate setup v2 and are not comparable.
 
 \begin{table}[htbp]
   \centering
