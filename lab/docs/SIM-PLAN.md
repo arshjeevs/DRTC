@@ -1,4 +1,4 @@
-# Stage 3: task success in simulation (proposal, waiting for a go/no-go)
+# Stage 3: task success in simulation (smoke test passed 2026-11-26)
 
 Research by Gemini workers on 2026-11-26 (LeRobot 0.7 source, Hugging Face Hub), checked here where it matters.
 
@@ -43,3 +43,25 @@ bench.
 2. If it works: the extra in pyproject, three conditions, a small eval plan (frozen like the others), laptop runs for
    SmolVLA; H200 for GR00T N1.7 and π0.5.
 3. Report section and a video clip of the simulated arm under faults.
+
+## Smoke test (2026-11-26, laptop RTX 4060): passed
+
+- **Install:** a separate environment (`~/Projects/drtc-sim/.venv`) with the project's locked packages plus
+  `hf-libero`: no conflicts (torch 2.14.1+cu130, numpy 2.2.6, MuJoCo 3.8.1, robosuite 1.4.0). LIBERO asks two setup
+  questions on first use (answer N). The project's `.venv` is untouched.
+- **Serving:** `lerobot-policy-server --config_path=sim/smolvla_libero_server.yaml`. The checkpoint expects
+  `camera1`/`camera2` at 256x256 and an 8-number state; the LIBERO env is set to match
+  (`camera_name_mapping`, `observation_height/width=256`).
+- **Running:** `MUJOCO_GL=egl python sim/smoke.py <remote|shipped|patient|drtc> <none|mix>` (one 14 s episode of
+  libero_spatial task 0 at 20 Hz; success read from the env).
+- **Result, one episode per cell (a smoke test, not a result):**
+
+| Client | No faults | Spike + drops + outage (bench timing, 250 ms latency) |
+|---|---|---|
+| LeRobot remote client | success at 3.9 s | (no fault injector in the plain client) |
+| LeRobot as shipped (our engine, upstream rules) | success at 3.8 s | run ended at the first fault (starvation grace) |
+| LeRobot, patient | success at 3.9 s | run ended (stuck after a lost request; 10 s startup deadline) |
+| DRTC | success at 3.8 s | **success at 4.0 s** |
+
+Next, with your OK: a small frozen eval (the three clients x none/mix/drops/outage x 10 LIBERO tasks x a few seeds),
+SmolVLA on the laptop first; then GR00T N1.7 (16-action chunks) on the H200.
