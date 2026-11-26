@@ -10,11 +10,9 @@
 \node[dev=robotline] (leader) at (0,4.2) {{\bfseries Leader arm}\\ SO-101 (teleoperation)};
 \node[dev=robotline] (follower) at (0,2.7) {{\bfseries Follower arm}\\ SO-101, 6 motors};
 \node[dev=robotline] (wrist) at (0,1.2) {{\bfseries Wrist camera}\\ USB, on the gripper};
-\node[dev=robotline] (phone) at (0,-0.3) {{\bfseries Phone}\\ scene camera (USB)};
-\node[dev=robotline, text width=30mm, minimum height=16mm] (pi) at (4.4,2.7) {{\bfseries Raspberry Pi 5}\\ robot
-  computer: control loop at 30~Hz, \drtc, smoothing};
-\node[dev=robotline, text width=30mm, minimum height=16mm] (laptop) at (4.4,0.0) {{\bfseries Laptop}\\ RTX 4060;
-  recording, robot computer, hotspot and gateway};
+\node[dev=robotline] (phone) at (0,-0.3) {{\bfseries Phone}\\ scene camera, USB};
+\node[dev=robotline, text width=34mm, minimum height=16mm] (pi) at (4.4,3.2) {{\bfseries Raspberry Pi 5}\\ robot computer (official trials): 30~Hz loop, \drtc, smoothing};
+\node[dev=robotline, text width=34mm, minimum height=16mm] (laptop) at (4.4,-0.4) {{\bfseries Laptop}\\ RTX 4060; recording, development; the Pi's gateway};
 \foreach \d in {leader, follower, wrist, phone} \draw[lnk] (\d.east) -- (\d.east-|1.95,0) |- (pi.west);
 \node[lab] at (2.25,4.55) {USB};
 \draw[lnk, very thick] (pi.south) -- node[lab, right] {Ethernet cable (E4)\,/\,WiFi} (laptop.north);
@@ -34,5 +32,6 @@
 \node[dev=purpleline, text width=40mm] (hub) at (9.0,5.4) {{\bfseries Hugging Face Hub}\\ datasets, models,\\ results store};
 \node[dev=purpleline, text width=40mm] (wandb) at (14.2,5.4) {{\bfseries Weights \& Biases}\\ and Trackio: training logs};
 \draw[lnk, dashed] (hub.south) -- (net.north); \draw[lnk, dashed] (h200.north) -- (wandb.south);
+\draw[lnk, dashed] (a100.east) -- ++(4mm,0) |- (wandb.east);
 \draw[lnk, dashed] (hub.east) -- (wandb.west);
 \end{tikzpicture}

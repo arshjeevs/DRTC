@@ -40,12 +40,14 @@ turnarounds. It keeps one request in flight and has two give-up limits:
 \item the \textbf{starvation grace} (1~s by default): when the queue has been empty this long, the run is ended with a
       fault; when the queue runs dry, the request in flight is forgotten, so its late reply is discarded; and
 \item the \textbf{request deadline} (5~s by default): a request not answered in this time ends the run with a fault.
-      The client never sends a second request for a lost reply.
+      When the queue runs dry the client forgets the request in flight and sends one fresh request; it never sends
+      another for a lost reply.
 \end{itemize}
 We evaluate the client in two settings (Chapter~\ref{ch:design}). \textbf{As shipped}, with both defaults. And
 \textbf{patient}, with both limits raised to the whole trial: each is a single setting, so this is upstream at its best
-under faults, and the fair baseline for \drtc. Patient upstream never ends a run by itself; when a reply is lost it
-waits, holding the arm, because it has no way to replace the reply.
+under faults, and the fair baseline for \drtc. Patient upstream does not end a run at its own limits. When a reply is lost it holds the arm; when the
+queue runs dry it sends one fresh request, and if that reply is lost too it sends nothing more, so LeRobot's 10~s
+start-up deadline ends the run (Figure~\ref{fig:flowupstream}).
 
 \diagram{flowupstream}{LeRobot's client: what it does when a reply is late or lost.}{fig:flowupstream}
 

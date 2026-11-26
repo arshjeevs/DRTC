@@ -8,7 +8,7 @@
   \fill[ink2!35] (0.6+\up,\y-0.3) rectangle ++(0.6,0.6);
   \fill[serverline!55] (1.2+\up,\y-0.3) rectangle ++(2.6,0.6);
   \fill[greenline!45] (3.8+\up,\y-0.3) rectangle ++(0.5,0.6);}
-\foreach \x/\y/\c/\t in {0/-1.2/robotline!35/{encode on the robot computer}, 5/-1.2/purpleline!45/{upload of the two images},
+\foreach \x/\y/\c/\t in {0/-1.2/robotline!35/{prepare the observation (images uncompressed)}, 5/-1.2/purpleline!45/{upload of the two images},
   10/-1.2/ink2!35/{tunnel to the server}, 0/-1.8/serverline!55/{queue and inference on the GPU}, 5/-1.8/greenline!45/{chunk back}} {
   \fill[\c] (\x,\y-0.17) rectangle ++(0.35,0.35); \node[anchor=west, font=\scriptsize] at (\x+0.4,\y) {\t};}
 \node[font=\scriptsize, text=ink2] at (5,2.3) {schematic: the upload is the part the cable shortens; measured

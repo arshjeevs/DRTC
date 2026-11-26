@@ -5,12 +5,10 @@
              font=\footnotesize},
   arr/.style={-{Latex[length=2.2mm]}, very thick, ink2}]
 \node[st=purpleline] (rec) {{\bfseries Recipe + dataset}\\[2pt] the authors' published settings; a pinned dataset revision};
-\node[st=greenline, right=of rec] (prep) {{\bfseries Preparation}\\[2pt] once per dataset: download, convert, statistics};
-\node[st=serverline, right=of prep] (train) {{\bfseries \texttt{lab train}}\\[2pt] on the A100 or the H200, in tmux,
-  sharing the GPU};
-\node[st=serverline, right=of train] (log) {{\bfseries Logging}\\[2pt] Weights \& Biases and Trackio (required)};
-\node[st=purpleline, right=of log] (hub) {{\bfseries Hub}\\[2pt] every checkpoint pushed; the model card names the
-  recipe};
+\node[st=greenline, right=of rec] (prep) {{\bfseries Preparation}\\[2pt] once per dataset revision: download; relative-action statistics for GR00T N1.7 and $\pi_{0.5}$};
+\node[st=serverline, right=of prep] (train) {{\bfseries \texttt{lab train}}\\[2pt] on the A100 or the H200; runs share a GPU; a job queue};
+\node[st=serverline, right=of train] (log) {{\bfseries Logging}\\[2pt] Weights \& Biases and Trackio (required); held-out loss about 20 times};
+\node[st=purpleline, right=of log] (hub) {{\bfseries Hub}\\[2pt] root: the checkpoint with the lowest held-out loss; the last one kept};
 \node[st=greenline, right=of hub] (frz) {{\bfseries Frozen}\\[2pt] an evaluation pins the model to one Hub commit};
 \foreach \a/\b in {rec/prep, prep/train, train/log, log/hub, hub/frz} \draw[arr] (\a) -- (\b);
 \end{tikzpicture}

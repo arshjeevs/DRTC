@@ -7,7 +7,7 @@
   ttl/.style={font=\small\bfseries, text=#1, anchor=south west}]
 % the lab command
 \node[box=greenline, text width=13mm] (c1) {record};
-\foreach \t [count=\i from 2] in {trim, train, serve, eval run, eval report, bench, edge setup}
+\foreach \t [count=\i from 2] in {data, prepare, train, serve, run, eval, results}
   {\pgfmathtruncatemacro{\p}{\i-1}\node[box=greenline, text width=13mm, right=of c\p] (c\i) {\t};}
 \node[lay=greenline, fit=(c1)(c8)] (cmd) {};
 \node[ttl=greenline] at ([yshift=0.5mm]cmd.north west) {The \texttt{lab} command};

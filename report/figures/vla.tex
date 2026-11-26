@@ -10,7 +10,7 @@
 % inputs
 \node[inp] (wrist) {{\bfseries Wrist camera}\\ \footnotesize image};
 \node[inp, right=of wrist] (scene) {{\bfseries Scene camera}\\ \footnotesize image};
-\node[inp, right=of scene] (text) {{\bfseries Instruction}\\ \footnotesize \enquote{put the green cube in the box}};
+\node[inp, right=of scene] (text) {{\bfseries Instruction}\\ \footnotesize \enquote{Pick up the green cube and put it inside the box.}};
 \node[inp, right=of text] (state) {{\bfseries Joint state}\\ \footnotesize 6 joint angles};
 % encoders
 \node[blk=purpleline, text width=64mm, minimum height=14mm, below=7mm of wrist.south west, anchor=north west] (venc)
@@ -50,7 +50,7 @@
   yshift=-4mm]cs) {{\bfseries Robot}\\ \footnotesize executes one action per tick at 30~Hz};
 \draw[arr] ([xshift=74mm, yshift=-4mm]cs) -- (robot.west);
 \draw[arr, dashed] (robot.east) -- ++(32mm,0) |- node[pos=0.25, right, font=\footnotesize, align=left, text=ink2]
-  {next observation,\\ while the chunk\\ is still running} (state.east);
+  {the next observation\\ (images and joints),\\ while the chunk\\ is still running} (state.east);
 \node[note, anchor=north west] at ([yshift=-17mm]cs) {The whole model is fine-tuned on our demonstrations with its
   authors' recipe (Chapter~\ref{ch:policies}).};
 \end{tikzpicture}

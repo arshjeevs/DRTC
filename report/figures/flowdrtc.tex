@@ -10,7 +10,7 @@
 \node[dec, below=of cool] (rep) {reply before the cooldown ends?};
 \node[st, right=14mm of rep] (merge) {merge (last write wins); update the latency estimate};
 \node[st, below=of rep] (re) {give the request up; send a fresh observation};
-\node[st, right=14mm of re] (hold) {queue empty meanwhile: hold the arm, never end the run};
+\node[st, right=14mm of re] (hold) {queue empty meanwhile: hold the arm (the run ends only if no reply comes within LeRobot's 10~s deadline)};
 \draw[arr] (trig) -- (cool); \draw[arr] (cool) -- (rep);
 \draw[arr] (rep) -- node[lab, above]{yes} (merge); \draw[arr] (rep) -- node[lab, left]{no} (re);
 \draw[arr] (re.west) -- ++(-6mm,0) |- (cool.west);

@@ -4,15 +4,18 @@
   st/.style={draw=#1, thick, rounded corners=3pt, fill=white, align=center, text width=24mm, minimum height=21mm,
              font=\footnotesize},
   arr/.style={-{Latex[length=2.2mm]}, very thick, ink2}]
-\node[st=robotline] (tele) {{\bfseries Teleoperation}\\[2pt] a person moves the leader arm; the follower copies it};
-\node[st=robotline, right=of tele] (rec) {{\bfseries Recording}\\[2pt] both cameras and the joint states at 30~fps,
-  one episode per demonstration};
-\node[st=robotline, right=of rec] (rev) {{\bfseries Review}\\[2pt] bad episodes deleted and recorded again};
-\node[st=greenline, right=of rev] (trim) {{\bfseries Trimming}\\[2pt] idle start and end cut automatically; raw copy
-  kept};
-\node[st=purpleline, right=of trim] (split) {{\bfseries Split and version}\\[2pt] seeded held-out episodes; pinned
-  Hub revision};
-\foreach \a/\b in {tele/rec, rec/rev, rev/trim, trim/split} \draw[arr] (\a) -- (\b);
-\draw[arr] (rev.north) -- ++(0,5mm) -| node[pos=0.25, above, font=\scriptsize]{re-record} (rec.north);
-\node[below=3mm of split, font=\scriptsize, text=ink2, align=center] {Hugging Face Hub;\\ \texttt{recorded.yaml} in git};
+\node[st=robotline] (tele) {{\bfseries Teleoperation}\\[2pt] the operator moves the leader arm; the follower
+  copies it; layouts rotate in a fixed order};
+\node[st=robotline, right=of tele] (rec) {{\bfseries \texttt{lab record}}\\[2pt] both cameras and the joint states at
+  30~fps; fixed episode and reset time};
+\node[st=robotline, right=of rec] (chk) {{\bfseries Checks}\\[2pt] dropped frames, camera rates, joint limits};
+\node[st=greenline, right=of chk] (trim) {{\bfseries Two copies}\\[2pt] raw (the only one edited) and trimmed (idle
+  start and end cut)};
+\node[st=purpleline, right=of trim] (split) {{\bfseries Hub and registry}\\[2pt] both pushed; pinned revision;
+  seeded held-out split};
+\foreach \a/\b in {tele/rec, rec/chk, chk/trim, trim/split} \draw[arr] (\a) -- (\b);
+\node[draw=ink2, rounded corners=2pt, font=\scriptsize, align=center, text width=50mm, below=6mm of trim.south west,
+  anchor=north] (edit) {editing tools: view, delete bad episodes, manual trim, undo; on the raw copy, the trimmed copy
+  is rebuilt};
+\draw[arr, dashed] (edit.north) -- (edit.north|-trim.south);
 \end{tikzpicture}

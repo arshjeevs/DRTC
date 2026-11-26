@@ -24,6 +24,6 @@
 \node[font=\scriptsize, align=center, anchor=south] at (9.9,3.1) {cooldown over: re-request\\[-2pt] with a fresh observation};
 \draw[-{Latex[length=2mm]}, thick, greenline] (11.3,0) -- (12.5,3);
 \node[font=\scriptsize, text=greenline, anchor=south] at (12.9,3.1) {fresh reply: merged};
-\node[font=\scriptsize, text=ink2, align=left, anchor=north west] at (5.5,-0.35) {a late reply to an older request is
-  dropped: the freshest observation wins (last-write-wins)};
+\node[font=\scriptsize, text=ink2, align=left, anchor=north west] at (5.5,-0.35) {stale or duplicated replies are
+  ignored: the freshest observation wins (last-write-wins)};
 \end{tikzpicture}
