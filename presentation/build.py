@@ -182,6 +182,72 @@ def s_section(part):
     return make
 
 
+def s_hardware(prs, n):
+    s = S.content(prs, n, "The setup · hardware", "A low-cost arm, a laptop, and GPU servers")
+    cw, ch, gap = Inches(3.7), Inches(1.5), Inches(0.12)
+    robot = [("SO-101 arm", "six servos; an identical leader arm records the demonstrations"),
+             ("Two cameras", "on the wrist and over the scene (a phone), 30 frames a second"),
+             ("Laptop", "RTX 4060; runs the arm, the cameras and the client at 30 Hz")]
+    left = []
+    for i, (t, b) in enumerate(robot):
+        left += card(s, M, TOP + (ch + gap) * i, cw, ch, "", t, b)
+    mid_y = TOP + Inches(1.55)
+    nx, nw = M + cw + Inches(1.05), Inches(2.3)
+    net = card(s, nx, mid_y - Inches(0.1), nw, Inches(1.45), "", "Network", "Wi-Fi and the local network")
+    sx = nx + nw + Inches(1.05)
+    server = card(s, sx, TOP + Inches(0.9), W - M - sx, Inches(2.55), "", "GPU servers",
+                  "NVIDIA A100 (80 GB) and H200 (141 GB), shared machines. They run the policies, 0.45 to 3.4 "
+                  "billion parameters, too big for the laptop at 30 actions per second.")
+    ay1, ay2 = mid_y + Inches(0.35), mid_y + Inches(0.9)
+    arrows = [line(s, M + cw + Inches(0.1), ay1, nx - Inches(0.1), ay1, color=S.accent, arrow=True),
+              line(s, nx + nw + Inches(0.1), ay1, sx - Inches(0.1), ay1, color=S.accent, arrow=True),
+              line(s, sx - Inches(0.1), ay2, nx + nw + Inches(0.1), ay2, color=S.alert, arrow=True),
+              line(s, nx - Inches(0.1), ay2, M + cw + Inches(0.1), ay2, color=S.alert, arrow=True),
+              text(s, M + cw + Inches(0.05), ay1 - Inches(0.32), Inches(1.0), Inches(0.3), "images, joints", size=10,
+                   color=S.accent, font=S.body, align=PP_ALIGN.CENTER),
+              text(s, M + cw + Inches(0.05), ay2 + Inches(0.05), Inches(1.0), Inches(0.3), "actions", size=10,
+                   color=S.alert, font=S.body, align=PP_ALIGN.CENTER)]
+    photo = REPO / "presentation" / "assets" / "setup.jpg"
+    extra = []
+    if photo.is_file():
+        extra = [picture(s, photo, sx, TOP + Inches(3.6), h=Inches(1.25))]
+    builds(s, [left, net + arrows, server + extra])
+    notes(s, "First the setup. The robot side is a low-cost SO-101 arm with two cameras, driven by a laptop. The "
+             "policies are too big for the laptop, so they run on shared GPU servers, an A100 and an H200. Every "
+             "cycle, the laptop sends the camera images and joint angles over Wi-Fi and gets actions back.")
+
+
+def s_vla(prs, n):
+    s = S.content(prs, n, "The setup · how a policy drives the arm", "A vision-language-action policy, in one loop")
+    bw, gap = Inches(2.55), Inches(0.43)
+    steps = [("1", "It sees", "the wrist and scene camera images, the six joint angles and an instruction, e.g. "
+                              "“put the cube in the box”."),
+             ("2", "It thinks", "a vision-language model reads the images and the instruction; an action "
+                                "expert turns them into motion. 0.45 to 3.4 billion parameters."),
+             ("3", "It plans a chunk", "not one action but the next 16 to 100 joint targets at once, about 0.5 to "
+                                       "3 s of motion."),
+             ("4", "The arm plays it", "one action every 1/30 s; before the chunk runs out, it asks for the "
+                                       "next one.")]
+    groups = []
+    for i, (num, t, b) in enumerate(steps):
+        x = M + (bw + gap) * i
+        g = card(s, x, TOP + Inches(0.1), bw, Inches(3.35), num, t, b)
+        if i:
+            g.append(line(s, x - gap + Inches(0.06), TOP + Inches(1.6), x - Inches(0.06), TOP + Inches(1.6),
+                          color=S.accent, arrow=True))
+        groups.append(g)
+    foot = text(s, M, TOP + Inches(3.7), CW, Inches(0.9),
+                [[("Remote inference: ", {"color": S.ink, "bold": True}),
+                  ("steps 1 and 3 cross the network for every chunk. If the next chunk is late, the queue of actions "
+                   "runs dry and the arm stops.", {"color": S.muted})]], size=16, font=S.body)
+    builds(s, groups + [foot])
+    notes(s, "How these policies work. A vision-language-action policy sees the two camera images, the joint angles "
+             "and a written instruction. A large vision-language model reads them, and an action expert produces "
+             "motion: not one action but a chunk, the next 16 to 100 joint targets. The arm plays one action every "
+             "thirtieth of a second, and before the chunk runs out the robot asks for the next one. With remote "
+             "inference, that request and its reply go over the network, every chunk.")
+
+
 def s_problem(prs, n):
     s = S.content(prs, n, "The problem", "Robot policies have outgrown the robot")
     w = Inches(5.6)
@@ -248,8 +314,8 @@ def s_setting(prs, n):
 
 def s_shipped(prs, n):
     s = S.content(prs, n, "The problem · what LeRobot ships", "One missed second ends the task")
-    rules = [("Requests late:", "a new chunk only when about one round trip of actions is left."),
-             ("One request in flight:", "a lost reply is never sent again."),
+    rules = [("Requests late:", "a new chunk only when about half a second of actions is left."),
+             ("One request in flight:", "a lost reply is replaced only after the queue has run dry."),
              ("Gives up:", "after 1 s without an action, the run is ended.")]
     groups = [para(s, M, TOP + Inches(0.05) + Inches(0.62) * i, CW, a, b, size=19, marker=S.muted)
               for i, (a, b) in enumerate(rules)]
@@ -271,9 +337,9 @@ def s_shipped(prs, n):
     for a, b, name, what in [(2, 3, "spike", "+1 s latency"), (4, 5, "drops", "every reply lost"),
                              (6, 7.5, "outage", "no link, 1.5 s")]:
         r = box(s, tx(a), ty, tx(b) - tx(a), th, fill=S.alert, alpha=0.18)
-        t1 = text(s, tx(a), ty + Inches(0.15), tx(b) - tx(a) + Inches(0.8), Inches(0.3), name, size=15, bold=True,
+        t1 = text(s, tx(a) + Inches(0.08), ty + Inches(0.15), tx(b) - tx(a) + Inches(0.8), Inches(0.3), name, size=15, bold=True,
                   color=S.alert, font=S.body, align=PP_ALIGN.LEFT)
-        t2 = text(s, tx(a), ty + Inches(0.45), tx(b) - tx(a) + Inches(0.8), Inches(0.5), what, size=12,
+        t2 = text(s, tx(a) + Inches(0.08), ty + Inches(0.45), tx(b) - tx(a) + Inches(0.8), Inches(0.5), what, size=12,
                   color=S.muted, font=S.body)
         windows.append([r, t1, t2])
     builds(s, groups + [axis] + windows)
@@ -908,7 +974,7 @@ def s_thanks(prs, n):
     notes(s, "Questions.")
 
 
-SLIDES = [s_title, s_outline,
+SLIDES = [s_title, s_outline, s_hardware, s_vla,
           s_section(1), s_problem, s_setting, s_shipped, s_claim,
           s_section(2), s_drtc, s_drtc_anim, s_fixes, s_smoothing,  # s_simulator: an extra, out until the user finalises it
           s_section(3), s_platform, s_data, s_models, s_protocol, s_design,

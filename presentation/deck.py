@@ -215,8 +215,8 @@ RISE = "0.04"  # how far a rising shape starts below its place, as a fraction of
 
 
 def _item(item):
-    if not isinstance(item, tuple):
-        return item, "rise", 0
+    if not isinstance(item, tuple):  # lines (connectors) fade: PowerPoint's Float In motion fails on them
+        return item, "fade" if item._element.tag.endswith("cxnSp") else "rise", 0
     return (item + ("rise", 0)[len(item) - 1:])[:3]  # fill in the missing effect / delay
 
 
