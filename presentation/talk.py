@@ -1629,8 +1629,15 @@ def t_e4(prs, n):
 
 def t_e4_video(prs, n):
     s = S.content(prs, n, "6 · Results", "Same fault, three clients")
-    slot(s, "e4_trials", M, TOP - Inches(0.1), CW, Inches(4.7))
-    notes(s, "Three real trials under the same fault mix.")
+    slot(s, "e4_trials", M, TOP - Inches(0.1), CW, Inches(4.2))
+    text(s, M, TOP + Inches(4.2), CW, Inches(0.35),
+         "Diffusion Policy, trial 10 of E4: the same faults at the same moments for all three. Patient LeRobot is "
+         "ended at 14.3 s; DRTC finishes at 13.0 s, and with the stack at 12.3 s.", size=12, color=S.muted,
+         font=S.body, align=PP_ALIGN.CENTER)
+    notes(s, "Another real trial, a different policy from the earlier slides: Diffusion Policy, trial 10, so the same "
+             "faults at the same moments under each client. With LeRobot's patient client the arm stops after a lost "
+             "reply and the run is ended. DRTC asks again and finishes the task; with the smoothing stack it finishes "
+             "too, a little sooner here and with smoother motion.")
 
 
 def t_e4_motion(prs, n):

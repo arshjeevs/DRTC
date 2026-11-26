@@ -134,7 +134,7 @@ def poster(video: Path, at: float = 1.0) -> Path:
     """A still from the video (its poster frame), cached."""
     CACHE.mkdir(exist_ok=True)
     parts = video.parts[-6:-2]  # condition / model / trial / video
-    out = CACHE / ("_".join(parts) + f"_{video.stem}_{at:g}.jpg")
+    out = CACHE / ("_".join(parts) + f"_{video.stem}_{int(video.stat().st_mtime)}_{at:g}.jpg")  # a re-made video gets a new still
     if not out.is_file():
         subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-ss", str(at), "-i", str(video), "-frames:v", "1",
                         str(out)], check=True)
