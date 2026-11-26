@@ -174,97 +174,112 @@ def t_outline(prs, n):
 # Part 1 -----------------------------------------------------------------------------------------------------------
 
 def t_vla_what(prs, n):
-    s = S.content(prs, n, "1 · Robot control with a VLA", "What goes in, what comes out")
+    s = S.content(prs, n, "1 · Robot control with a VLA", "From camera to motion: inside a VLA")
     ex = json.loads((MEDIA / "data" / "vla_example.json").read_text())
     st = MEDIA / "stills"
-    y0, h = TOP - Inches(0.05), Inches(4.3)
-    iw, aw, mw = Inches(3.85), Inches(0.55), Inches(2.75)
+    y0, h = TOP - Inches(0.05), Inches(4.15)
+    iw, aw, mw = Inches(3.45), Inches(0.45), Inches(3.75)
     ix, mx = M, M + iw + aw
     ox = mx + mw + aw
     ow = W - M - ox
-    pad = Inches(0.18)
+    pad = Inches(0.16)
     eb = dict(size=11, bold=True, color=S.muted, font=S.body, spacing=1.2)
-    heads = [text(s, ix, y0 - Inches(0.32), iw, Inches(0.3), "INPUTS  ·  ONE MOMENT", **eb),
-             text(s, mx, y0 - Inches(0.32), mw, Inches(0.3), "THE POLICY", **eb),
-             text(s, ox, y0 - Inches(0.32), ow, Inches(0.3), "OUTPUT  ·  AN ACTION CHUNK", **eb)]
-    # inputs
-    inp = [heads[0], box(s, ix, y0, iw, h, fill=S.panel, line=S.panel_line, radius=0.04)]
-    pw = (iw - 2 * pad - Inches(0.12)) / 2
+    # 1. the inputs of one moment
+    inp = [text(s, ix, y0 - Inches(0.32), iw, Inches(0.3), "INPUTS  ·  ONE MOMENT", **eb),
+           box(s, ix, y0, iw, h, fill=S.panel, line=S.panel_line, radius=0.04)]
+    pw = (iw - 2 * pad - Inches(0.1)) / 2
     for k, (f, cap) in enumerate((("vla_ep0_wrist.jpg", "wrist camera"), ("vla_ep0_scene.jpg", "scene camera"))):
-        x = int(ix + pad + (pw + Inches(0.12)) * k)
+        x = int(ix + pad + (pw + Inches(0.1)) * k)
         inp.append(picture(s, st / f, x, int(y0 + pad), w=int(pw)))
-        inp.append(text(s, x, int(y0 + pad + pw * 0.75 + Inches(0.03)), int(pw), Inches(0.25), cap, size=11,
+        inp.append(text(s, x, int(y0 + pad + pw * 0.75 + Inches(0.02)), int(pw), Inches(0.25), cap, size=10,
                         color=S.muted, font=S.body))
-    yi = y0 + Inches(1.78)
+    yi = y0 + Inches(1.6)
     inp.append(text(s, ix + pad, yi, iw - 2 * pad, Inches(0.25), "INSTRUCTION", size=10, bold=True, color=S.muted,
                     font=S.body, spacing=1.2))
     inp.append(text(s, ix + pad, yi + Inches(0.22), iw - 2 * pad, Inches(0.5),
-                    "“Pick up the green cube and put it in the box”", size=14, italic=True, color=S.ink,
+                    "“Pick up the green cube and put it in the box”", size=13, italic=True, color=S.ink,
                     font=S.body, line=1.1))
-    yj = y0 + Inches(2.62)
+    yj = y0 + Inches(2.45)
     inp.append(text(s, ix + pad, yj, iw - 2 * pad, Inches(0.25), "JOINT POSITIONS NOW", size=10, bold=True,
                     color=S.muted, font=S.body, spacing=1.2))
     labels = ["shoulder pan", "shoulder lift", "elbow", "wrist flex", "wrist roll", "gripper"]
     cw_ = (iw - 2 * pad) / 3
     for k, (lab, v) in enumerate(zip(labels, ex["state"])):
         x = int(ix + pad + cw_ * (k % 3))
-        y = int(yj + Inches(0.28) + Inches(0.62) * (k // 3))
-        inp.append(text(s, x, y, int(cw_), Inches(0.6), [[(lab, {"size": 10, "color": S.muted})],
-                                                          [(f"{v:+.1f}", {"size": 17, "bold": True,
+        y = int(yj + Inches(0.27) + Inches(0.6) * (k // 3))
+        inp.append(text(s, x, y, int(cw_), Inches(0.6), [[(lab, {"size": 9, "color": S.muted})],
+                                                          [(f"{v:+.1f}", {"size": 16, "bold": True,
                                                                           "color": S.ink})]],
                         size=12, font=S.body, line=1.05))
-    # the policy
+    # 2. inside the policy, step by step
     ymid = y0 + h / 2
-    a1 = line(s, ix + iw + Inches(0.08), ymid, mx - Inches(0.08), ymid, color=S.ink, weight=Pt(1.75), arrow=True)
-    pol = [heads[1], box(s, mx, y0, mw, h, fill=S.dark, radius=0.04),
-           text(s, mx + pad, y0 + Inches(0.2), mw - 2 * pad, Inches(0.4), "VLA policy", size=20, bold=True,
-                font=S.heading, color=S.dark_text),
-           text(s, mx + pad, y0 + Inches(0.6), mw - 2 * pad, Inches(0.3), "e.g. SmolVLA, 0.45 B parameters",
-                size=11, color=S.dark_muted, font=S.body)]
-    ib = Inches(1.25)
-    for k, (t1, t2) in enumerate((("Vision-language model", "images + instruction → tokens"),
-                                  ("Action expert", "tokens + joint positions → 50 future actions"))):
-        yy = y0 + Inches(1.05) + (ib + Inches(0.35)) * k
-        pol.append(box(s, mx + pad, yy, mw - 2 * pad, ib, fill="#232A34", radius=0.08,
-                       runs=[[(t1, {"bold": True})], [(t2, {"color": S.dark_muted, "size": 12})]], size=14,
-                       font=S.body, color=S.dark_text))
-    pol.append(line(s, mx + mw / 2, y0 + Inches(1.05) + ib + Inches(0.04), mx + mw / 2,
-                    y0 + Inches(1.05) + ib + Inches(0.31), color=S.dark_muted, weight=Pt(1.5), arrow=True))
-    # the output: one row per joint
-    a2 = line(s, mx + mw + Inches(0.08), ymid, ox - Inches(0.08), ymid, color=S.ink, weight=Pt(1.75), arrow=True)
-    out = [heads[2], box(s, ox, y0, ow, h, fill=S.panel, line=S.panel_line, radius=0.04)]
+    a1 = line(s, ix + iw + Inches(0.06), ymid, mx - Inches(0.06), ymid, color=S.ink, weight=Pt(1.75), arrow=True)
+    frame = [text(s, mx, y0 - Inches(0.32), mw, Inches(0.3), "THE VLA POLICY  ·  e.g. SmolVLA, 0.45 B", **eb),
+             box(s, mx, y0, mw, h, fill=S.dark, radius=0.04)]
+    bx, bw = mx + pad, mw - 2 * pad
+    sh = Inches(0.82)
+    gap = (h - 2 * pad - 4 * sh) / 3
+    steps_txt = [("1  Into tokens", "each image is cut into patches; words and joint angles become tokens too"),
+                 ("2  Vision-language backbone", "reads all the tokens together: what is where, and what was asked"),
+                 ("3  Action expert", "starts from random noise and refines it into actions in a few steps"),
+                 ("4  An action chunk", "50 future positions for each of the 6 joints")]
+    inner = []
+    for k, (t1, t2) in enumerate(steps_txt):
+        yy = y0 + pad + (sh + gap) * k
+        g = [box(s, bx, yy, bw, sh, fill="#232A34", radius=0.08,
+                 runs=[[(t1, {"bold": True})], [(t2, {"color": S.dark_muted, "size": 11})]], size=13,
+                 font=S.body, color=S.dark_text, align=PP_ALIGN.LEFT, margin=Inches(0.14))]
+        if k == 0:  # a strip of tokens: image (blue), words (green), joints (orange)
+            for j, col in enumerate([S.accent] * 6 + [S.series["drtc"]] * 3 + [S.alert]):
+                g.append(box(s, bx + bw - Inches(0.15) - Inches(0.13) * (10 - j), yy + Inches(0.1), Inches(0.1),
+                             Inches(0.1), fill=col))
+        if k:
+            g.insert(0, line(s, bx + bw / 2, yy - gap + Inches(0.02), bx + bw / 2, yy - Inches(0.02),
+                             color=S.dark_muted, weight=Pt(1.5), arrow=True))
+        inner.append(g)
+    # 3. the output, played at 30 Hz
+    a2 = line(s, mx + mw + Inches(0.06), ymid, ox - Inches(0.06), ymid, color=S.ink, weight=Pt(1.75), arrow=True)
+    out = [text(s, ox, y0 - Inches(0.32), ow, Inches(0.3), "OUTPUT  ·  THE CHUNK", **eb),
+           box(s, ox, y0, ow, h, fill=S.panel, line=S.panel_line, radius=0.04)]
     chunk = np.array(ex["chunk"])
-    lw_ = Inches(0.95)
+    lw_ = Inches(0.85)
     gx, gw = ox + pad + lw_, ow - 2 * pad - lw_
     rh = (h - 2 * pad - Inches(0.45)) / 6
     curves = []
     for k, (lab, col) in enumerate(zip(labels, JOINT_COLOURS)):
         ry = y0 + pad + rh * k
-        out.append(text(s, ox + pad, ry, lw_, rh, lab, size=11, color=S.ink, font=S.body, anchor=MSO_ANCHOR.MIDDLE))
+        out.append(text(s, ox + pad, ry, lw_, rh, lab, size=10, color=S.ink, font=S.body, anchor=MSO_ANCHOR.MIDDLE))
         out.append(line(s, gx, ry + rh - Inches(0.04), gx + gw, ry + rh - Inches(0.04), color=S.grid,
                         weight=Pt(0.5)))
         v = chunk[:, k]
         lo, hi = float(v.min()), float(v.max())
         if hi - lo < 3:
             lo, hi = lo - 3, hi + 3
-        f = mapper(gx, ry + Inches(0.08), gw, rh - Inches(0.18), 0, len(v) - 1, lo, hi)
-        curves.append(curve(s, [f(i, a) for i, a in enumerate(v)], col, weight=Pt(2.25)))
-    ay = y0 + h - pad - Inches(0.38)
-    out += [text(s, gx, ay, Inches(0.8), Inches(0.25), "now", size=10, color=S.muted, font=S.body),
-            text(s, gx, ay, gw, Inches(0.25), "50 actions", size=10, color=S.muted, font=S.body,
-                 align=PP_ALIGN.CENTER),
-            text(s, gx + gw - Inches(0.8), ay, Inches(0.8), Inches(0.25), "+1.7 s", size=10, color=S.muted,
+        f = mapper(gx, ry + Inches(0.07), gw, rh - Inches(0.16), 0, len(v) - 1, lo, hi)
+        curves.append(curve(s, [f(i, a) for i, a in enumerate(v)], col, weight=Pt(2)))
+    ay = y0 + h - pad - Inches(0.36)
+    out += [text(s, gx, ay, Inches(0.8), Inches(0.25), "now", size=9, color=S.muted, font=S.body),
+            text(s, gx, ay + Inches(0.2), gw, Inches(0.25), "played at 30 per second", size=9, color=S.muted,
+                 font=S.body, align=PP_ALIGN.CENTER),
+            text(s, gx + gw - Inches(0.8), ay, Inches(0.8), Inches(0.25), "+1.7 s", size=9, color=S.muted,
                  font=S.body, align=PP_ALIGN.RIGHT)]
-    cap = text(s, M, y0 + h + Inches(0.1), CW, Inches(0.3),
-               "One moment of a recorded demonstration (cube in box): the two camera frames, the arm's joint "
-               "positions, and the next 50 actions the person made: what the policy learns to predict.", size=11,
-               color=S.muted, font=S.body)
-    builds(s, [inp, [a1] + pol, [a2] + out + [(c, "wipe_right") for c in curves], [cap]])
-    notes(s, "Real data from one moment of a demonstration. In: the wrist and scene camera frames, the instruction, "
-             "and the six joint positions (LeRobot's normalised units). The vision-language model turns images and "
-             "words into tokens; the action expert turns those and the joint positions into a chunk: the next 50 "
-             "actions for every joint, 1.7 s of motion. Shown here: what the person actually did next, which is "
-             "exactly what the policy is trained to predict.")
+    loop = [line(s, ox + ow / 2, y0 + h + Inches(0.08), ox + ow / 2, y0 + h + Inches(0.3), color=S.accent,
+                 weight=Pt(1.5)),
+            line(s, ox + ow / 2, y0 + h + Inches(0.3), ix + iw / 2, y0 + h + Inches(0.3), color=S.accent,
+                 weight=Pt(1.5)),
+            line(s, ix + iw / 2, y0 + h + Inches(0.3), ix + iw / 2, y0 + h + Inches(0.08), color=S.accent,
+                 weight=Pt(1.5), arrow=True),
+            text(s, ix + iw / 2 + Inches(0.2), y0 + h + Inches(0.31), ox + ow / 2 - ix - iw / 2 - Inches(0.4),
+                 Inches(0.25), "before the chunk runs out, the next moment is sent: the loop repeats", size=11,
+                 color=S.accent, font=S.body, align=PP_ALIGN.CENTER)]
+    builds(s, [inp, [a1] + frame, inner[0], inner[1], inner[2], inner[3],
+               [a2] + out + [(c, "wipe_right") for c in curves], [(x_, "fade") for x_ in loop]])
+    notes(s, "Real data from one moment of a recorded demonstration (cube in box). In: the wrist and scene frames, "
+             "the instruction and the six joint positions. Inside the VLA: everything becomes tokens; a vision-"
+             "language backbone, pretrained on web images and text, reads them together; a smaller action expert "
+             "starts from noise and refines it into a chunk of 50 future positions per joint. Out: the next 1.7 s of "
+             "motion (shown here: what the person actually did next, which the policy learns to predict). The arm "
+             "plays it at 30 per second, and before it runs out the next moment is sent: the loop repeats.")
 
 
 def t_vla_video(prs, n):
@@ -525,42 +540,96 @@ def t_drtc_idea(prs, n):
              "turns out to carry almost all of the benefit.")
 
 
+def _seq_column(s, x, w, title, colour, lost_again):
+    """A message diagram for one client: robot and server lifelines, time flowing down."""
+    rx, sx = x + Inches(0.75), x + w - Inches(0.75)
+    top, bot = TOP + Inches(0.25), TOP + Inches(4.15)
+    yy = lambda f: int(top + (bot - top) * f)  # noqa: E731
+    head = [text(s, x, TOP - Inches(0.45), w, Inches(0.35), title, size=18, bold=True, color=colour, font=S.body,
+                 align=PP_ALIGN.CENTER),
+            box(s, rx - Inches(0.6), top - Inches(0.12), Inches(1.2), Inches(0.3), fill=S.dark, radius=0.3,
+                runs="robot", size=11, bold=True, color=S.dark_text, font=S.body),
+            box(s, sx - Inches(0.6), top - Inches(0.12), Inches(1.2), Inches(0.3), fill=S.dark, radius=0.3,
+                runs="GPU server", size=11, bold=True, color=S.dark_text, font=S.body),
+            line(s, rx, yy(0.06), rx, bot, color=S.grid, weight=Pt(1.5)),
+            line(s, sx, yy(0.06), sx, bot, color=S.grid, weight=Pt(1.5))]
+
+    def msg(f0, f1, words, up=True, ok=True, cut=False, col=S.ink):
+        a, b = (rx, sx) if up else (sx, rx)
+        y_a, y_b = yy(f0), yy(f1)
+        if cut and not up:  # a lost reply travels down from the server, like every reply
+            y_a, y_b = min(y_a, y_b), max(y_a, y_b)
+        if cut:
+            mx_ = (a + b) / 2
+            my_ = (y_a + y_b) / 2
+            return [line(s, a, y_a, mx_, my_, color=S.alert, weight=Pt(1.75)),
+                    text(s, int(mx_ - Inches(0.2)), int(my_ - Inches(0.2)), Inches(0.4), Inches(0.4), "×",
+                         size=22, bold=True, color=S.alert, font=S.body, align=PP_ALIGN.CENTER,
+                         anchor=MSO_ANCHOR.MIDDLE),
+                    text(s, int(mx_ - Inches(0.95)), int(my_ + Inches(0.12)),
+                         Inches(1.9), Inches(0.3), words, size=11, bold=True, color=S.alert, font=S.body,
+                         align=PP_ALIGN.CENTER)]
+        return [line(s, a, y_a, b, y_b, color=col, weight=Pt(1.75), arrow=True),
+                text(s, rx + Inches(0.1), int((y_a + y_b) / 2 - Inches(0.27)), sx - rx - Inches(0.2), Inches(0.26),
+                     words, size=11, color=col, font=S.body, align=PP_ALIGN.CENTER)]
+
+    def note(f0, f1, words, col):
+        return [line(s, rx - Inches(0.12), yy(f0), rx - Inches(0.12), yy(f1), color=col, weight=Pt(3)),
+                text(s, x - Inches(0.3), yy(f0) - Inches(0.05), Inches(0.9), yy(f1) - yy(f0) + Inches(0.1), words,
+                     size=9, bold=True,
+                     color=col, font=S.body, anchor=MSO_ANCHOR.MIDDLE, align=PP_ALIGN.RIGHT, line=1.0)]
+
+    normal = msg(0.08, 0.16, "request: images + joints") + msg(0.2, 0.28, "a chunk: the arm moves", up=False,
+                                                                      col=S.series["drtc"])
+    req2 = msg(0.3, 0.36, "request")
+    lost = msg(0.4, 0.46, "reply lost", up=False, cut=True)
+    return head, normal, req2 + lost, yy, msg, note, rx, sx, bot
+
+
 def t_drtc_media(prs, n):
-    s = S.content(prs, n, "3 · Our solution", "DRTC at work: the same trial, the same faults")
+    s = S.content(prs, n, "3 · Our solution", "DRTC at work: what happens when a reply is lost")
     if media_file("drtc"):
         slot(s, "drtc", M, TOP - Inches(0.1), CW, Inches(4.7))
         return
-    p, d = e4_trial("upstream_patient__mix"), e4_trial("drtc__mix")
-    faults = fault_windows(d)
-    tmax = 18
-    key = json.loads((d / "trial.json").read_text()).get("key_time_s") or 13.1
-    leg = text(s, M, TOP - Inches(0.3), CW, Inches(0.3),
-               [[("■ ", {"color": S.series["drtc"]}), ("arm moving    ", {"color": S.muted}),
-                 ("■ ", {"color": S.alert}), ("network fault    ", {"color": S.muted}),
-                 ("● ", {"color": S.accent}), ("DRTC asks again", {"color": S.muted})]], size=12, font=S.body)
-    fls = fault_labels(s, M, TOP + Inches(0.1), CW, tmax, faults)
-    y1, y2 = TOP + Inches(0.4), TOP + Inches(1.45)
-    b1, m1, f1, _, e1 = timeline_row(s, M, y1, CW, tmax, moving_segments(p), faults, label="Patient LeRobot",
-                                     sub="waits for the lost reply", colour=S.series["baseline"],
-                                     end=(16.5, "run ended"), end_ok=False, row_h=Inches(0.8))
-    segs = moving_segments(d)
-    before, after = _split(segs, faults[-1][0])
-    b2, m2, f2, a2, e2 = timeline_row(s, M, y2, CW, tmax, segs, faults, label="DRTC", sub="asks again",
-                                      colour=S.series["drtc"], asks=resends(d), end=(key, "✓ task done"),
-                                      row_h=Inches(0.8))
-    m2_before, m2_after = m2[:len(before)], m2[len(before):]
-    axis = time_axis(s, M, y2 + Inches(1.0), CW, tmax)
-    expl = text(s, M, y2 + Inches(1.4), CW, Inches(1.0),
-                [[("Same robot, same policy, same trial number, so the same faults at the same moments. ",
-                   {"bold": True, "color": S.ink}),
-                  ("When a reply does not come within its cooldown, DRTC sends a fresh request; after the outage the "
-                   "second one gets through, and the arm moves again about a second after the link returns.",
-                   {"color": S.muted})]], size=14, font=S.body, line=1.25)
-    builds(s, [[leg] + axis + fls + b1 + m1 + f1 + e1, b2 + m2_before + f2, a2, m2_after + e2, [expl]])
-    notes(s, "Top: the patient client from the previous slide. Bottom: DRTC in the same trial. Both meet the same "
-             "late reply, lost replies and outage. The blue dots are DRTC giving up on a reply and asking again with "
-             "a fresh observation. The second one, after the outage, gets an answer, the arm moves again, and the cube "
-             "is in the box at 13 seconds.")
+    cw = (CW - Inches(0.5)) / 2
+    lx, dx = M, M + cw + Inches(0.5)
+    L = _seq_column(s, lx, cw, "Patient LeRobot", S.series["baseline"], False)
+    D = _seq_column(s, dx, cw, "DRTC", S.series["drtc"], True)
+    yy = L[3]
+    band = [box(s, x_ + Inches(0.75), yy(0.37), cw - Inches(1.5), yy(0.6) - yy(0.37), fill=S.alert, alpha=0.12)
+            for x_ in (lx, dx)]
+    band += [text(s, x_ + Inches(0.85), yy(0.375), Inches(1.2), Inches(0.25), "outage", size=9, bold=True,
+                  color=S.alert, font=S.body) for x_ in (lx, dx)]
+    # LeRobot: waits forever
+    _, _, _, _, msgL, noteL, rxL, sxL, botL = L
+    onceL = msgL(0.53, 0.57, "one more try: lost too", cut=True)
+    waitL = noteL(0.6, 0.86, "waiting; arm still", S.alert)
+    endL = [box(s, lx + Inches(0.3), yy(0.88), cw - Inches(0.6), Inches(0.42), fill="#FFFFFF", line=S.alert,
+                radius=0.3, runs="nothing more is sent: 10 s later the run is ended ✗", size=12, bold=True,
+                color=S.alert, font=S.body)]
+    # DRTC: asks again after its cooldown
+    _, _, _, _, msgD, noteD, rxD, sxD, botD = D
+    cool1 = noteD(0.47, 0.53, "cooldown", S.accent)
+    again1 = msgD(0.53, 0.57, "asks again: lost too", cut=True)
+    cool2 = noteD(0.58, 0.71, "cooldown", S.accent)
+    again2 = msgD(0.72, 0.77, "asks again: fresh images", col=S.accent)
+    reply = msgD(0.8, 0.86, "a chunk: the arm moves again", up=False, col=S.series["drtc"])
+    endD = [box(s, dx + Inches(0.3), yy(0.88), cw - Inches(0.6), Inches(0.42), fill="#FFFFFF",
+                line=S.series["drtc"], radius=0.3, runs="task done ✓", size=12, bold=True,
+                color=S.series["drtc"], font=S.body)]
+    foot = text(s, M, TOP + Inches(4.3), CW, Inches(0.35),
+                "A real trial (GR00T N1.7, trial 1, the same faults for both): LeRobot's arm stopped at 6.4 s and the run "
+                "was ended at 16.5 s; DRTC asked again at 9.9 and 11.0 s and finished the task at 13.1 s.", size=11,
+                color=S.muted, font=S.body, align=PP_ALIGN.CENTER)
+    builds(s, [L[0] + D[0], L[1] + D[1], L[2] + D[2] + band, onceL + cool1 + again1, waitL + endL, cool2 + again2,
+               reply + endD, [foot]])
+    notes(s, "Both clients, side by side, as messages between the robot and the server; time flows down. At first "
+             "both work: a request goes up, a chunk comes back. Then the outage: a reply is lost. LeRobot, even when "
+             "patient, sends one fresh request when its queue runs dry; when that is lost too it never asks again: it "
+             "waits, the arm stands still, and after 10 s LeRobot ends the run. DRTC "
+             "waits only for its cooldown, about one round trip; then it sends a fresh request with new images. The "
+             "first one falls into the outage too; the next gets through, a chunk comes back, and the task is done. "
+             "This is exactly what happened in the real trial on the previous slides' timeline.")
 
 
 SMOOTH = [("seam", "Seams", "a new chunk starts somewhere else: the arm jumps",
@@ -1657,7 +1726,7 @@ def t_thanks(prs, n):
 
 SLIDES = [t_title, t_hook, t_outline,
           lambda p, n: S.section_slide(p, n, 1, "Robot control with a VLA", "Cameras and joints in, motion out"),
-          t_vla_what, t_vla_video, t_chunks, t_why_server,
+          t_vla_what, t_chunks, t_why_server,
           lambda p, n: S.section_slide(p, n, 2, "The problem", "Control over an unreliable network"),
           t_loop, t_fault, t_faults, t_question, t_project,
           lambda p, n: S.section_slide(p, n, 3, "Our solution", "DRTC and motion smoothing"),
@@ -1665,7 +1734,7 @@ SLIDES = [t_title, t_hook, t_outline,
           lambda p, n: S.section_slide(p, n, 4, "What we built", "Hardware, our lab platform, data, training"),
           t_hardware, t_lab, t_machines, t_record, t_first_attempt, t_data, t_trimming, t_models,
           lambda p, n: S.section_slide(p, n, 5, "How we evaluate", "Offline, the bench, live robot trials"),
-          t_eval_kinds, t_offline, t_bench, t_robot_eval, t_records, t_fair, t_map,
+          t_eval_kinds, t_offline, t_bench, t_robot_eval, t_records, t_map,
           lambda p, n: S.section_slide(p, n, 6, "Results", "Baselines, the bench studies, the robot experiment"),
           t_baselines, t_e1, t_e2, t_e3a, t_e3, t_stack_choice, t_e4, t_e4_policy, t_e4_video, t_e4_motion, t_pi,
           t_conclusion, t_contrib, t_limits, t_thanks]
