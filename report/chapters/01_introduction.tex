@@ -1,5 +1,16 @@
 \chapter{Introduction}\label{ch:intro}
 
+\section{General overview}\label{sec:overview}
+
+\textslot{one page on the project as a whole: a low-cost SO-101 arm, learned policies served from a GPU server, the
+network between them, and what this project built and measured; walks through Figure~\ref{fig:projectflow}.}
+
+\figslot{fig:projectflow}{The project in one flow, from the hardware to the results.}{D1.1 Diagram}{The whole project
+as one flow: hardware and rig (SO-101 arms, cameras, laptop, Raspberry Pi) $\rightarrow$ data collection
+(teleoperation, recording, trimming) $\rightarrow$ training (seven policies, original recipes, GPU servers)
+$\rightarrow$ serving (remote inference over the network, DRTC, smoothing) $\rightarrow$ evaluation (offline, robot,
+bench) $\rightarrow$ results and report.}
+
 \section{Motivation}
 
 Robots can now learn manipulation skills from a few dozen human demonstrations. Early policies of this kind, such as
@@ -19,6 +30,11 @@ The network is the weak point. WiFi links show latency spikes, lose messages and
 reply is late or lost, the robot's queue of actions empties and the arm stops. The remote-inference client shipped with
 LeRobot~0.7~\cite{lerobot}, the open robot-learning library this project builds on, ends a run after one second without
 actions and never replaces a lost reply, so a short fault ends or stalls the task.
+
+\figslot{fig:problem}{The problem: a network fault empties the robot's action queue and the arm stops.}{D1.2 Diagram}{
+The robot's action queue over time (actions left against seconds): the queue is refilled by each reply; a latency
+spike or a lost reply arrives, the queue runs dry, and the arm stops until the next reply; shaded: the time the arm
+stands still.}
 
 Distributed Real-Time Chunking (\drtc)~\cite{vial2026drtc} is a recent scheduling method for exactly this setting: it
 requests the next chunk early, estimates the latency the way TCP estimates round-trip times, and re-requests with a
@@ -66,9 +82,9 @@ motion be kept smooth without lowering success?
 \item \textbf{An evaluation framework}: offline, robot and bench evaluations; frozen plans that only grow; seeded
       rounds; raw records and a shared results store; metrics including recovery time and deviation from the policy's
       plan; and primary comparisons tested with the Holm correction (Chapter~\ref{ch:evaluation}).
-\item \textbf{Experiments}: a first robot run of \R{main/n} trials with its benches, the redesigned setup~v2 on two
-      tasks and seven policies, the offline evaluation of the trained policies, and a Raspberry Pi test
-      (Chapters~\ref{ch:design}--\ref{ch:edge}).
+\item \textbf{Experiments}: the offline evaluation of the seven trained policies, their baselines on the robot on
+      both tasks, the bench and robot experiments of setup~v2 with \drtc{} under controlled network faults, and the
+      Raspberry Pi as the robot computer (Chapters~\ref{ch:design}--\ref{ch:edge}).
 \end{enumerate}
 
 \section{Organisation of the report}
@@ -81,3 +97,6 @@ injection, and Chapter~\ref{ch:evaluation} the evaluation framework. Chapter~\re
 design, Chapter~\ref{ch:results} the results and Chapter~\ref{ch:edge} the Raspberry Pi. Chapter~\ref{ch:discussion}
 discusses the results and their limitations, and Chapter~\ref{ch:conclusion} concludes. The appendices list the training
 recipes, the full metric definitions, every condition and plan, and how to reproduce the results.
+
+\section{Summary}
+\textslot{the chapter's summary: the problem, the objectives, the contributions and the organisation}

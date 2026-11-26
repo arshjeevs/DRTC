@@ -1,5 +1,7 @@
 \chapter{Evaluation Framework}\label{ch:evaluation}
 
+\section{Introduction}
+
 Every result in this report comes from one framework, built so that a result can only be made one way and can always
 be traced back to the raw records of its trials. This chapter describes it; Chapter~\ref{ch:design} describes the
 experiments run with it.
@@ -68,6 +70,11 @@ change, and the next rounds run the new models until they have as many trials as
 condition, the task, the success rule, the time limit, a model's version) needs a new plan, which the session refuses
 to mix with the old one. Stopping at the end of a round keeps every condition at the same number of trials.
 
+\figslot{fig:evalflow}{The evaluation workflow, from a plan to a report.}{D7.1 Diagram}{Write the plan (models,
+conditions, trials) $\rightarrow$ check and freeze it (models pinned to their Hub commits) $\rightarrow$ serve the models
+on a GPU server $\rightarrow$ run the seeded rounds from the robot computer (label each trial s/f, void setup mistakes)
+$\rightarrow$ push the session to the results store $\rightarrow$ the report is rebuilt from the raw records.}
+
 \section{Records and the results store}\label{sec:records}
 
 Every trial stores its raw files: one row per control tick (the queue, stalls, the latency estimate, the commanded and
@@ -135,6 +142,11 @@ policy asked for. On every executed tick it is the mean over the five arm joints
 position and the newest accepted chunk's raw action for that step, before any smoothing. It is 0 without smoothing, and
 grows with a filter's lag.
 
+\figslot{fig:metricsdef}{The motion metrics, defined on one trial.}{D7.2 Diagram}{One trial's timeline with the
+action queue, the arm's joint speed and the fault: marked are a stall (queue empty, arm holding), the recovery time after
+the fault (until the arm moves on the policy's actions again), the jerk (from the joint trajectory) and the deviation
+from the policy's plan.}
+
 \section{Statistics}\label{sec:stats}
 
 Success rates are reported with Wilson 95\% intervals~\cite{wilson1927}. Differences in success between two conditions
@@ -161,3 +173,11 @@ its reference wins the pair; within 1\%, the lower largest step. The candidate w
 on M12 matters because the bench has no task success: without it, the rule would favour whatever smooths hardest,
 including by lagging behind the policy, which on the robot can cost a grasp. Policies without RTC use temporal
 ensembling as the seam method.
+
+\figslot{fig:stackrule}{The rule that chooses the smoothing stack.}{D7.3 Diagram}{A flowchart of the stack rule fixed
+before the bench ran: for each method, compare with \drtc{} alone under the mix $\rightarrow$ keep it only if it lowers
+the jerk without raising the stall or the recovery time beyond their bounds and with a plan deviation under its limit
+$\rightarrow$ combine the kept methods (one seam method, one jitter method) $\rightarrow$ the stack.}
+
+\section{Summary}
+\textslot{the chapter's summary: the three kinds of evaluation, plans, records, metrics, statistics and the stack rule}

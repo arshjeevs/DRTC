@@ -1,4 +1,9 @@
-\chapter{Data}\label{ch:data}
+\chapter{Data Collection}\label{ch:data}
+
+\section{Introduction}
+\textslot{what was recorded, how, and how it became training data; walks through Figure~\ref{fig:datapipe}.}
+
+\figslot{fig:datapipe}{The data pipeline, from teleoperation to a versioned dataset on the Hub.}{D4.1 Diagram}{Leader arm moved by a person $\rightarrow$ follower arm copies it $\rightarrow$ the recorder saves both cameras and the joint states at 30~fps $\rightarrow$ episodes are reviewed (bad ones deleted, re-recorded) $\rightarrow$ idle starts and ends are trimmed automatically $\rightarrow$ the dataset is split (training and held-out) and pushed to the Hub with a pinned revision.}
 
 \section{Tasks}\label{sec:tasks}
 
@@ -36,6 +41,10 @@ Two tasks were recorded, on three datasets (Table~\ref{tab:datasets}, Figure~\re
   \caption{The two tasks.}
   \label{fig:tasks}
 \end{figure}
+
+\figslot{fig:layouts}{The task layouts, seen from above.}{D4.2 Diagram}{Top views of the table: for sorting, the
+coloured squares and the cube's taped start marks with the rotation of layouts; for cube in box, the box and the cube's
+start marks. Drawn to scale from the taped layouts.}
 
 \section{Recording}\label{sec:recording}
 
@@ -77,3 +86,10 @@ training run refuses a local copy that does not match. The trimmed copy has the 
 \texttt{\_raw}, so a name without the suffix is always trimmed. The joint units are part of the entry because the two
 cube-in-box recordings use LeRobot's normalised range and the sorting recording uses degrees; datasets in different
 units are never mixed, and errors are only compared within one dataset.
+
+\figslot{fig:datastats}{The datasets: episodes and episode lengths, before and after trimming.}{C4.1 Chart}{From the
+dataset files: the number of training and held-out episodes per dataset, and the distribution of episode lengths in
+seconds before and after trimming (cube in box v0, v1, sorting).}
+
+\section{Summary}
+\textslot{the chapter's summary: the tasks, the recording, trimming and the versioned datasets}

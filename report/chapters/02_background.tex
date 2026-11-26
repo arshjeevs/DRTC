@@ -1,4 +1,8 @@
-\chapter{Background and Related Work}\label{ch:background}
+\chapter{Literature Review}\label{ch:background}
+
+\section{Introduction}
+\textslot{what this chapter reviews and why: learning from demonstrations, VLA models, action chunking, remote
+inference, RTC, DRTC and smoothing, ending with the gap this project fills.}
 
 \section{Learning manipulation from demonstrations}
 
@@ -8,6 +12,22 @@ the SO-101~\cite{so101}, demonstrations are recorded by teleoperation: the opera
 and an identical \emph{follower} arm copies it, while cameras and joint encoders are recorded at a fixed rate. LeRobot
 stores such recordings as datasets of episodes and trains policies on them~\cite{lerobot}.
 
+\figslot{fig:illoop}{Imitation learning: from human demonstrations to a policy that drives the robot.}{D2.2 Diagram}{
+The imitation-learning loop: a person teleoperates the follower arm with the leader arm $\rightarrow$ episodes of
+camera images, joint states and actions are recorded $\rightarrow$ the dataset trains a policy $\rightarrow$ the policy
+maps new observations to actions and drives the arm.}
+
+\section{Vision-language-action models}\label{sec:bg-vla}
+\textslot{what a VLA is, how it is built from a pretrained vision-language model plus an action expert, how it is
+trained and why it needs a GPU; walks through Figure~\ref{fig:vla}.}
+
+\figslot{fig:vla}{How a vision-language-action model turns images, an instruction and the arm's state into a chunk of
+actions.}{D2.1 Diagram}{Inside a VLA: the inputs (the wrist and scene camera images, the written instruction, the
+arm's joint state) $\rightarrow$ a vision encoder turns each image into tokens $\rightarrow$ the language-model
+backbone reads the image and text tokens together $\rightarrow$ an action expert (flow matching or diffusion) turns
+its features and the joint state into a chunk of future joint targets (e.g. 50 actions, 1.7~s) $\rightarrow$ the
+robot executes the chunk at 30~Hz. Small labels: which parts are pretrained, which are fine-tuned.}
+
 \section{Action chunking}
 
 Predicting one action per step makes policies sensitive to compounding errors and to the timing of inference.
@@ -15,7 +35,7 @@ Predicting one action per step makes policies sensitive to compounding errors an
 Actions can be \emph{absolute} joint targets or \emph{relative} to the current state; relative actions generalise
 across starting poses but tie each chunk to the state it was predicted from.
 
-\section{The policies}\label{sec:bg-policies}
+\section{The policies used in this work}\label{sec:bg-policies}
 
 \begin{description}[style=nextline, leftmargin=0pt]
 \item[ACT] Zhao et al.~\cite{zhao2023act} introduced chunking with a transformer conditional variational autoencoder over ResNet
@@ -36,6 +56,15 @@ longer than one round trip leaves no reserve when a reply is late (Section~\ref{
 the SO-101 differ considerably between these policies~\cite{armnetbench,so101failure,valloss2026};
 Section~\ref{sec:shortlist} summarises them.
 
+\tabslot{tab:policies-compare}{The seven policies side by side.}{One row per policy (ACT, Diffusion Policy,
+\smolvla, GR00T~N1.5, GR00T~N1.7, \pizerofive, MolmoAct~2): architecture, backbone, parameters, chunk length (actions and
+seconds), absolute or relative actions, inputs, and the action head (CVAE, diffusion, flow matching).}
+
+\figslot{fig:chunking}{Action chunking: chunks are requested, received and executed while the next one is computed.}{D2.3
+Diagram}{A timeline at 30~Hz: chunk 1 is executed action by action; partway through, the request for chunk 2 is
+sent; the server computes it while chunk 1 keeps the arm moving; chunk 2 arrives and takes over. Marked: the round
+trip, the actions left when the request is sent, and the switch-over point.}
+
 \section{Asynchronous and remote inference}\label{sec:bg-remote}
 
 If the robot waits for each chunk before moving, it pauses for every inference. \emph{Asynchronous} inference requests
@@ -52,6 +81,11 @@ disagree and the arm jumps when execution switches chunks. Real-Time Chunking (R
 next chunk as an in-painting problem: while generating it with a flow-matching policy, the actions that will still be
 executed from the current chunk are fixed as a prefix, so the new chunk continues them smoothly. RTC needs a
 flow-matching policy and an estimate of how many actions will be executed before the new chunk arrives.
+
+\figslot{fig:rtc}{Real-time chunking: the start of the new chunk is in-painted to continue the actions still to be
+executed.}{D2.4 Diagram}{Two chunks over time: the old chunk's remaining actions are frozen as a prefix; the new chunk is
+generated so that its first actions match the prefix and then follow the new observation; without RTC the switch
+shows a jump, with RTC it is continuous.}
 
 \section{Distributed Real-Time Chunking}\label{sec:bg-drtc}
 
@@ -70,7 +104,14 @@ network:
       types~\cite{shapiro2011crdt}, so reordered and duplicated messages are absorbed.
 \end{itemize}
 Its author evaluated it with injected faults on an SO-101 arm. The present work ports its scheduling into LeRobot~0.7's
-runtime, compares it with LeRobot's client on task success and takes it apart.
+runtime, compares it with LeRobot's client on task success and takes it apart. In this report \drtc{} therefore means DRTC's
+scheduling (the trigger, the latency estimate, the cooldown and the message semantics); RTC is treated separately, as
+one of the smoothing methods (Section~\ref{sec:smoothing}), and is not part of the robot experiment.
+
+\figslot{fig:drtc}{\drtc's scheduling: when it requests, how it estimates the latency, and when it gives up a reply.}{D2.5
+Diagram}{A timeline of requests and replies: the trigger fires when $H - s_{\min}$ actions are left; the latency
+estimate (smoothed mean plus deviation) sets the cooldown; a reply that misses the cooldown is abandoned and a fresh
+observation is sent; the freshest reply wins.}
 
 \section{Smoothing robot commands}
 
@@ -82,6 +123,11 @@ specific to chunking: averaging the overlapping predictions of successive chunks
 ACT~\cite{zhao2023act}), and varying the playback rate so that a late chunk causes a slowdown rather than a stop. Where
 a motion must start from rest, the minimum-jerk profile~\cite{flash1985} of human reaching movements gives a smooth
 blend.
+
+\section{Limitations of existing systems}\label{sec:bg-limits}
+\textslot{what is missing: LeRobot's client gives up after one second and never replaces a lost reply; DRTC was
+evaluated only by its author; no controlled comparison on a physical robot against a fair, patient baseline, with task
+success as the outcome and the method taken apart.}
 
 \section{Summary}
 

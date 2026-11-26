@@ -1,5 +1,8 @@
 \chapter{Policies and Training}\label{ch:policies}
 
+\section{Introduction}
+\textslot{which policies were trained, why, and how; the offline evaluation at the end.}
+
 \section{Choosing the policies}\label{sec:shortlist}
 
 The policies were chosen from published results on the same arm before any training, to span small task-specific
@@ -100,6 +103,12 @@ robot; the last checkpoint, with its training state, is kept as well. Because he
 and diffusion models~\cite{valloss2026}, the offline evaluation reports the action error of both
 (Section~\ref{sec:offline}).
 
+\figslot{fig:trainpipe}{The training pipeline, from a recipe to a model on the Hub.}{D5.1 Diagram}{A recipe (the
+authors' published settings) and a pinned dataset $\rightarrow$ automatic preparation (download once, convert, compute
+statistics) $\rightarrow$ \texttt{lab train} on the A100 or the H200 (shared GPUs, inside tmux) $\rightarrow$ logs to
+Weights \& Biases and Trackio $\rightarrow$ checkpoints pushed to the Hugging Face Hub $\rightarrow$ a frozen commit
+used by the evaluations.}
+
 \section{What was trained}\label{sec:trained}
 
 \begin{table}[htbp]
@@ -127,3 +136,44 @@ recipe to fit the project's time: \pizerofive{} after 15k of its 20k steps and M
 run is stopped by a step limit set in the recipe, which saves, pushes and ends the run at that step; the number of
 steps that sizes the learning-rate schedule is left at the recipe's value, so the stopped run is identical to the
 full one up to that step. Neither run logged a held-out loss, so the checkpoint served is the last one.
+
+\figslot{fig:losscurves}{Training loss of the seven policies on both tasks.}{C5.1 Chart}{Training loss against
+training step for each policy, one panel per task, exported from the Weights \& Biases runs (log scale); the step where
+\pizerofive{} and MolmoAct~2 were stopped is marked.}
+
+\figslot{fig:sizespeed}{Model size against inference time.}{C5.2 Chart}{Parameters (billions, log scale) against the
+server's inference time per chunk (ms) for the seven policies, from the server logs of the robot baselines; marker size:
+chunk length.}
+
+\section{Offline evaluation}\label{sec:offline}
+
+Table~\ref{tab:offline} and Figure~\ref{fig:offline} give the held-out action error (M9) and the inference cost (M10)
+of the trained policies, measured on the \R{offline/gpu} while training jobs shared it, which is how a shared server
+is used in practice. On sorting, \smolvla{} had the lowest arm error (\R{offline/sortone/smolvla/M9arm}\degree),
+followed by Diffusion Policy (\R{offline/sortone/diffusion/M9arm}\degree), \groot{} (\R{offline/sortone/groot/M9arm}\degree)
+and ACT (\R{offline/sortone/act/M9arm}\degree). ACT was the fastest (\R{offline/sortone/act/M10} per chunk,
+\R{offline/sortone/act/M10gb}), \groot{} the largest (\R{offline/sortone/groot/M10gb}). For two policies the last
+checkpoint had a lower held-out error than the one selected by held-out loss (Table~\ref{tab:offline}), so the two
+criteria do not always agree. On cube in box v1 the order of speed is the same, ACT being the fastest. GR00T~N1.7,
+\pizerofive{} and MolmoAct~2 are trained; their offline evaluation is added when it has run.
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \begin{adjustbox}{max width=\textwidth}
+  \gentable{tab_offline}
+  \end{adjustbox}
+  \caption{Offline evaluation: held-out action error of the served and the last checkpoint (sorting in degrees; cube in
+           box in LeRobot's normalised units), and inference time and peak GPU memory over 200 requests.}\label{tab:offline}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \genfigure{fig_offline}
+  \caption{Offline evaluation: held-out arm error on sorting (left) and inference time per chunk, median to 95th
+           percentile (right).}
+  \label{fig:offline}
+\end{figure}
+
+\section{Summary}
+\textslot{the chapter's summary: the seven policies, the recipes, the training infrastructure and the offline evaluation}

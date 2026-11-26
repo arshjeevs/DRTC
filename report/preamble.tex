@@ -104,3 +104,17 @@
 \renewcommand{\listtablename}{List of Tables}
 \renewcommand{\bibname}{References}
 \renewcommand{\appendixname}{Appendix}
+
+% Skeleton slots (report plan, lab/docs/REPORT-PLAN.md): a figure still to be drawn or generated, and results still to
+% come. Each prints a framed box saying what will go there.
+% \figslot{label}{caption}{D1.1 diagram|chart}{what it shows}
+\newcommand{\figslot}[4]{\begin{figure}[htbp]\centering
+  \placeholderbox[0.92\textwidth]{4.2cm}{\textbf{#3 (to be made)}\\[4pt] #4}\caption{#2}\label{#1}\end{figure}}
+% \tabslot{label}{caption}{what it shows}
+\newcommand{\tabslot}[3]{\begin{table}[htbp]\centering
+  \placeholderbox[0.92\textwidth]{3.2cm}{\textbf{Table (to be made)}\\[4pt] #3}\caption{#2}\label{#1}\end{table}}
+% \resultsslot{what will be reported}
+\newcommand{\resultsslot}[1]{\par\noindent\fbox{\parbox{\dimexpr\textwidth-2\fboxsep-2\fboxrule}{\centering\small
+  \textbf{Results to be added.} #1}}\par}
+% \textslot{what this part will say}: text to be written in the text pass (plan stage 4)
+\newcommand{\textslot}[1]{\par\noindent{\small\itshape [To be written: #1]}\par}

@@ -1,440 +1,11 @@
 \chapter{Results}\label{ch:results}
 
-This chapter gives every result so far. The first robot run and its benches are complete; the setup~v2 experiments
-and the baselines are being run, and their sections fill in as their results arrive (until then they read
-\pending). Every number is computed with metrics version~3 from the raw files of the trials.
-
-\section{The first run}\label{sec:main}
-
-The first run (Section~\ref{sec:firstrun}) ran \smolvla{} and \groot{} on the sorting task under four conditions:
-\R{main/n} valid trials in \R{main/sessions} sessions. One further trial was not counted, because the arm's motor bus was not found when it
-started (a setup fault before the first action). Figure~\ref{fig:success} and Table~\ref{tab:success} give the task
-success.
-
-\begin{figure}[htbp]
-  \centering
-  \genfigure{fig_main_success}
-  \caption{The first run: task success per condition, with Wilson 95\% intervals (10 trials per bar). Conditions:
-           1~baseline, 2~baseline with faults, 3~\drtc{} with faults, 4~\drtc{} with smoothing and faults.}
-  \label{fig:success}
-\end{figure}
-
-\begin{table}[htbp]
-  \centering
-  \small
-  \begin{adjustbox}{max width=\textwidth}
-  \gentable{tab_main_success}
-  \end{adjustbox}
-  \caption{Task success, its 95\% interval, and the trials ended by a fault.}\label{tab:success}
-\end{table}
-
-\subsection{Network faults break the shipped client}
-
-Under the fault mix, neither policy completed a single trial: \smolvla's success fell from \R{main/smolvla/baseline/M1}
-to \R{main/smolvla/faults/M1} (\R{main/smolvla/p/baseline-faults/M1}) and \groot's from \R{main/groot/baseline/M1} to
-\R{main/groot/faults/M1} (\R{main/groot/p/baseline-faults/M1}). The shipped client itself ended
-\R{main/smolvla/faults/M1f} of \smolvla's and \R{main/groot/faults/M1f} of \groot's trials, every one of them at the
-first fault, the latency spike: the queue ran dry, the late reply was discarded, and one second later the starvation
-grace ended the run. The dropped replies and the outage were never reached. This is what led to the redesign
-(Section~\ref{sec:redesign}).
-
-
-\subsection{\drtc{} recovers task success}
-
-With \drtc{} under the same faults, success was \R{main/smolvla/drtc/M1} for \smolvla{}
-(\R{main/smolvla/p/faults-drtc/M1} against the faulted baseline) and \R{main/groot/drtc/M1} for \groot{}
-(\R{main/groot/p/faults-drtc/M1}), and no trial was ended by a fault (\R{main/smolvla/drtc/M1f} and
-\R{main/groot/drtc/M1f}). This recovery is measured against a client that gave up by design; setup~v2 compares \drtc{}
-with a client that waits instead (Section~\ref{sec:v2robot}). Against the fault-free baseline the difference is not significant at this sample size
-(\smolvla: \R{main/smolvla/drtc/M1} against \R{main/smolvla/baseline/M1}, \R{main/smolvla/p/baseline-drtc/M1};
-\groot: \R{main/groot/drtc/M1} against \R{main/groot/baseline/M1}, \R{main/groot/p/baseline-drtc/M1}).
-
-\subsection{Smoothing improves the motion}
-
-Smoothing lowered the jerk of the commanded motion from \R{main/smolvla/drtc/M7} to \R{main/smolvla/smooth/M7}~\jerkunit{}
-for \smolvla{} (\R{main/smolvla/p/drtc-smooth/M7}) and from \R{main/groot/drtc/M7} to \R{main/groot/smooth/M7} for
-\groot{} (\R{main/groot/p/drtc-smooth/M7}), factors of \R{main/smolvla/jerkratio} and \R{main/groot/jerkratio}
-(Figure~\ref{fig:jerk}). The largest step between two ticks fell from \R{main/smolvla/drtc/M8b} to
-\R{main/smolvla/smooth/M8b} (\R{main/smolvla/p/drtc-smooth/M8b}) and from \R{main/groot/drtc/M8b} to
-\R{main/groot/smooth/M8b} (\R{main/groot/p/drtc-smooth/M8b}). For \groot, adaptive playback also cut the time without
-new actions from \R{main/groot/drtc/M2} to \R{main/groot/smooth/M2} of the ticks (\R{main/groot/p/drtc-smooth/M2};
-Figure~\ref{fig:stall}). Success did not fall: \R{main/smolvla/smooth/M1} and \R{main/groot/smooth/M1}
-(\R{main/smolvla/p/drtc-smooth/M1} and \R{main/groot/p/drtc-smooth/M1} against \drtc{} alone).
-Table~\ref{tab:tests} collects these comparisons.
-
-\begin{figure}[htbp]
-  \centering
-  \genfigure{fig_main_jerk}
-  \caption{Jerk of the commanded arm motion, one dot per trial; the bar and number give the median.}
-  \label{fig:jerk}
-\end{figure}
-
-\begin{figure}[htbp]
-  \centering
-  \genfigure{fig_main_stall}
-  \caption{Stall fraction: the share of control ticks without a new action, one dot per trial.}
-  \label{fig:stall}
-\end{figure}
-
-\begin{table}[htbp]
-  \centering
-  \small
-  \begin{adjustbox}{max width=\textwidth}
-  \gentable{tab_main_tests}
-  \end{adjustbox}
-  \caption{Comparisons between conditions (Fisher's exact test for success, Mann--Whitney $U$ for the others; values
-           are the medians of the per-trial values, the later condition first).}\label{tab:tests}
-\end{table}
-
-\subsection{Recovery after each fault}
-
-Table~\ref{tab:mainrecovery} gives the recovery time (M11) after each fault of the mix. The shipped client never
-recovered: its first fault ended every run. \drtc{} recovered from every fault in every counted run, typically within
-half a second to a second and a half; for \smolvla{} the dropped replies did not even stop the arm (0~s), because its
-earlier trigger left enough actions in the queue. With smoothing, \groot's recovery from the outage fell from
-\R{main/groot/drtc/M11/outage} to \R{main/groot/smooth/M11/outage}. Fewer runs are counted for the outage, because
-\smolvla{} often completed the task before the outage ended.
-
-\begin{table}[htbp]
-  \centering
-  \small
-  \begin{adjustbox}{max width=\textwidth}
-  \gentable{tab_main_recovery}
-  \end{adjustbox}
-  \caption{The first run: recovery after each fault of the mix (recovered runs out of the counted ones, and the median
-           time from the end of the fault until the arm moved again).}\label{tab:mainrecovery}
-\end{table}
-
-\subsection{Behaviour over time}
-
-Figure~\ref{fig:timeline} follows one \smolvla{} trial per condition, chosen as the trial with the median jerk of its
-condition (for condition~2, among the trials ended by a fault). Under the shipped client, the latency spike delays a
-reply, the queue runs dry, and one second later the run is ended. With \drtc, the arm holds through the spike, the
-dropped replies and the outage, and continues each time a chunk arrives. With smoothing, the same trajectory is
-followed without the small jumps at chunk switches.
-
-\begin{figure}[htbp]
-  \centering
-  \genfigure{fig_main_timeline}
-  \caption{One \smolvla{} trial per condition: the most-moving arm joint's commanded position over time. Grey bands:
-           the fault windows; short dark ticks: stalls; $\times$: the run ended by a fault.}
-  \label{fig:timeline}
-\end{figure}
-
-\subsection{Timing}
-
-The median turnaround on the normal network was \R{main/smolvla/baseline/M4med} for \smolvla{}, of which
-\R{main/smolvla/baseline/M6} was inference on the server, and \R{main/groot/baseline/M4med} for \groot{}, of which
-\R{main/groot/baseline/M6} was inference. The rest, \R{main/smolvla/baseline/net} and \R{main/groot/baseline/net},
-is the network and queueing share, mostly the transfer of the uncompressed images. Under the faults with \drtc{},
-\groot's 95th-percentile turnaround rose to \R{main/groot/drtc/M4p95} and its latency estimate exceeded the measured
-turnaround by \R{main/groot/drtc/M5}; with smoothing they were \R{main/groot/smooth/M4p95} and
-\R{main/groot/smooth/M5}. Table~\ref{tab:motion} lists all timing and smoothness metrics.
-
-\begin{table}[htbp]
-  \centering
-  \small
-  \begin{adjustbox}{max width=\textwidth}
-  \gentable{tab_main_motion}
-  \end{adjustbox}
-  \caption{Timing and smoothness, medians over trials. Condition numbers as in Table~\ref{tab:conditions1}.}\label{tab:motion}
-\end{table}
-
-\section{The first benches: each fault on its own}\label{sec:bench}
-
-On the replay robot, each fault of the mix was applied alone and together, with the network latency simulated as
-measured on the robot (250~ms $\pm$ 20~ms on every reply), for both policies and all four conditions (8 runs each;
-Figure~\ref{fig:bench}, Table~\ref{tab:bench}). Each fault alone was enough for the shipped client to end every
-\smolvla{} run (spike \R{bench/spike/smolvla/faults/M1f}, dropped replies \R{bench/drops/smolvla/faults/M1f}, outage
-\R{bench/outage/smolvla/faults/M1f}), including the single 1-second latency spike. Under \drtc{} no run was ended by
-a fault in any fault type (for example \R{bench/mix/smolvla/drtc/M1f} and \R{bench/mix/groot/drtc/M1f} under the
-mix). Smoothing lowered the jerk under every fault type, for example under the mix from \R{bench/mix/smolvla/drtc/M7}
-to \R{bench/mix/smolvla/smooth/M7} for \smolvla{} and from \R{bench/mix/groot/drtc/M7} to
-\R{bench/mix/groot/smooth/M7} for \groot. The bench reproduces the robot's pattern, which supports reading the robot
-results as an effect of the scheduling rather than of the particular sessions. These benches compared the same four
-conditions as the first run, so they share its limitation: the faulted baseline gave up by design.
-
-\begin{figure}[htbp]
-  \centering
-  \genfigure{fig_bench}
-  \caption{Bench (replay robot): runs ended by a fault (top; the numbers are runs out of 8) and jerk (bottom), for each
-           fault type alone and the mix.}
-  \label{fig:bench}
-\end{figure}
-
-\begin{table}[htbp]
-  \centering
-  \small
-  \begin{adjustbox}{max width=\textwidth}
-  \gentable{tab_bench}
-  \end{adjustbox}
-  \caption{Bench results per fault type: runs ended by a fault (out of 8), stall fraction and jerk (medians).}\label{tab:bench}
-\end{table}
-
-\section{Offline evaluation of the policies}\label{sec:offline}
-
-Table~\ref{tab:offline} and Figure~\ref{fig:offline} give the held-out action error (M9) and the inference cost (M10)
-of the trained policies, measured on the \R{offline/gpu} while training jobs shared it, which is how a shared server
-is used in practice. On sorting, \smolvla{} had the lowest arm error (\R{offline/sortone/smolvla/M9arm}\degree),
-followed by Diffusion Policy (\R{offline/sortone/diffusion/M9arm}\degree), \groot{} (\R{offline/sortone/groot/M9arm}\degree)
-and ACT (\R{offline/sortone/act/M9arm}\degree). ACT was the fastest (\R{offline/sortone/act/M10} per chunk,
-\R{offline/sortone/act/M10gb}), \groot{} the largest (\R{offline/sortone/groot/M10gb}). For two policies the last
-checkpoint had a lower held-out error than the one selected by held-out loss (Table~\ref{tab:offline}), so the two
-criteria do not always agree. On cube in box v1 the order of speed is the same, ACT being the fastest. GR00T~N1.7,
-\pizerofive{} and MolmoAct~2 are trained; their offline evaluation is added when it has run.
-
-\begin{table}[htbp]
-  \centering
-  \small
-  \begin{adjustbox}{max width=\textwidth}
-  \gentable{tab_offline}
-  \end{adjustbox}
-  \caption{Offline evaluation: held-out action error of the served and the last checkpoint (sorting in degrees; cube in
-           box in LeRobot's normalised units), and inference time and peak GPU memory over 200 requests.}\label{tab:offline}
-\end{table}
-
-\begin{figure}[htbp]
-  \centering
-  \genfigure{fig_offline}
-  \caption{Offline evaluation: held-out arm error on sorting (left) and inference time per chunk, median to 95th
-           percentile (right).}
-  \label{fig:offline}
-\end{figure}
-
-\section{Setup v2 on the bench}\label{sec:v2bench}
-
-\subsection{\drtc{} against upstream, and the ablations (E1, E2)}
-
-Tables~\ref{tab:v2e1sort} and~\ref{tab:v2e1cube} compare \drtc{} with patient upstream under every fault type: the
-stall fraction, how many recoveries succeeded, and how long they took, with the runs that upstream as shipped ended.
-Tables~\ref{tab:v2e2sort} and~\ref{tab:v2e2cube} give the ablations: for each part of \drtc{} removed, in how many
-policies the stalls rose and by how much. The primary comparisons (\drtc{} against patient upstream, each fault type)
-are tested in the plans' reports.
-
-\paragraph{\drtc{} against the patient client (E1).} On sorting (Table~\ref{tab:v2e1sort}), without faults the two
-clients stalled about equally: both keep one request in flight, the long-chunk policies rarely run dry, and the
-short-chunk ones stall as before. The faults separate them. Under the fault mix \drtc{} cut the stall fraction from
-\R{v2/sort_one/e1/mix/act/patient} to \R{v2/sort_one/e1/mix/act/drtc}\,\% for ACT, from \R{v2/sort_one/e1/mix/smolvla/patient} to \R{v2/sort_one/e1/mix/smolvla/drtc}\,\% for
-\smolvla{} and from \R{v2/sort_one/e1/mix/pi05/patient} to \R{v2/sort_one/e1/mix/pi05/drtc}\,\% for \pizerofive{}, and it recovered from every
-fault for six of the seven policies (GR00T N1.7: \R{v2/sort_one/e1/mix/grootn17/drtcrec}), against \R{v2/sort_one/e1/mix/smolvla/patientrec} for
-\smolvla{} and \R{v2/sort_one/e1/mix/groot/patientrec} for \groot{} with the patient client. The difference comes from lost
-replies. After an outage the patient client recovered in \R{v2/sort_one/e1/outage/smolvla/patientrec} \smolvla{} runs and
-\R{v2/sort_one/e1/outage/groot/patientrec} \groot{} runs, \drtc{} in all of them, \R{v2/sort_one/e1/outage/smolvla/drtcrectime} and
-\R{v2/sort_one/e1/outage/groot/drtcrectime}\,s after the outage ended. The patient client sends a fresh request only once, when its
-queue runs dry; when that request is lost too, nothing more is sent until LeRobot's 10\,s startup deadline ends the
-run. A latency spike alone was absorbed by both clients.
-
-\paragraph{Where \drtc{} was worse: a rising latency.} When every reply became 0.4\,s slower for 5\,s (rise),
-\drtc{} stalled more than the patient client for every policy, for example \smolvla{} \R{v2/sort_one/e1/rise/smolvla/patient} against
-\R{v2/sort_one/e1/rise/smolvla/drtc}\,\% and ACT \R{v2/sort_one/e1/rise/act/patient} against \R{v2/sort_one/e1/rise/act/drtc}\,\%. The cooldown is the cause. It
-is set from the replies seen so far, so a reply that is only slower than the recent ones is given up and a new request
-sent; the server, still computing the abandoned one, answers BUSY, and the replacement starts late. Without the
-cooldown the stall under rise changed by \R{v2/sort_one/e2/a1_no_cooldown/rise/delta} points (Table~\ref{tab:v2e2sort}). A cooldown
-that adapts faster to a slower link is future work (Section~\ref{sec:limits}).
-
-\paragraph{Which part matters (E2).} The cooldown carries almost all of \drtc's benefit. Without it the stall rose in
-\R{v2/sort_one/e2/a1_no_cooldown/mix/worse} policies under the fault mix, by a median of \R{v2/sort_one/e2/a1_no_cooldown/mix/delta} points (outage
-\R{v2/sort_one/e2/a1_no_cooldown/outage/delta}, drops \R{v2/sort_one/e2/a1_no_cooldown/drops/delta}). The latency estimator made no measurable
-difference (median change \R{v2/sort_one/e2/a2_upstream_estimator/mix/delta} points under the mix, \R{v2/sort_one/e2/a2_upstream_estimator/rise/delta}
-under rise): on the bench's steady link the maximum of recent turnarounds and the Jacobson--Karels estimate are nearly
-the same. The early trigger helped a little (\R{v2/sort_one/e2/a3_upstream_trigger/mix/delta} points under the mix). \drtc's original
-cap of the cooldown at half a chunk, which our first fix removed, raised the stall by \R{v2/sort_one/e2/a4_half_chunk_cap/none/delta}
-points even without faults and by \R{v2/sort_one/e2/a4_half_chunk_cap/mix/delta} under the mix: the fix holds for all seven policies.
-
-\begin{figure}[htbp]
-  \centering
-  \genfigure{fig_v2_e1_sort_one}
-  \par\medskip
-  \genfigure{fig_v2_e1_cubebox_v1}
-  \caption{E1: each policy's median stall fraction with patient upstream (orange) and with \drtc{} (green), per
-           fault type; sorting (top) and cube in box v1 (bottom). A line going down: \drtc{} stalls less.}
-  \label{fig:v2e1}
-\end{figure}
-
-\begin{table}[htbp]
-  \centering
-  \small
-  \begin{adjustbox}{max width=\textwidth}
-  \gentable{tab_v2_e1_sort_one}
-  \end{adjustbox}
-  \caption{E1 on sorting: \drtc{} against patient upstream (medians over 8 runs; recovered: runs that moved again
-           after each timed fault, summed over the faults of the type).}\label{tab:v2e1sort}
-\end{table}
-
-\begin{table}[htbp]
-  \centering
-  \small
-  \begin{adjustbox}{max width=\textwidth}
-  \gentable{tab_v2_e1_cubebox_v1}
-  \end{adjustbox}
-  \caption{E1 on cube in box v1, as Table~\ref{tab:v2e1sort}.}\label{tab:v2e1cube}
-\end{table}
-
-\begin{table}[htbp]
-  \centering
-  \small
-  \gentable{tab_v2_e2_sort_one}
-  \caption{E2 on sorting: each ablation against \drtc{} (policies whose median stall fraction rose, and the median
-           change in percentage points).}\label{tab:v2e2sort}
-\end{table}
-
-\begin{table}[htbp]
-  \centering
-  \small
-  \gentable{tab_v2_e2_cubebox_v1}
-  \caption{E2 on cube in box v1, as Table~\ref{tab:v2e2sort}.}\label{tab:v2e2cube}
-\end{table}
-
-\subsection{The smoothing methods alone (E3a)}
-
-Tables~\ref{tab:v2e3asort} and~\ref{tab:v2e3acube} give each smoothing method alone on \drtc{} under the mix: the jerk
-relative to \drtc{} alone, the largest step, the deviation from the policy's plan and the stall fraction. Each method
-did one job, and the same one on both tasks.
-
-\paragraph{Two groups of policies.} With \drtc{} alone under the mix, ACT stalled for about 3\% of the run and
-\smolvla{} for 12--15\%, while \pizerofive{} (about 38\%), Diffusion Policy (48--53\%), MolmoAct~2 (55--57\%),
-\groot{} (64\%) and GR00T~N1.7 (68\%) stalled for a third to two thirds of it: their chunk runs out before the next
-one arrives. This split decides which methods help.
-
-\paragraph{The Butterworth filter} lowered the jerk for every policy, to between 0.12 and 0.28 of \drtc{} alone on
-sorting, and roughly halved the largest step. Its cost is a deviation of 0.9--1.6\degree{} from the policy's plan; it
-did not change the stalls.
-
-\paragraph{Adaptive playback} lowered the stalls of the slow policies, which is what it is for: \groot{} from 64 to
-40\%, MolmoAct~2 from 55--57 to 30--35\%, Diffusion Policy from 48--53 to 29--30\% and GR00T~N1.7 from 68 to
-53--55\%. It did not help \pizerofive, and ACT and \smolvla{} had little stalling to remove. It also roughly halved
-the jerk of the slow policies, because the arm stops and restarts less often, and it never moves the arm off the plan.
-Combined with the Butterworth filter (the first run's condition~4) it gave both effects: MolmoAct~2 on cube in box went
-from 57\% stalls and a jerk of 232 to 32\% and 15 ($10^3$\degree/s$^3$).
-
-\paragraph{The resume ramp} helps where the arm restarts often: \groot's jerk fell to 0.18 of \drtc{} alone, at a
-deviation of 2\degree. \textbf{Zero-lag smoothing} halved the jerk of the fast policies (ACT, \smolvla) but raised it
-for \groot{} and MolmoAct~2. \textbf{Temporal ensembling} changed little except for ACT.
-
-\paragraph{RTC} did not help. It more than doubled \smolvla's stalls (from about 14 to 36--38\%): each RTC request
-is slower, and the longer turnaround outweighs the smoother joins. For \groot{} the jerk changed by $-19\%$ on sorting
-and $+11\%$ on cube in box, within the run-to-run spread.
-
-\paragraph{The stack.} By the rule of Section~\ref{sec:stackrule}, fixed before E3a ran, the stack is \R{v2/stack}.
-Both choices were close. The seam choice was decided by one pair (\groot{} on sorting, where RTC lowered the jerk and
-ensembling slowed the recovery from the spike); in the other three RTC-capable pairs both candidates were ruled out.
-Of the fourteen pairs for the jitter choice, the Butterworth filter won two (ACT on both tasks) and zero-lag smoothing
-one; in the other eleven both were ruled out, the filter mostly by the deviation guard (1.0--1.6\degree{} against a
-limit of 1\degree) and zero-lag smoothing by slower recovery. Eight runs per cell also leave a wide spread: the same
-\drtc{} cell of \groot{} on sorting had a median jerk of 178 in one plan and 219 in the other, so differences below
-about 20\% are not reliable.
-
-\begin{table}[htbp]
-  \centering
-  \small
-  \begin{adjustbox}{max width=\textwidth}
-  \gentable{tab_v2_e3a_sort_one}
-  \end{adjustbox}
-  \caption{E3a on sorting: each smoothing method alone on \drtc{} under the fault mix (medians over 8 runs).}\label{tab:v2e3asort}
-\end{table}
-
-\begin{table}[htbp]
-  \centering
-  \small
-  \begin{adjustbox}{max width=\textwidth}
-  \gentable{tab_v2_e3a_cubebox_v1}
-  \end{adjustbox}
-  \caption{E3a on cube in box v1, as Table~\ref{tab:v2e3asort}.}\label{tab:v2e3acube}
-\end{table}
-
-\subsection{The stack on the bench (E3b)}\label{sec:v2e3b}
-
-Figure~\ref{fig:v2stack} and Tables~\ref{tab:v2e3bsort} and~\ref{tab:v2e3bcube} compare the stack with \drtc{} alone
-under the mix, and
-Tables~\ref{tab:v2e3bablsort} and~\ref{tab:v2e3bablcube} remove one part at a time. \smolvla{} and \groot{} ran the
-stack as chosen, with RTC; the five policies without RTC ran it with temporal ensembling as the seam method.
-
-\paragraph{The stack against \drtc{} alone.} The stack lowered the jerk for every policy on both tasks, to between
-0.05 and 0.31 of \drtc{} alone (3 to 20 times smoother), and the largest single step by a factor of 2 to 6. It cut the
-stalls of the slow policies: on sorting Diffusion Policy from 50 to 27\%, MolmoAct~2 from 57 to 32\%, \groot{} from 65
-to 41\% and GR00T~N1.7 from 68 to 49\%, with the same pattern on cube in box. Recovery after the faults was as fast or
-faster for five of the seven policies. Three costs remain. The arm deviated from the policy's plan by 0.7 to
-2.3\degree, more than any single method, because the filter, ensembling and the ramp each add their share. \smolvla's
-stalls doubled (15 to 33\% on sorting, 14 to 31\% on cube in box). And \pizerofive{} recovered more slowly on sorting
-(1.0 to 2.2~s), with more stalls there (40 to 46\%) but fewer on cube in box (40 to 33\%).
-
-\paragraph{The parts.} Adaptive playback is what removes the stalls: without it the stall fraction rose by 11 to 19
-percentage points (median per group) in 12 of the 14 policy-task pairs. The Butterworth filter is what removes most of
-the jerk: without it the jerk was 1.7 to 2.4 times higher, in 14 of 14 pairs. The resume ramp mattered little in the
-stack (median change of the jerk $-4$ to $+22\%$), because adaptive playback already removes most of the restarts it
-smooths. The seam method behaved differently by kind. Removing RTC \emph{lowered} the stalls on both tasks, of \smolvla{} by 16 to
-20 points and of \groot{} by 3, at no cost in jerk (1.01 to 1.03 times); \smolvla{} without RTC stalled no more than with
-\drtc{} alone, and on cube in box \groot{} recovered from the latency spike in 0.7~s without RTC against 2.3~s with it.
-Removing ensembling changed little on sorting and raised the jerk by 1.28 times on cube in box.
-
-\paragraph{What this means for the stack.} By its pre-registered rule the stack includes RTC, but E3b shows that RTC is
-the one part that does not earn its place on this setup: it makes each request slower, and with a round trip
-dominated by the network the extra delay costs more stalls than the smoother seams save. The stack without RTC
-(adaptive playback, the Butterworth filter and the resume ramp) stalled less than the chosen stack on all four RTC
-policy-task pairs (\smolvla{} 16 to 20 points, \groot{} 3), at the same jerk. The rule is kept as it was fixed, and this result is reported as its correction; the stack used on
-the robot is stated in Section~\ref{sec:v2robot}.
-
-Without faults the stack still stalled \groot{} (20--23\%) and GR00T~N1.7 (36\%): the chunk of these policies is barely
-longer than their round trip even on a good network (Section~\ref{sec:shortchunk}). The other policies stalled for
-less than 13\% of a fault-free run, \smolvla{} excepted (22\%, with RTC).
-
-\begin{figure}[htbp]
-  \centering
-  \genfigure{fig_v2_stack}
-  \caption{E3b: each policy's median stall fraction under the fault mix with \drtc{} alone (grey) and with the stack
-           (orange), and how many times lower the stack's jerk was (right).}
-  \label{fig:v2stack}
-\end{figure}
-
-\begin{table}[htbp]
-  \centering
-  \small
-  \begin{adjustbox}{max width=\textwidth}
-  \gentable{tab_v2_e3b_sort_one}
-  \end{adjustbox}
-  \caption{E3b on sorting: the stack against \drtc{} alone under the fault mix, and the stack without faults (medians
-           over 8 runs; jerk: the stack's median over \drtc's; recovery: median over the mix's three faults). Seam: the
-           stack's seam method, RTC where the policy supports it and temporal ensembling otherwise.}\label{tab:v2e3bsort}
-\end{table}
-
-\begin{table}[htbp]
-  \centering
-  \small
-  \begin{adjustbox}{max width=\textwidth}
-  \gentable{tab_v2_e3b_cubebox_v1}
-  \end{adjustbox}
-  \caption{E3b on cube in box v1, as Table~\ref{tab:v2e3bsort}.}\label{tab:v2e3bcube}
-\end{table}
-
-\begin{table}[htbp]
-  \centering
-  \small
-  \gentable{tab_v2_e3b_abl_sort_one}
-  \caption{E3b ablations on sorting: the stack without one part, against the full stack under the mix (number of
-           policies in which the jerk or the stalls were higher without the part; median ratio of the jerk, median
-           change of the stall fraction and of the recovery time).}\label{tab:v2e3bablsort}
-\end{table}
-
-\begin{table}[htbp]
-  \centering
-  \small
-  \gentable{tab_v2_e3b_abl_cubebox_v1}
-  \caption{E3b ablations on cube in box v1, as Table~\ref{tab:v2e3bablsort}.}\label{tab:v2e3bablcube}
-\end{table}
-
-\section{Setup v2 on the robot (E4)}\label{sec:v2robot}
-
-Table~\ref{tab:e4} gives E4: \smolvla{} and \groot{} on sorting, patient upstream without faults and under the mix,
-\drtc{} under the mix and \drtc{} with the stack under the mix.
-
-\begin{table}[htbp]
-  \centering
-  \small
-  \gentable{tab_e4}
-  \caption{E4: task success on the robot with Wilson 95\% intervals.}\label{tab:e4}
-\end{table}
-
-\section{Baselines of all policies}\label{sec:baselines}
+\section{Introduction}
+This chapter gives the results of the experiments of Chapter~\ref{ch:design}: the robot baselines of all seven policies,
+the bench experiments of setup~v2, and the robot experiment E4. Every number is computed with metrics version~3 from
+the raw files of the trials, and every table and chart is rebuilt from them.
+
+\section{Robot baselines of all policies}\label{sec:baselines}
 
 Tables~\ref{tab:basesort} and~\ref{tab:basecube} give the baseline of all seven trained policies on the robot:
 patient upstream LeRobot, a normal network, ten trials per policy and task, the Raspberry Pi~5 as the robot computer
@@ -472,3 +43,50 @@ plan and metrics v1, four models) are archived the same way; they predate setup 
   \gentable{tab_base_cubebox_v1}
   \caption{Baselines on cube in box v1, as Table~\ref{tab:basesort}.}\label{tab:basecube}
 \end{table}
+
+\figslot{fig:baselines}{Baselines of the seven policies on both tasks.}{C9.1 Chart}{Generated from the baseline trials:
+task success with Wilson 95\% intervals, seven policies, one bar per task, sorted by the mean of the two tasks;
+MolmoAct~2 marked as a broken fine-tune.}
+
+
+\section{Bench: \drtc{} against LeRobot's client (E1) and its ablations (E2)}\label{sec:v2bench}
+\resultsslot{E1 and E2 on both tasks: the stall fraction, the recoveries and the recovery time of \drtc{} against the
+patient and the shipped client under each fault type, and the effect of removing each part of \drtc{}. Tables and charts
+per task.}
+
+\section{Bench: smoothing (E3a, E3b)}\label{sec:res-e3}\label{sec:v2e3b}
+\resultsslot{E3a (each smoothing method alone under the fault mix) and E3b (the chosen stack and its ablations), on
+both tasks: jerk, stall, recovery time and deviation from the policy's plan; and the choice of the stack for E4.}
+
+\section{Robot: \drtc{} under network faults (E4)}\label{sec:v2robot}
+
+E4 runs GR00T~N1.7, \smolvla, Diffusion and \pizerofive{} on cube in box v1 and on sorting, under four conditions
+each: patient upstream without faults and under the mix, \drtc{} under the mix, and \drtc{} with the stack without RTC
+under the mix (Section~\ref{sec:setupv2}). The Raspberry Pi~5 drives the arm over a wired link to the laptop, and the
+models are served from the H200. \textit{The runs are in progress; Tables~\ref{tab:e4cube} and~\ref{tab:e4} are
+filled in from the trials when they are complete.}
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \gentable{tab_e4_cubebox_v1}
+  \caption{E4 on cube in box v1: task success on the robot with Wilson 95\% intervals.}\label{tab:e4cube}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \gentable{tab_e4}
+  \caption{E4 on sorting, as Table~\ref{tab:e4cube}.}\label{tab:e4}
+\end{table}
+
+\figslot{fig:e4success}{E4: task success under the four conditions.}{C9.2 Chart}{Generated from the E4 trials: task
+success with 95\% intervals for each of the four policies under the four conditions, one panel per task.}
+
+\figslot{fig:e4motion}{E4: stall, jerk and recovery time under the four conditions.}{C9.3--C9.5 Charts}{Generated from
+the E4 trials: the stall fraction, the jerk and the recovery time after each fault, per policy and condition, one row
+per task.}
+
+
+\section{Summary}
+\textslot{the chapter's summary: the baselines, the bench experiments and E4}

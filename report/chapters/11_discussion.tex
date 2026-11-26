@@ -1,76 +1,25 @@
 \chapter{Discussion}\label{ch:discussion}
 
-\section{Why the shipped client fails under faults}
+\section{Introduction}
+\textslot{what the results mean, what they do not show, and what was learned building the system.}
 
-The shipped client has two give-up limits (Section~\ref{sec:baseline}). The starvation grace ends a run one second
-after the queue runs dry, and every fault of the mix lasts about that long or longer; worse, when the queue runs dry
-the request in flight is forgotten, so the late reply that would have saved the run is discarded. In the first run
-every faulted trial ended this way at the first fault (Section~\ref{sec:main}), and on the bench each fault alone was
-enough (Section~\ref{sec:bench}). The failures therefore came from the client's rules, not from the policies, which
-succeeded in most trials on the normal network.
+\section{What the baselines show}
+\textslot{the newer and larger models are not uniformly better (GR00T~N1.7 far above N1.5; Diffusion best on cube in
+box); task-dependence; ten trials give wide intervals; MolmoAct~2's fine-tune is broken.}
 
-Raising the limits removes the give-up but not the weakness behind it. The client still keeps only half a second of
-actions in reserve, and it replaces a lost request only once, when its queue runs dry: if that fresh request is lost
-too, nothing more is sent, and the arm waits until LeRobot's 10~s startup deadline ends the run. In our local replay checks a patient client stalled for more than half of a faulted run, with a single
-stall of 7.5~s after the dropped replies. This is why setup~v2 compares \drtc{} with the patient client, and why its
-primary comparisons use the stall fraction and the recovery time rather than whether the run was ended.
+\section{\drtc{} on the robot}
+\resultsslot{the discussion of E4 (what the faults cost, what \drtc{} wins back, what the stack adds), written when
+the E4 results are complete.}
 
-\section{Why \drtc{} recovers}
+\section{Short-chunk policies and the round trip}\label{sec:shortchunk}
+\textslot{a policy whose chunk is not much longer than its round trip runs dry whatever the client does; GR00T~N1.7's
+16 actions (0.53~s) against about 0.6--1~s from the Pi; what adaptive playback can and cannot do.}
 
-\drtc{} changes three things that matter under faults. It asks earlier (with $H-s_{\min}$ actions left), so a short
-delay is absorbed by the queue; it holds the arm when the queue is empty instead of ending the run; and its cooldown
-replaces an overdue reply with a fresh request, so the first chunk after a fault is computed from the current scene.
-Because the policies are closed-loop, they continue the task from wherever the arm stopped. In the first run this
-brought success back to a level not significantly different from the fault-free baseline for both policies, and the
-arm moved again within 0--1.5~s of every fault's end (Table~\ref{tab:mainrecovery}). Setup~v2 separated these parts
-(Section~\ref{sec:v2bench}): against a client that also waits, \drtc's advantage comes almost entirely from the
-cooldown re-request, and the same rule makes it worse when the link only slows down, because it gives up replies that
-are late but coming.
+\figslot{fig:whendrtc}{When \drtc{} can help: chunk length against round trip.}{D11.1 Diagram}{The plane of chunk
+duration (s) against round trip (s): below the diagonal the queue cannot stay full whatever the client; above it a
+patient client copes on a good link and \drtc{} matters when replies are lost; the seven policies placed by their chunk
+length and their measured turnaround from the Pi.}
 
-\section{Short-chunk policies}\label{sec:shortchunk}
-
-\groot's chunk holds 16 actions, 0.53~s at 30~Hz, barely longer than its round trip of about 0.45~s. Even on the
-normal network its queue empties before the next chunk is ready, and the arm stood still in
-\R{main/groot/baseline/M2} of the ticks. This is a property of the combination of chunk length and latency rather than
-of the network faults, and it is where adaptive playback helps most: slowing down instead of stopping cut the stall
-fraction to \R{main/groot/smooth/M2}. The cost is speed: slower playback lengthens the trial a little (time to success
-\R{main/groot/drtc/M1t} with \drtc{} alone, \R{main/groot/smooth/M1t} with smoothing). For policies with long chunks,
-such as \smolvla{} with 50 actions, the queue rarely runs dry and playback stays at full rate. The same arithmetic
-explains our first fix: a cooldown capped at half a chunk gives up every request when the round trip is longer than
-half a chunk, which for a 16-action policy over WiFi is always.
-
-\section{Smoothness and success}
-
-In the first run the filter and adaptive playback made the motion markedly smoother (jerk lower by factors of
-\R{main/smolvla/jerkratio} and \R{main/groot/jerkratio}) with no loss of success; the success rates with smoothing were
-higher than with \drtc{} alone for both policies, but with ten trials per condition that difference is not
-significant. Two cautions apply. First, a low jerk can come from standing still: the first version of the metric
-counted the time the arm held still, which made the stalling client look smooth; metrics version~3 counts only the
-moving time. Second, smoothing can lag behind the policy: a causal filter delays the motion, and the bench has no task
-success to show the cost. Setup~v2 therefore measures the deviation from the policy's plan (M12) and refuses a smoothing
-method that adds more than one degree of it.
-
-\section{Smoothing on a slow link}\label{sec:smoothdisc}
-
-Setup~v2 separated the smoothing methods (Sections~\ref{sec:v2bench} and~\ref{sec:v2e3b}), and three lessons stand out.
-
-\paragraph{Match the method to the source.} Each method removed the source it was designed for and little else: the
-Butterworth filter the jitter and the seams (most of the jerk), adaptive playback the stalls of the policies whose
-chunk is barely longer than their round trip. Which policies need what is decided by the ratio of chunk length to
-round trip, not by the model's size: ACT (100 actions) and \smolvla{} (50) stalled for 3\% and 12--15\% of a faulted
-run, the two GR00T models (16 actions) for about two thirds of it without adaptive playback.
-
-\paragraph{RTC is for inference-bound links.} Guided real-time chunking makes the seam smooth at the source, but it
-asks the server for more work per request. When the round trip is mostly network (about 260~ms of our 300--450~ms),
-the extra time per request costs more stalls than the smoother seam saves: \smolvla's stalls doubled. RTC was chosen
-by the pre-registered rule on a single policy-task pair, and the ablation of E3b shows that the stack is better
-without it. We keep the rule as fixed and report the ablation as its correction; on a link where inference dominates
-the round trip, the trade-off may well reverse.
-
-\paragraph{Smoothness has a price, and it has to be measured.} The full stack moves the arm 0.7 to 2.3\degree{} away
-from the policy's own plan on average. On the bench this cannot cost a task, because the replay robot does not grasp;
-on the robot it might. This is why the deviation (M12) is measured and limited in the stack rule, and why the robot
-experiment E4 is the test that matters for the stack: it is the only one with task success.
 
 \section{Lessons from the implementation}
 
@@ -81,7 +30,7 @@ experiment E4 is the test that matters for the stack: it is the only one with ta
 \item \textbf{A method can hurt in combination.} The soft stop looked harmless alone but, by keeping the queue alive, let
       a reply from an old observation be accepted, and the next chunk jumped; it was dropped
       (Section~\ref{sec:smoothing}). Each smoothing method is therefore tested alone before the stack is chosen.
-\item \textbf{Measure what the system does, not what the operator presses.} In the first run seven of the twenty
+\item \textbf{Measure what the system does, not what the operator presses.} In an early run several of the
       trials that the client ended were stored as ordinary failures, because the operator pressed the failure key
       while the stopped arm returned home. The label is now read from the run's own record.
 \item \textbf{Fix the analysis before the data.} The comparisons that are tested and the rule that chooses the stack
@@ -91,12 +40,10 @@ experiment E4 is the test that matters for the stack: it is the only one with ta
 \section{Limitations}\label{sec:limits}
 
 \begin{itemize}
-\item \textbf{Sample size.} Ten trials per cell give wide intervals (for example \R{main/smolvla/drtc/M1ci} around
-      \R{main/smolvla/drtc/M1}), so only large differences in success are significant. The robot plans can grow to
+\item \textbf{Sample size.} Ten trials per cell give wide intervals (a 50\% success rate over ten trials has a 95\%
+      interval of about 24--76\%), so only large differences in success are significant. The robot plans can grow to
       twenty trials.
-\item \textbf{The first run's baseline} gave up by design, so its recovery result is an upper bound on what \drtc's
-      scheduling adds; setup~v2 removes this.
-\item \textbf{Scope on the robot.} The robot DRTC experiments cover one task and two policies; the bench covers two
+\item \textbf{Scope on the robot.} The robot DRTC experiment covers two tasks and four policies; the bench covers two
       tasks and seven policies, without task success.
 \item \textbf{Operator judgement.} Success is judged by the operator, who knows the condition; the success rule is
       written down before the first trial to limit this.
@@ -109,3 +56,6 @@ experiment E4 is the test that matters for the stack: it is the only one with ta
 \item \textbf{Uncompressed images.} About 260~ms of each round trip is the network share, mostly the 2.9~MB of raw
       images per request; compression would shorten it and change the timing.
 \end{itemize}
+
+\section{Summary}
+\textslot{the chapter's summary: the baselines, \drtc{} on the robot, short chunks, lessons and limitations}

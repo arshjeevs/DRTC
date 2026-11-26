@@ -1,4 +1,7 @@
-\chapter{Remote Inference, \drtc{} and Smoothing}\label{ch:control}
+\chapter{Remote Inference and DRTC}\label{ch:control}
+
+\section{Introduction}
+\textslot{how the robot computer and the model server work together, how LeRobot's client and \drtc{} handle late and lost replies, the smoothing methods and the fault injection.}
 
 \section{The client-server loop}\label{sec:loop}
 
@@ -22,6 +25,12 @@ deadlines and latched faults. The policy server is LeRobot's, unchanged.
   \label{fig:architecture}
 \end{figure}
 
+\figslot{fig:sequence}{One request and its reply between the robot computer and the model server.}{D6.1 Diagram}{A
+sequence diagram with two lifelines (robot computer, model server): observe (cameras + joints) $\rightarrow$ send the
+observation over the tunnel $\rightarrow$ the server queues and runs the policy $\rightarrow$ the chunk comes back
+$\rightarrow$ merged into the action queue $\rightarrow$ executed at 30~Hz; with the timings that make up the round
+trip.}
+
 \section{The upstream client}\label{sec:baseline}
 
 LeRobot~0.7's client (\emph{upstream}) requests the next chunk when the queued playback falls to the refill time or
@@ -41,6 +50,12 @@ We evaluate the client in two settings (Chapter~\ref{ch:design}). \textbf{As shi
 \textbf{patient}, with both limits raised to the whole trial: each is a single setting, so this is upstream at its best
 under faults, and the fair baseline for \drtc. Patient upstream never ends a run by itself; when a reply is lost it
 waits, holding the arm, because it has no way to replace the reply.
+
+\figslot{fig:flowupstream}{LeRobot's client: what it does when a reply is late or lost.}{D6.2 Diagram}{A flowchart of
+the shipped client: request when the queue falls below its threshold $\rightarrow$ wait for the reply $\rightarrow$
+reply arrives: merge and continue; queue empty: hold the arm, start the starvation clock $\rightarrow$ after the grace
+(1~s as shipped, the whole trial when patient) end the run; a lost reply is never replaced, except one fresh request
+when the queue runs dry.}
 
 \section{\drtc{} on LeRobot 0.7}\label{sec:drtc}
 
@@ -96,6 +111,12 @@ experiments required. Each was found as a failure on the real robot and checked 
   \end{tabularx}
   \caption{Failure modes of \drtc{} on the real setup and our fixes.}\label{tab:fixes}
 \end{table}
+
+\figslot{fig:flowdrtc}{\drtc: the trigger, the latency estimate and the cooldown.}{D6.3 Diagram}{A flowchart of
+\drtc{} as implemented: trigger at $H - s_{\min}$ actions left $\rightarrow$ send the freshest observation
+$\rightarrow$ the Jacobson--Karels estimate sets the cooldown $\rightarrow$ reply in time: merge (last write wins);
+cooldown expired: abandon it and send a fresh observation; queue empty: hold the arm $\rightarrow$ with our four fixes
+marked where they act.}
 
 \section{Smoothing}\label{sec:smoothing}
 
@@ -180,6 +201,11 @@ both the jerk and the largest step, so it was dropped. Also considered and not b
 denoising (the same job as RTC), a crossfade at the seam (a weaker form of ensembling), a One Euro filter (a second
 filter next to zero-lag smoothing adds little) and a step limiter (a safety cap, not smoothing).
 
+\figslot{fig:smoothpipe}{Where each smoothing method acts in the loop.}{D6.4 Diagram}{A block diagram of the action
+path: the chunk from the server $\rightarrow$ RTC (in the policy) or temporal ensembling (when merging) $\rightarrow$ the
+action queue with adaptive playback $\rightarrow$ the Butterworth filter or zero-lag smoothing $\rightarrow$ the resume
+ramp after a stall $\rightarrow$ the motor commands; the stack used in E4 highlighted.}
+
 \section{Network fault injection}\label{sec:faults}
 
 Faults are injected in the client's transport, where a real network would cause them, so the scheduler, the deadlines
@@ -220,3 +246,10 @@ number in the same way.
            shift of 0--4~s.}
   \label{fig:faultmix}
 \end{figure}
+
+\figslot{fig:faulttypes}{The seven fault types on a timeline.}{D6.5 Diagram}{One row per fault type (spike, rise,
+drops, loss, outage, disconnect, mix): when it starts, how long it lasts and what it does to the replies, on a common
+time axis of one trial, with the seeded shift shown.}
+
+\section{Summary}
+\textslot{the chapter's summary: the loop, the two clients, \drtc{} and our fixes, the smoothing methods and the faults}

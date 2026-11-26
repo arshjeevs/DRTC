@@ -1,4 +1,6 @@
-\chapter{The Platform}\label{ch:platform}
+\chapter{System Design}\label{ch:platform}
+
+\section{Introduction}
 
 This chapter describes what the experiments run on: the robot and its cameras, the computers, the software layer we
 built on LeRobot~0.7, and how work moves between the machines. Figure~\ref{fig:pipeline} shows the whole path of the
@@ -12,6 +14,15 @@ project, from a recorded dataset to the report; the following chapters take its 
            bench. The report is rebuilt from the raw result files.}
   \label{fig:pipeline}
 \end{figure}
+
+\section{Overall system architecture}\label{sec:architecture-overview}
+\textslot{the system as a whole and how its parts connect; walks through Figure~\ref{fig:sysarch}.}
+
+\figslot{fig:sysarch}{The system architecture: robot side, network and model servers.}{D3.1 Diagram}{The robot side
+(SO-101 follower and leader arms, wrist camera, phone as the scene camera, the laptop or the Raspberry Pi 5 as the robot
+computer), the links (USB, the Pi's cable or WiFi to the laptop, the campus network, SSH tunnels), and the server side
+(H200 and A100 GPU servers in containers, the laptop's RTX 4060), with the Hugging Face Hub (datasets, models, results
+store) and Weights \& Biases.}
 
 \section{Hardware}\label{sec:hardware}
 
@@ -91,6 +102,11 @@ The software runs on Linux on every machine: Python~3.12, PyTorch~2.14.1 built f
 LeRobot's optional dependencies for the robot, the cameras and the policies. The layer is covered by
 \R{software/tests} automated tests, which run on the laptop without a GPU or a robot.
 
+\figslot{fig:swlayers}{The software layers: LeRobot 0.7 and the layer this project adds on top.}{D3.2 Diagram}{Three
+layers: LeRobot 0.7 unmodified (robots, cameras, datasets, policies, the remote-inference runtime) $\rightarrow$ our
+layer (registry, GR00T~N1.5 and replay-robot plugins, \drtc{} scheduler, smoothing, fault injector, evaluation
+framework) $\rightarrow$ the \texttt{lab} command (record, train, serve, eval run, report).}
+
 \section{The registry}\label{sec:registry}
 
 Every object an experiment depends on is a small file in the repository, and every file refers to the others by name:
@@ -144,3 +160,6 @@ PyTorch build its driver supports, long jobs run in terminal multiplexer session
 work runs inside a container started the way the server's guide prescribes, and nothing outside the project's folder
 is ever written or deleted. During a robot session the laptop reaches the model server through one SSH connection
 that forwards a port for every served model; on the H200 the connection reaches into the container.
+
+\section{Summary}
+\textslot{the chapter's summary: the hardware, the software layer, the registry and the machines}
