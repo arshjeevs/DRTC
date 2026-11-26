@@ -14,7 +14,7 @@ results and merges what the user approves.
 | O3 | Bench E1/E2 sorting (sort_one) | done, in report; regenerated figures not committed yet |
 | O4 | Bench E1/E2 cube in box | bench COMPLETE 2912/2912 on the H200 -> metrics on the H200 -> ch. 9 text + viva todo |
 | O5 | E4 robot stack (RTC or no RTC) | **user decision** -> unblocks tab_e4, tab_base_sort_one, tab_base_cubebox_v1 |
-| O6 | Robot baselines (sort_one_baseline, cubebox_v1_baseline), all 7 models x 10 = 70 each, plain LeRobot, **Pi as the robot computer**, H200 serving | started 2026-11-26 (user runs) |
+| O6 | Robot baselines (sort_one_baseline, cubebox_v1_baseline), all 7 models x 10 = 70 each, plain LeRobot, **Pi as the robot computer**, H200 serving | sort_one DONE 70/70 (pushed). cubebox run 1 DISCARDED (labels entered by another person; archived in the store at evals/_archive/cubebox_v1_baseline/ with ARCHIVED.md); re-run from scratch. **The report must say a first cube-in-box run was discarded and why.** |
 | O6b | E4 robot runs (DRTC) | after O6, if time; RTC choice still open (O5) |
 | O7 | Report final pass + PDF | after O4-O6 |
 | O8 | Deck final pass | after O4-O6 |
