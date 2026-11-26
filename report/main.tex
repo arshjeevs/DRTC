@@ -14,9 +14,12 @@
 \ifdeclaration\input{frontmatter/declaration}\fi
 \ifacknowledgements\input{frontmatter/acknowledgements}\fi
 \input{frontmatter/abstract}
+% The contents and the lists: single-spaced, no paragraph gap (the body text keeps 1.15 and its gap)
+{\setlength{\parskip}{0pt}\singlespacing
 \tableofcontents
 \listoffigures
 \listoftables
+}
 \input{frontmatter/abbreviations}
 
 % --- chapters ---------------------------------------------------------------------------------------------------------

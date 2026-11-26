@@ -35,7 +35,7 @@ plan and metrics v1, four models) are archived the same way; they predate setup 
   \centering
   \small
   \gentable{tab_base_sort_one}
-  \caption{Baselines on sorting: task success with Wilson 95\% intervals.}\label{tab:basesort}
+  \caption{Baselines on sorting: task success with Wilson 95\% intervals (bold: the best policy).}\label{tab:basesort}
 \end{table}
 
 \begin{table}[htbp]
@@ -50,8 +50,9 @@ plan and metrics v1, four models) are archived the same way; they predate setup 
 
 \section{Bench: \drtc{} against LeRobot's client (E1) and its ablations (E2)}\label{sec:v2bench}
 
-Tables~\ref{tab:v2e1sort} and~\ref{tab:v2e1cube} compare \drtc{} with patient upstream under every fault type: the
-stall fraction, how many recoveries succeeded, and how long they took, with the runs that upstream as shipped ended.
+Tables~\ref{tab:v2e1sort} and~\ref{tab:v2e1cube} compare the stall fraction of \drtc{} and patient upstream
+under every fault type, and Tables~\ref{tab:v2e1recsort} and~\ref{tab:v2e1reccube} the recovery after each timed
+fault: how many runs moved again, how fast \drtc{} recovered, and how many runs upstream as shipped ended.
 Tables~\ref{tab:v2e2sort} and~\ref{tab:v2e2cube} give the ablations: for each part of \drtc{} removed, in how many
 policies the stalls rose and by how much. The primary comparisons (\drtc{} against patient upstream, each fault type)
 are tested in the plans' reports.
@@ -117,8 +118,20 @@ points even without faults and by \R{v2/sort_one/e2/a4_half_chunk_cap/mix/delta}
   \begin{adjustbox}{max width=\textwidth}
   \gentable{tab_v2_e1_sort_one}
   \end{adjustbox}
-  \caption{E1 on sorting: \drtc{} against patient upstream (medians over 8 runs; recovered: runs that moved again
-           after each timed fault, summed over the faults of the type).}\label{tab:v2e1sort}
+  \caption{E1 on sorting: the stall fraction (\% of the run, medians over 8 runs) under each fault type, patient
+           upstream (pat.) against \drtc. Bold: the better value of each pair.}\label{tab:v2e1sort}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \setlength{\tabcolsep}{2.6pt}
+  \begin{adjustbox}{max width=\textwidth}
+  \gentable{tab_v2_e1rec_sort_one}
+  \end{adjustbox}
+  \caption{E1 on sorting: the recovery after each timed fault. pat., \drtc: faults after which the arm moved again,
+           out of 8 (24 for the mix, which has three faults per run; bold: the better of the two); s: \drtc's median
+           recovery time in seconds; ship.: runs, out of 8, that LeRobot's client as shipped ended.}\label{tab:v2e1recsort}
 \end{table}
 
 \begin{table}[htbp]
@@ -127,7 +140,17 @@ points even without faults and by \R{v2/sort_one/e2/a4_half_chunk_cap/mix/delta}
   \begin{adjustbox}{max width=\textwidth}
   \gentable{tab_v2_e1_cubebox_v1}
   \end{adjustbox}
-  \caption{E1 on cube in box v1, as Table~\ref{tab:v2e1sort}.}\label{tab:v2e1cube}
+  \caption{E1 on cube in box v1: the stall fraction, as Table~\ref{tab:v2e1sort}.}\label{tab:v2e1cube}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \setlength{\tabcolsep}{2.6pt}
+  \begin{adjustbox}{max width=\textwidth}
+  \gentable{tab_v2_e1rec_cubebox_v1}
+  \end{adjustbox}
+  \caption{E1 on cube in box v1: the recovery, as Table~\ref{tab:v2e1recsort}.}\label{tab:v2e1reccube}
 \end{table}
 
 \begin{table}[htbp]
@@ -135,7 +158,8 @@ points even without faults and by \R{v2/sort_one/e2/a4_half_chunk_cap/mix/delta}
   \small
   \gentable{tab_v2_e2_sort_one}
   \caption{E2 on sorting: each ablation against \drtc{} (policies whose median stall fraction rose, and the median
-           change in percentage points).}\label{tab:v2e2sort}
+           change in percentage points; bold: removing the part raised the stall by a point or more, so the part
+           helps).}\label{tab:v2e2sort}
 \end{table}
 
 \begin{table}[htbp]
@@ -192,7 +216,10 @@ about 20\% are not reliable.
   \begin{adjustbox}{max width=\textwidth}
   \gentable{tab_v2_e3a_sort_one}
   \end{adjustbox}
-  \caption{E3a on sorting: each smoothing method alone on \drtc{} under the fault mix (medians over 8 runs).}\label{tab:v2e3asort}
+  \caption{E3a on sorting: each smoothing method alone on \drtc{} under the fault mix (medians over 8 runs; --: the
+           method does not apply to the policy; Butterw.: the Butterworth filter, ensembl.: temporal ensembling, adaptive:
+           adaptive playback, ramp: the resume ramp). Bold: an improvement on \drtc{} alone (a jerk ratio below 1; a
+           stall lower by a point or more).}\label{tab:v2e3asort}
 \end{table}
 
 \begin{table}[htbp]
@@ -256,7 +283,8 @@ less than 13\% of a fault-free run, \smolvla{} excepted (22\%, with RTC).
   \end{adjustbox}
   \caption{E3b on sorting: the stack against \drtc{} alone under the fault mix, and the stack without faults (medians
            over 8 runs; jerk: the stack's median over \drtc's; recovery: median over the mix's three faults). Seam: the
-           stack's seam method, RTC where the policy supports it and temporal ensembling otherwise.}\label{tab:v2e3bsort}
+           stack's seam method, RTC where the policy supports it and temporal ensembling otherwise. Bold: the stack
+           improves on \drtc{} alone.}\label{tab:v2e3bsort}
 \end{table}
 
 \begin{table}[htbp]
@@ -299,7 +327,8 @@ Figure~\ref{fig:e4motion} the motion.
   \small
   \gentable{tab_e4_wide_cubebox_v1}
   \caption{E4 on cube in box v1: successful trials per policy and condition (in brackets: trials ended by a fault),
-           and over all four policies with Wilson 95\% intervals.}\label{tab:e4cube}
+           and over all four policies with Wilson 95\% intervals. Bold: more successes than the patient client under the
+           same faults (condition 2).}\label{tab:e4cube}
 \end{table}
 
 \chart{fig_e4_success}{E4: task success of the four policies under the four conditions (cube in box v1, ten trials
@@ -343,7 +372,8 @@ early; it is not smoother motion.
   \end{adjustbox}
   \caption{E4 on cube in box v1: the motion, as medians over the trials of each policy and condition (1 patient
            LeRobot, 2 + faults, 3 \drtc{} + faults, 4 \drtc{} + stack + faults). Recovery: from the end of the 1.5~s
-           outage until the arm moves again, over the trials that recovered.}\label{tab:e4motion}
+           outage until the arm moves again, over the trials that recovered. Bold: an improvement (stall and recovery against
+           condition 2; jerk of the stack against \drtc{} alone).}\label{tab:e4motion}
 \end{table}
 
 \chart{fig_e4_motion}{E4: stall, jerk and recovery after the outage per policy and condition (medians; cube in box

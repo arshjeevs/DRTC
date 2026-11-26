@@ -1,56 +1,49 @@
-\begin{tabular}{l l rrrr}
+\begin{tabular}{@{}c@{}}
+\begin{tabular}{l rrrrrrr}
 \toprule
-Method & Policy & Jerk vs \drtc{} & Largest step ($^\circ$) & Deviation ($^\circ$) & Stall (\%) \\
+\multicolumn{8}{l}{\textit{(a) Jerk relative to \drtc{} alone (below 1: smoother)}} \\
 \midrule
-Butterworth & ACT & 0.16 & 11.7 & 0.84 & 3.4 \\
- & Diffusion Policy & 0.17 & 5.3 & 1.22 & 50.4 \\
- & GR00T N1.5 & 0.12 & 9.9 & 1.61 & 64.3 \\
- & GR00T N1.7 & 0.29 & 4.4 & 0.90 & 67.5 \\
- & MolmoAct 2 & 0.11 & 20.9 & 1.52 & 59.9 \\
- & $\pi_{0.5}$ & 0.20 & 5.0 & 0.98 & 38.0 \\
- & SmolVLA & 0.18 & 7.0 & 0.93 & 14.2 \\
-\addlinespace
-zero-lag & ACT & 0.43 & 21.7 & 0.16 & 3.4 \\
- & Diffusion Policy & 0.64 & 14.1 & 0.13 & 50.6 \\
- & GR00T N1.5 & 0.92 & 29.0 & 0.19 & 64.0 \\
- & GR00T N1.7 & 0.97 & 12.7 & 0.09 & 64.6 \\
- & MolmoAct 2 & 1.09 & 66.8 & 0.09 & 58.8 \\
- & $\pi_{0.5}$ & 0.57 & 10.6 & 0.12 & 39.9 \\
- & SmolVLA & 0.57 & 12.3 & 0.21 & 14.6 \\
-\addlinespace
-ensembling & ACT & 0.61 & 19.0 & 1.85 & 3.2 \\
- & Diffusion Policy & 0.89 & 16.6 & 0.09 & 51.5 \\
- & GR00T N1.5 & 1.00 & 28.9 & 0.00 & 64.1 \\
- & GR00T N1.7 & 0.95 & 11.2 & 0.00 & 68.3 \\
- & MolmoAct 2 & 1.05 & 59.0 & 0.00 & 54.6 \\
- & $\pi_{0.5}$ & 0.84 & 14.0 & 0.15 & 38.1 \\
- & SmolVLA & 0.85 & 11.8 & 0.72 & 14.3 \\
-\addlinespace
-RTC & GR00T N1.5 & 1.11 & 35.4 & 0.00 & 62.1 \\
- & SmolVLA & 0.79 & 10.1 & 0.00 & 36.0 \\
-\addlinespace
-adaptive playback & ACT & 0.94 & 33.9 & 0.00 & 3.3 \\
- & Diffusion Policy & 0.89 & 28.1 & 0.00 & 29.8 \\
- & GR00T N1.5 & 0.46 & 22.9 & 0.00 & 39.9 \\
- & GR00T N1.7 & 0.41 & 7.1 & 0.00 & 54.5 \\
- & MolmoAct 2 & 0.33 & 31.6 & 0.00 & 30.2 \\
- & $\pi_{0.5}$ & 0.52 & 10.7 & 0.00 & 35.6 \\
- & SmolVLA & 0.87 & 15.5 & 0.00 & 14.3 \\
-\addlinespace
-resume ramp & ACT & 0.94 & 34.5 & 0.01 & 3.4 \\
- & Diffusion Policy & 1.14 & 29.2 & 0.57 & 50.8 \\
- & GR00T N1.5 & 0.26 & 11.3 & 1.85 & 64.1 \\
- & GR00T N1.7 & 0.39 & 6.1 & 0.70 & 67.5 \\
- & MolmoAct 2 & 0.10 & 14.8 & 1.51 & 53.2 \\
- & $\pi_{0.5}$ & 0.83 & 12.8 & 0.12 & 40.2 \\
- & SmolVLA & 0.96 & 13.8 & 0.10 & 14.6 \\
-\addlinespace
-Butterworth + adaptive & ACT & 0.15 & 11.8 & 0.86 & 3.6 \\
- & Diffusion Policy & 0.22 & 10.9 & 1.08 & 32.3 \\
- & GR00T N1.5 & 0.12 & 11.9 & 1.40 & 40.8 \\
- & GR00T N1.7 & 0.24 & 3.4 & 0.54 & 52.2 \\
- & MolmoAct 2 & 0.06 & 19.2 & 0.89 & 32.1 \\
- & $\pi_{0.5}$ & 0.24 & 6.6 & 1.11 & 37.3 \\
- & SmolVLA & 0.18 & 6.5 & 0.88 & 13.2 \\
+Policy & Butterw. & zero-lag & ensembl. & RTC & adaptive & ramp & Butterw.+adapt. \\
+\midrule
+ACT & \textbf{0.16} & \textbf{0.43} & \textbf{0.61} & -- & \textbf{0.94} & \textbf{0.94} & \textbf{0.15} \\
+Diffusion Policy & \textbf{0.17} & \textbf{0.64} & \textbf{0.89} & -- & \textbf{0.89} & 1.14 & \textbf{0.22} \\
+GR00T N1.5 & \textbf{0.12} & \textbf{0.92} & \textbf{1.00} & 1.11 & \textbf{0.46} & \textbf{0.26} & \textbf{0.12} \\
+GR00T N1.7 & \textbf{0.29} & \textbf{0.97} & \textbf{0.95} & -- & \textbf{0.41} & \textbf{0.39} & \textbf{0.24} \\
+MolmoAct 2 & \textbf{0.11} & 1.09 & 1.05 & -- & \textbf{0.33} & \textbf{0.10} & \textbf{0.06} \\
+$\pi_{0.5}$ & \textbf{0.20} & \textbf{0.57} & \textbf{0.84} & -- & \textbf{0.52} & \textbf{0.83} & \textbf{0.24} \\
+SmolVLA & \textbf{0.18} & \textbf{0.57} & \textbf{0.85} & \textbf{0.79} & \textbf{0.87} & \textbf{0.96} & \textbf{0.18} \\
 \bottomrule
+\end{tabular}
+\\[8pt]
+\begin{tabular}{l rrrrrrrr}
+\toprule
+\multicolumn{9}{l}{\textit{(b) Stall (\% of the run)}} \\
+\midrule
+Policy & \drtc{} alone & Butterw. & zero-lag & ensembl. & RTC & adaptive & ramp & Butterw.+adapt. \\
+\midrule
+ACT & 3.4 & 3.4 & 3.4 & 3.2 & -- & 3.3 & 3.4 & 3.6 \\
+Diffusion Policy & 52.9 & \textbf{50.4} & \textbf{50.6} & \textbf{51.5} & -- & \textbf{29.8} & \textbf{50.8} & \textbf{32.3} \\
+GR00T N1.5 & 64.1 & 64.3 & 64.0 & 64.1 & \textbf{62.1} & \textbf{39.9} & 64.1 & \textbf{40.8} \\
+GR00T N1.7 & 68.0 & 67.5 & \textbf{64.6} & 68.3 & -- & \textbf{54.5} & 67.5 & \textbf{52.2} \\
+MolmoAct 2 & 57.3 & 59.9 & 58.8 & \textbf{54.6} & -- & \textbf{30.2} & \textbf{53.2} & \textbf{32.1} \\
+$\pi_{0.5}$ & 37.6 & 38.0 & 39.9 & 38.1 & -- & \textbf{35.6} & 40.2 & 37.3 \\
+SmolVLA & 12.8 & 14.2 & 14.6 & 14.3 & 36.0 & 14.3 & 14.6 & 13.2 \\
+\bottomrule
+\end{tabular}
+\\[8pt]
+\begin{tabular}{l rrrrrrr}
+\toprule
+\multicolumn{8}{l}{\textit{(c) Deviation from the policy's plan ($^\circ$)}} \\
+\midrule
+Policy & Butterw. & zero-lag & ensembl. & RTC & adaptive & ramp & Butterw.+adapt. \\
+\midrule
+ACT & 0.84 & 0.16 & 1.85 & -- & 0.00 & 0.01 & 0.86 \\
+Diffusion Policy & 1.22 & 0.13 & 0.09 & -- & 0.00 & 0.57 & 1.08 \\
+GR00T N1.5 & 1.61 & 0.19 & 0.00 & 0.00 & 0.00 & 1.85 & 1.40 \\
+GR00T N1.7 & 0.90 & 0.09 & 0.00 & -- & 0.00 & 0.70 & 0.54 \\
+MolmoAct 2 & 1.52 & 0.09 & 0.00 & -- & 0.00 & 1.51 & 0.89 \\
+$\pi_{0.5}$ & 0.98 & 0.12 & 0.15 & -- & 0.00 & 0.12 & 1.11 \\
+SmolVLA & 0.93 & 0.21 & 0.72 & 0.00 & 0.00 & 0.10 & 0.88 \\
+\bottomrule
+\end{tabular}
 \end{tabular}

@@ -323,39 +323,52 @@ def charts(st: dict, b) -> None:
         fig.subplots_adjust(wspace=0.35)
         b.save(fig, "fig_e4_motion", st)
 
-    # E4 tables (report only): success per policy and condition, and the motion medians, condition order 1-4
+    # E4 tables (report only): success per policy and condition, and the motion medians, condition order 1-4.
+    # Bold: an improvement - conditions 3 and 4 against the faulted patient client (2), and 4 against 3 for the jerk.
     if have and st["ext"] == "pdf":
         names_tex = b.POLICY_NAMES
+        bold = lambda x, on: f"\\textbf{{{x}}}" if on else x
+        conds = [c for c, _, _ in E4_CONDS]
         for t, m in have.items():
+            def sel(p, cond):
+                return m[m.condition == cond] if p == "all" else m[(m.model == model_name(p, t)) & (m.condition == cond)]
             rows = []
-            for p in E4_POLICIES:
-                cells = [names_tex[p]]
-                for cond, _, _ in E4_CONDS:
-                    g = m[(m.model == model_name(p, t)) & (m.condition == cond)]
-                    k, n, f = int((g["M1_success"] == 1).sum()), len(g), int(g["M1f_fault"].sum())
-                    cells.append(f"{k}/{n}" + (f" ({f})" if f else ""))
+            for p in E4_POLICIES + ["all"]:
+                ks = {c: (int((sel(p, c)["M1_success"] == 1).sum()), len(sel(p, c)), int(sel(p, c)["M1f_fault"].sum()))
+                      for c in conds}
+                cells = [names_tex[p] if p != "all" else "All four"]
+                for c in conds:
+                    k, n, f = ks[c]
+                    txt = f"{k}/{n}" + (f" ({f})" if f else "")
+                    if p == "all":
+                        lo, hi = b.wilson(k, n)
+                        txt = f"{k}/{n} ({100 * lo:.0f}--{100 * hi:.0f}\\%)"
+                    cells.append(bold(txt, c in conds[2:] and k > ks[conds[1]][0]))
+                if p == "all":
+                    rows.append("\\midrule")
                 rows.append(" & ".join(cells) + " \\\\")
-            cells = ["\\textbf{All four}"]
-            for cond, _, _ in E4_CONDS:
-                g = m[m.condition == cond]
-                k, n, f = int((g["M1_success"] == 1).sum()), len(g), int(g["M1f_fault"].sum())
-                lo, hi = b.wilson(k, n)
-                cells.append(f"\\textbf{{{k}/{n}}} ({100*lo:.0f}--{100*hi:.0f}\\%)")
-            rows += ["\\midrule", " & ".join(cells) + " \\\\"]
             b.write(f"tab_e4_wide_{t}.tex", "\n".join([
                 "\\begin{tabular}{l cccc}", "\\toprule",
                 "Policy & 1 Patient LeRobot & 2 + faults & 3 \\drtc{} + faults & 4 \\drtc{} + stack + faults \\\\",
                 "\\midrule", *rows, "\\bottomrule", "\\end{tabular}", ""]))
             rows = []
             for p in E4_POLICIES + ["all"]:
-                cells = [names_tex[p] if p != "all" else "\\textbf{All four}"]
-                for col, fmt in (("M2_stall_pct", "{:.0f}"), ("M7_jerk_k", "{:.0f}"), ("M11_recovery_outage_s", "{:.2f}")):
-                    for cond, _, _ in E4_CONDS:
-                        if col == "M11_recovery_outage_s" and cond == "upstream_patient__none":
-                            continue
-                        g = m[m.condition == cond] if p == "all" else m[(m.model == model_name(p, t)) & (m.condition == cond)]
-                        v = g[col].dropna()
-                        cells.append(fmt.format(v.median()) if len(v) else "--")
+                med = {(col, c): sel(p, c)[col].dropna().median() if len(sel(p, c)[col].dropna()) else None
+                       for col in ("M2_stall_pct", "M7_jerk_k", "M11_recovery_outage_s") for c in conds}
+                cells = [names_tex[p] if p != "all" else "All four"]
+                for c in conds:  # stall: lower than the faulted patient client
+                    v = med[("M2_stall_pct", c)]
+                    ref = med[("M2_stall_pct", conds[1])]
+                    cells.append(bold(f"{v:.0f}", c in conds[2:] and ref is not None and v <= ref - 1) if v is not None else "--")
+                for c in conds:  # jerk: the stack against DRTC alone
+                    v = med[("M7_jerk_k", c)]
+                    ref = med[("M7_jerk_k", conds[2])]
+                    cells.append(bold(f"{v:.0f}", c == conds[3] and ref is not None and v < ref) if v is not None else "--")
+                for c in conds[1:]:  # recovery after the outage: recovered at all, or faster
+                    v = med[("M11_recovery_outage_s", c)]
+                    ref = med[("M11_recovery_outage_s", conds[1])]
+                    on = c in conds[2:] and v is not None and (ref is None or v < ref)
+                    cells.append(bold(f"{v:.2f}", on) if v is not None else "--")
                 if p == "all":
                     rows.append("\\midrule")
                 rows.append(" & ".join(cells) + " \\\\")
@@ -366,7 +379,6 @@ def charts(st: dict, b) -> None:
                 "\\cmidrule(lr){2-5}\\cmidrule(lr){6-9}\\cmidrule(lr){10-12}",
                 "Policy & 1 & 2 & 3 & 4 & 1 & 2 & 3 & 4 & 2 & 3 & 4 \\\\", "\\midrule", *rows,
                 "\\bottomrule", "\\end{tabular}", ""]))
-
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])

@@ -1,0 +1,15 @@
+\begin{tabular}{l cccccccccccccccccccc}
+\toprule
+Fault & \multicolumn{4}{c}{spike} & \multicolumn{4}{c}{drops} & \multicolumn{4}{c}{outage} & \multicolumn{4}{c}{mix} & \multicolumn{4}{c}{rise} \\
+\cmidrule(lr){2-5}\cmidrule(lr){6-9}\cmidrule(lr){10-13}\cmidrule(lr){14-17}\cmidrule(lr){18-21}
+Policy & pat. & \drtc{} & s & ship. & pat. & \drtc{} & s & ship. & pat. & \drtc{} & s & ship. & pat. & \drtc{} & s & ship. & pat. & \drtc{} & s & ship. \\
+\midrule
+ACT & 8 & 8 & 0.00 & 8 & 8 & 8 & 0.00 & 0 & 6 & \textbf{8} & 0.00 & 2 & 13 & \textbf{24} & 0.00 & 8 & 8 & 8 & 0.48 & 0 \\
+Diffusion Policy & 8 & 8 & 0.85 & 8 & 2 & \textbf{8} & 0.40 & 5 & 0 & \textbf{8} & 0.90 & 8 & 9 & \textbf{24} & 0.85 & 8 & 8 & 8 & 0.45 & 0 \\
+GR00T N1.5 & 8 & 8 & 0.86 & 8 & 2 & \textbf{8} & 0.32 & 8 & 0 & \textbf{8} & 0.94 & 8 & 7 & \textbf{24} & 0.72 & 8 & 8 & 8 & 0.66 & 3 \\
+GR00T N1.7 & 8 & 8 & 0.74 & 8 & 2 & \textbf{8} & 0.45 & 6 & 0 & \textbf{8} & 0.89 & 8 & 10 & \textbf{21} & 0.87 & 8 & 8 & 8 & 0.71 & 8 \\
+MolmoAct 2 & 8 & 8 & 0.50 & 8 & 1 & \textbf{8} & 0.55 & 3 & 0 & \textbf{8} & 1.26 & 8 & 15 & \textbf{24} & 0.97 & 8 & 8 & 8 & 0.80 & 8 \\
+$\pi_{0.5}$ & 8 & 8 & 0.87 & 8 & 7 & \textbf{8} & 0.56 & 4 & 1 & \textbf{8} & 0.97 & 7 & 7 & \textbf{24} & 0.94 & 8 & 8 & 8 & 0.40 & 8 \\
+SmolVLA & 8 & 8 & 0.65 & 8 & 5 & \textbf{8} & 0.18 & 3 & 0 & \textbf{8} & 0.61 & 8 & 6 & \textbf{24} & 0.56 & 8 & 8 & 8 & 0.52 & 0 \\
+\bottomrule
+\end{tabular}

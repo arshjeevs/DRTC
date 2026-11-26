@@ -112,41 +112,70 @@ def bench_v2(results, write, setn, names) -> None:
         print(f"  (stack not chosen yet: {type(e).__name__})")
 
 
+def _bold(x: str, on: bool) -> str:
+    return f"\\textbf{{{x}}}" if on and x not in ("--", "") else x
+
+
+def _k(rec: str) -> int:
+    """'k/n' -> k (recovered faults); -1 when there is none."""
+    try:
+        return int(rec.split("/")[0])
+    except (ValueError, IndexError):
+        return -1
+
+
 def _e1(df, ds, write, setn, names) -> None:
-    rows = []
-    for fault, fname in FAULTS:
-        first = True
-        for model in sorted(df["model"].unique()):
-            g = {s: df[(df["condition"] == f"{s}__{fault}") & (df["model"] == model)]
-                 for s in ("upstream_patient", "upstream_shipped", "drtc")}
+    """E1 as two compact tables, one row per policy: the stall under every fault type (patient against DRTC), and the
+    recovery after each timed fault. The better value of each pair is in bold."""
+    models = sorted(df["model"].unique())
+    timed = [(f, n) for f, n in FAULTS if f not in ("none", "loss")]
+    stall_rows, rec_rows = [], []
+    for model in models:
+        m = model.split("_")[0]  # the policy (act, smolvla, groot, grootn17, ...): keys for the text
+        scells, rcells, any_cell = [_policy(model, names)], [_policy(model, names)], False
+        for fault, _ in FAULTS:
+            g = {s_: df[(df["condition"] == f"{s_}__{fault}") & (df["model"] == model)]
+                 for s_ in ("upstream_patient", "upstream_shipped", "drtc")}
             if g["drtc"].empty:
+                scells += ["--", "--"]
                 continue
+            any_cell = True
             fs = _faults_of(fault)
             shipped = g["upstream_shipped"]
             ended = f"{int(shipped['M1f_fault'].sum())}/{len(shipped)}" if not shipped.empty else "--"
-            m = model.split("_")[0]  # the policy (act, smolvla, groot, grootn17, ...): keys for the text
-            setn(f"v2/{ds}/e1/{fault}/{m}/patient", _f(_med(g["upstream_patient"]["M2_stall_pct"])))
-            setn(f"v2/{ds}/e1/{fault}/{m}/drtc", _f(_med(g["drtc"]["M2_stall_pct"])))
-            setn(f"v2/{ds}/e1/{fault}/{m}/patientrec", _recovered(g["upstream_patient"], fs))
-            setn(f"v2/{ds}/e1/{fault}/{m}/drtcrec", _recovered(g["drtc"], fs))
+            sp, sd = _med(g["upstream_patient"]["M2_stall_pct"]), _med(g["drtc"]["M2_stall_pct"])
+            rp, rd = _recovered(g["upstream_patient"], fs), _recovered(g["drtc"], fs)
+            setn(f"v2/{ds}/e1/{fault}/{m}/patient", _f(sp))
+            setn(f"v2/{ds}/e1/{fault}/{m}/drtc", _f(sd))
+            setn(f"v2/{ds}/e1/{fault}/{m}/patientrec", rp)
+            setn(f"v2/{ds}/e1/{fault}/{m}/drtcrec", rd)
             setn(f"v2/{ds}/e1/{fault}/{m}/drtcrectime", _f(_rec_time(g["drtc"], fs), 2))
             setn(f"v2/{ds}/e1/{fault}/{m}/ended", ended)
-            rows.append(" & ".join([
-                fname if first else "", _policy(model, names),
-                _f(_med(g["upstream_patient"]["M2_stall_pct"])), _f(_med(g["drtc"]["M2_stall_pct"])), ended,
-                _recovered(g["upstream_patient"], fs), _recovered(g["drtc"], fs),
-                _f(_rec_time(g["upstream_patient"], fs), 2), _f(_rec_time(g["drtc"], fs), 2)]) + " \\\\")
-            first = False
-        rows.append("\\addlinespace")
-    if rows:
+            diff = (sp - sd) if sp == sp and sd == sd else 0.0
+            scells += [_bold(_f(sp), diff <= -1.0), _bold(_f(sd), diff >= 1.0)]
+            if (fault, fault) in [(f, f) for f, _ in timed]:
+                kp, kd = _k(rp), _k(rd)
+                rcells += [_bold(str(kp) if kp >= 0 else "--", kp > kd), _bold(str(kd) if kd >= 0 else "--", kd > kp),
+                           _f(_rec_time(g["drtc"], fs), 2), ended.split("/")[0]]
+        if any_cell:
+            stall_rows.append(" & ".join(scells) + " \\\\")
+            rec_rows.append(" & ".join(rcells) + " \\\\")
+    if stall_rows:
         setn(f"v2/{ds}/e1/n", str(len(df)))
+        heads = " & ".join(f"\\multicolumn{{2}}{{c}}{{{n}}}" for _, n in FAULTS)
+        rules = "".join(f"\\cmidrule(lr){{{2 + 2 * i}-{3 + 2 * i}}}" for i in range(len(FAULTS)))
         write(f"tab_v2_e1_{ds}.tex", "\n".join([
-            "\\begin{tabular}{l l rr c cc rr}", "\\toprule",
-            " & & \\multicolumn{2}{c}{Stall (\\%)} & Shipped & \\multicolumn{2}{c}{Recovered} & "
-            "\\multicolumn{2}{c}{Recovery (s)} \\\\",
-            "\\cmidrule(lr){3-4}\\cmidrule(lr){6-7}\\cmidrule(lr){8-9}",
-            "Fault & Policy & patient & \\drtc{} & ended & patient & \\drtc{} & patient & \\drtc{} \\\\", "\\midrule",
-            *rows[:-1], "\\bottomrule", "\\end{tabular}", ""]))
+            "\\begin{tabular}{l " + "rr" * len(FAULTS) + "}", "\\toprule",
+            "Fault & " + heads + " \\\\", rules,
+            "Policy" + " & pat. & \\drtc{}" * len(FAULTS) + " \\\\", "\\midrule",
+            *stall_rows, "\\bottomrule", "\\end{tabular}", ""]))
+        heads = " & ".join(f"\\multicolumn{{4}}{{c}}{{{n}}}" for _, n in timed)
+        rules = "".join(f"\\cmidrule(lr){{{2 + 4 * i}-{5 + 4 * i}}}" for i in range(len(timed)))
+        write(f"tab_v2_e1rec_{ds}.tex", "\n".join([
+            "\\begin{tabular}{l " + "cccc" * len(timed) + "}", "\\toprule",
+            "Fault & " + heads + " \\\\", rules,
+            "Policy" + " & pat. & \\drtc{} & s & ship." * len(timed) + " \\\\", "\\midrule",
+            *rec_rows, "\\bottomrule", "\\end{tabular}", ""]))
 
 
 def _e2(df, ds, write, setn) -> None:
@@ -168,7 +197,7 @@ def _e2(df, ds, write, setn) -> None:
             if n:
                 setn(f"v2/{ds}/e2/{a}/{fault}/delta", _f(_med(d2), 1))
                 setn(f"v2/{ds}/e2/{a}/{fault}/worse", f"{worse}/{n}")
-                rows.append(" & ".join([aname if first else "", fname, f"{worse}/{n}", _f(_med(d2), 1)]) + " \\\\")
+                rows.append(" & ".join([aname if first else "", fname, f"{worse}/{n}", _bold(_f(_med(d2), 1), _med(d2) >= 1.0)]) + " \\\\")
                 first = False
         rows.append("\\addlinespace")
     if any("&" in r for r in rows):
@@ -179,27 +208,54 @@ def _e2(df, ds, write, setn) -> None:
 
 
 def _e3a(frames, ds, write, names) -> None:
-    rows = []
-    for meth, mname in METHODS:
-        first = True
+    """E3a as three compact tables, one row per policy and one column per method: the jerk relative to DRTC alone
+    (bold below 1: smoother), the stall (bold: lower than DRTC alone by a point or more) and the deviation."""
+    models = sorted({m for fr in frames for m in fr["model"].unique()})
+    meths = [(meth, mname) for meth, mname in METHODS
+             if any(not fr[fr["condition"] == f"{meth}__mix"].empty for fr in frames)]
+    jr_rows, st_rows, dv_rows = [], [], []
+    for model in models:
+        jr, st, dv = [_policy(model, names)], [_policy(model, names)], [_policy(model, names)]
+        ref_stall = None
         for fr in frames:
-            for model in sorted(fr["model"].unique()):
+            ref = fr[(fr["condition"] == "drtc__mix") & (fr["model"] == model)]
+            if not ref.empty and ref_stall is None:
+                ref_stall = _med(ref["M2_stall_pct"])
+        st.append(_f(ref_stall) if ref_stall is not None else "--")
+        for meth, _ in meths:
+            cell = None
+            for fr in frames:
                 g = fr[(fr["condition"] == f"{meth}__mix") & (fr["model"] == model)]
                 ref = fr[(fr["condition"] == "drtc__mix") & (fr["model"] == model)]
-                if g.empty or ref.empty:
-                    continue
-                jr = _med(g["M7_jerk_k"]) / _med(ref["M7_jerk_k"]) if _med(ref["M7_jerk_k"]) else float("nan")
-                rows.append(" & ".join([mname if first else "", _policy(model, names), _f(jr, 2),
-                                        _f(_med(g["M8b_largest_step_deg"]), 1),
-                                        _f(_med(g.get("M12_plan_deviation_deg", pd.Series(dtype=float))), 2),
-                                        _f(_med(g["M2_stall_pct"]), 1)]) + " \\\\")
-                first = False
-        rows.append("\\addlinespace")
-    if any("&" in r for r in rows):
+                if not g.empty and not ref.empty:
+                    cell = (g, ref)
+                    break
+            if cell is None:
+                jr.append("--"); st.append("--"); dv.append("--")
+                continue
+            g, ref = cell
+            r = _med(g["M7_jerk_k"]) / _med(ref["M7_jerk_k"]) if _med(ref["M7_jerk_k"]) else float("nan")
+            sv = _med(g["M2_stall_pct"])
+            jr.append(_bold(_f(r, 2), r < 1.0))
+            st.append(_bold(_f(sv), ref_stall is not None and sv <= ref_stall - 1.0))
+            dv.append(_f(_med(g.get("M12_plan_deviation_deg", pd.Series(dtype=float))), 2))
+        jr_rows.append(" & ".join(jr) + " \\\\")
+        st_rows.append(" & ".join(st) + " \\\\")
+        dv_rows.append(" & ".join(dv) + " \\\\")
+    if jr_rows:
+        short = {"Butterworth": "Butterw.", "adaptive playback": "adaptive", "resume ramp": "ramp",
+                 "Butterworth + adaptive": "Butterw.+adapt.", "ensembling": "ensembl."}
+        mh = " & ".join(short.get(m, m) for _, m in meths)
+        n = len(meths)
+        def block(title, head, rows, extra=0):
+            return ["\\begin{tabular}{l " + "r" * (n + extra) + "}", "\\toprule",
+                    f"\\multicolumn{{{n + 1 + extra}}}{{l}}{{\\textit{{{title}}}}} \\\\", "\\midrule",
+                    "Policy & " + head + " \\\\", "\\midrule", *rows, "\\bottomrule", "\\end{tabular}"]
         write(f"tab_v2_e3a_{ds}.tex", "\n".join([
-            "\\begin{tabular}{l l rrrr}", "\\toprule",
-            "Method & Policy & Jerk vs \\drtc{} & Largest step ($^\\circ$) & Deviation ($^\\circ$) & Stall (\\%) \\\\",
-            "\\midrule", *rows[:-1], "\\bottomrule", "\\end{tabular}", ""]))
+            "\\begin{tabular}{@{}c@{}}",
+            *block("(a) Jerk relative to \\drtc{} alone (below 1: smoother)", mh, jr_rows), "\\\\[8pt]",
+            *block("(b) Stall (\\% of the run)", "\\drtc{} alone & " + mh, st_rows, extra=1), "\\\\[8pt]",
+            *block("(c) Deviation from the policy's plan ($^\\circ$)", mh, dv_rows), "\\end{tabular}", ""]))
 
 
 PARTS = [("adaptive", "adaptive playback"), ("seam", "RTC / ensembling"), ("butterworth", "Butterworth"),
@@ -234,11 +290,15 @@ def _e3b(df, ds, write, setn, names) -> None:
         setn(f"v2/{ds}/e3b/{model.split('_')[0]}/jerkratio", f"{1 / j:.0f}" if j else "--")
         rows.append(" & ".join([
             pol, seam,
-            _f(_med(g["drtc"]["M2_stall_pct"])), _f(_med(g["stack"]["M2_stall_pct"])),
+            _f(_med(g["drtc"]["M2_stall_pct"])),
+            _bold(_f(_med(g["stack"]["M2_stall_pct"])), _med(g["stack"]["M2_stall_pct"]) <= _med(g["drtc"]["M2_stall_pct"]) - 1.0),
             _f(_med(g["stack__none"]["M2_stall_pct"])),
-            _f(j, 2), _f(_med(g["drtc"]["M8b_largest_step_deg"])), _f(_med(g["stack"]["M8b_largest_step_deg"])),
+            _bold(_f(j, 2), j < 1.0), _f(_med(g["drtc"]["M8b_largest_step_deg"])),
+            _bold(_f(_med(g["stack"]["M8b_largest_step_deg"])),
+                  _med(g["stack"]["M8b_largest_step_deg"]) < _med(g["drtc"]["M8b_largest_step_deg"])),
             _f(_med(g["stack"]["M12_plan_deviation_deg"]), 2),
-            _f(_rec_time(g["drtc"], mix), 2), _f(_rec_time(g["stack"], mix), 2)]) + " \\\\")
+            _f(_rec_time(g["drtc"], mix), 2),
+            _bold(_f(_rec_time(g["stack"], mix), 2), _rec_time(g["stack"], mix) < _rec_time(g["drtc"], mix))]) + " \\\\")
     if rows:
         write(f"tab_v2_e3b_{ds}.tex", "\n".join([
             "\\begin{tabular}{l l rrr r rr r rr}", "\\toprule",
@@ -297,8 +357,10 @@ def robot_v2(results, write, setn, names, wilson, fisher_p) -> None:
                     continue
                 k, n = int((g["M1_success"] == 1).sum()), len(g)
                 lo, hi = wilson(k, n)
-                rows.append(" & ".join([cond.replace("_", "\\_"), _policy(model, names), f"{k}/{n}",
-                                        f"{100 * k / n:.0f}\\%", f"{100 * lo:.0f}--{100 * hi:.0f}\\%",
+                best = key.startswith("base_") and k == max(int((df[(df["condition"] == cond) & (df["model"] == mm)]
+                                                                  ["M1_success"] == 1).sum()) for mm in df["model"].unique())
+                rows.append(" & ".join([cond.replace("_", "\\_"), _policy(model, names), _bold(f"{k}/{n}", best),
+                                        _bold(f"{100 * k / n:.0f}\\%", best), f"{100 * lo:.0f}--{100 * hi:.0f}\\%",
                                         f"{int(g['M1f_fault'].sum())}/{n}"]) + " \\\\")
                 setn(f"{key}/{model.split('_')[0]}/{cond}/M1", f"{100 * k / n:.0f}\\%")
         write(f"tab_{key}.tex", "\n".join([
