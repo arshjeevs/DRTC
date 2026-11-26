@@ -65,3 +65,13 @@ bench.
 
 Next, with your OK: a small frozen eval (the three clients x none/mix/drops/outage x 10 LIBERO tasks x a few seeds),
 SmolVLA on the laptop first; then GR00T N1.7 (16-action chunks) on the H200.
+
+## The evaluation (plan fixed 2026-11-26, before the runs)
+
+`sim/eval.py`: SmolVLA (`lerobot/smolvla_libero`) on the laptop; libero_spatial tasks 0-9 x seeds 0-1 x faults
+none / mix (spike + drops + outage) / drops / outage x LeRobot as shipped / patient / DRTC = 240 episodes of 15 s at
+20 Hz, the bench's 250 ms reply latency in all, fault times shifted per seed in [0, 4] s as on the bench, the same
+initial scene (seed) for every client. Primary measure: task success within the episode, per client and fault (20
+episodes per cell, Wilson intervals; DRTC vs patient compared on the same task and seed). Secondary: stall fraction
+from the engine's ticks. Results: `results/sim/libero_smolvla.jsonl`. No other analysis is planned; anything else is
+labelled exploratory.
