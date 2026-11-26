@@ -96,8 +96,12 @@ def slot(s, key, x, y, w, h):
     """A media slot: presentation/media/<key>.* when present; else a stand-in from media/fallback/ (a real frame or
     figure); else a dashed box describing what goes there."""
     f = media_file(key)
-    if f is not None and f.suffix in (".mp4", ".mov"):
-        return movie(s, f, x, y, w, h)
+    if f is not None and f.suffix in (".mp4", ".mov"):  # fitted to the box at the video's own aspect ratio
+        vw, vh = (int(v) for v in subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of",
+             "csv=p=0", str(f)], capture_output=True, text=True, check=True).stdout.strip().split(","))
+        fw, fh = (w, int(w * vh / vw)) if w * vh / vw <= h else (int(h * vw / vh), h)
+        return movie(s, f, int(x + (w - fw) / 2), int(y + (h - fh) / 2), fw, fh, poster_at=2.0)
     if f is not None:
         return fit_picture(s, f, x, y, w, h)
     for fb in (MEDIA / "fallback" / f"{key}.jpg", MEDIA / "fallback" / f"{key}.png", MEDIA / "diagrams" / f"{key}.png"):
@@ -729,18 +733,27 @@ def t_hardware(prs, n):
              "The Raspberry Pi drives the arm; the models run on the university's shared GPU servers.")
 
 
+def _steps_row(s, y, items, *, size=13):
+    """Numbered steps in one row under a wide video."""
+    n_ = len(items)
+    cw = (CW - Inches(0.25) * (n_ - 1)) / n_
+    return [text(s, M + (cw + Inches(0.25)) * i, y, cw, Inches(0.9),
+                 [[(a, {"bold": True, "color": S.ink})], [(b, {"color": S.muted, "size": size - 1})]], size=size,
+                 font=S.body, line=1.1) for i, (a, b) in enumerate(items)]
+
+
 def t_record(prs, n):
     s = S.content(prs, n, "4 · What we built", "Teaching by demonstration")
-    slot(s, "record", M, TOP - Inches(0.1), Inches(7.4), Inches(4.6))
-    x = M + Inches(7.8)
-    rows = bullets(s, x, TOP, Inches(3.8), [
-        ("Move the leader arm", "by hand; the follower copies it"),
-        ("Record", "both cameras + the joints, 30 per second"),
-        ("Review", "in Rerun; trim idle starts and ends"),
-        ("Hold back", "some episodes for testing"),
-    ], size=17, gap=Inches(0.8))
-    builds(s, rows)
-    notes(s, "Teleoperation: a person drives the leader arm and every frame is saved as training data.")
+    slot(s, "record", M, TOP - Inches(0.25), CW, Inches(3.75))
+    steps = _steps_row(s, TOP + Inches(3.65), [
+        ("1  Move the leader arm", "by hand; the follower arm copies it"),
+        ("2  Record", "both cameras and the joints, 30 per second"),
+        ("3  Review", "in Rerun; idle starts and ends trimmed automatically"),
+        ("4  Hold back", "some episodes for testing, never trained on")])
+    builds(s, steps)
+    notes(s, "A real demonstration from our cube-in-box dataset on the Hugging Face Hub, as recorded: the scene camera "
+             "and the wrist camera. A person moves the leader arm and the follower copies it; every frame, with the "
+             "joint positions, becomes training data.")
 
 
 def t_first_attempt(prs, n):
@@ -1206,20 +1219,18 @@ def t_eval_kinds(prs, n):
 
 def t_robot_eval(prs, n):
     s = S.content(prs, n, "5 · How we evaluate", "Robot evaluation, live and in real time")
-    slot(s, "robot_eval", M, TOP - Inches(0.1), Inches(7.2), Inches(4.6))
-    x = M + Inches(7.6)
-    steps = [("1  Set the layout", "taped marks, rotated every round"),
-             ("2  Start the trial", "the Pi runs the client; the H200 runs the model"),
-             ("3  Faults, live", "the injector applies this trial's seeded faults"),
-             ("4  Judge it", "operator presses s (success) or f (fail); 30 s limit"),
-             ("5  Save it", "videos, every tick, every chunk, the outcome")]
-    rows = [para(s, x, TOP - Inches(0.15) + Inches(0.88) * i, W - M - x, a, b, size=15, h=Inches(0.85))
-            for i, (a, b) in enumerate(steps)]
-    builds(s, rows)
-    notes(s, "This is how every robot trial ran: in real time, on the real arm, from the Raspberry Pi. Trials run in "
-             "rounds: each round runs every model under every condition once, in a seeded random order, so slow "
-             "drifts (light, motor heat, the operator) affect all conditions alike. A trial with a setup mistake is "
-             "voided and re-run, never deleted.")
+    slot(s, "robot_eval", M, TOP - Inches(0.25), CW, Inches(3.75))
+    steps = _steps_row(s, TOP + Inches(3.65), [
+        ("1  Set the layout", "taped marks, rotated every round"),
+        ("2  Start the trial", "the Pi runs the client; the H200 runs the model"),
+        ("3  Faults, live", "the injector applies the trial's seeded faults"),
+        ("4  Judge it", "s for success, f for fail; 30 s limit"),
+        ("5  Save it", "videos, every tick, every chunk, the outcome")], size=12)
+    builds(s, steps)
+    notes(s, "A real robot trial as it ran, live, from the Raspberry Pi: the DRTC run of GR00T N1.7, trial 1, under "
+             "the fault mix. Trials run in rounds: each round runs every model under every condition once, in a "
+             "seeded random order, so slow drifts affect all conditions alike. A trial with a setup mistake is voided "
+             "and run again, never deleted.")
 
 
 def hbars(s, x, y, w, rows, vmax, *, label_w=Inches(3.3), row_h=Inches(0.62), colours=None, unit=""):
