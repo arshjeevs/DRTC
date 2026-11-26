@@ -61,6 +61,31 @@ bench plays (Section~\ref{sec:bench-design}). Sorting has $80+8$ episodes, cube 
 over the episodes (for sorting: red or blue cube, times the two sides of the squares, four combinations), so every
 combination is equally represented in training and in the held-out episodes.
 
+\paragraph{Inspecting a recording.} Every recorded episode can be replayed in the Rerun viewer with
+\texttt{lab data view} (LeRobot's dataset visualiser), which shows the task instruction, both camera streams and the
+joint positions over time, with a cursor that moves through the episode (Figure~\ref{fig:rerun}). It is how bad
+episodes were found before training: a missed grasp, a camera that froze, or an arm that stood still too long.
+
+\begin{figure}[!htbp]
+  \centering
+  \begin{subfigure}{\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{assets/rerun_episode.png}
+    \caption{The Rerun viewer at 4.5~s: the task, the wrist camera (\texttt{camera1}), the scene camera
+             (\texttt{camera2}), the action (the leader arm's joint targets) and the state (the follower's measured
+             joints), six joints each, in degrees; the white line is the current time.}
+  \end{subfigure}\\[6pt]
+  \begin{subfigure}{0.32\textwidth}\centering
+    \includegraphics[width=\textwidth]{assets/rerun_t20.jpg}\caption{2.0~s: approaching the cube.}\end{subfigure}\hfill
+  \begin{subfigure}{0.32\textwidth}\centering
+    \includegraphics[width=\textwidth]{assets/rerun_t29.jpg}\caption{2.9~s: grasping it.}\end{subfigure}\hfill
+  \begin{subfigure}{0.32\textwidth}\centering
+    \includegraphics[width=\textwidth]{assets/rerun_t45.jpg}\caption{4.5~s: placing it on the blue square.}\end{subfigure}
+  \caption{One recorded sorting demonstration (episode~5 of the trimmed sorting dataset) inspected in the Rerun
+           viewer, and the scene camera at three moments of the episode.}
+  \label{fig:rerun}
+\end{figure}
+
 \section{Trimming and editing}\label{sec:trimming}
 
 A recorded episode starts and ends with the arm at rest while the operator gets ready and lets go. Trained on such
