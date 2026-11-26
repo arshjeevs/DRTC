@@ -577,8 +577,10 @@ def t_data(prs, n):
     first = node(s, x0, r1, nw, nh, "First attempt", "50 demos, two cameras in front, no wrist camera: 0 / 10",
                  edge=S.alert, size=14)
     v0 = node(s, x0 + nw + ag, r1, nw, nh, "Cube in box v0",
-              f"{R('data/so101_cubebox_v0/episodes')} demos; wrist camera added", edge=S.accent, size=14)
+              f"{R('data/so101_cubebox_v0/episodes')} demos; first setup with a wrist camera", edge=S.accent,
+              size=14)
     v1 = node(s, x0 + 2 * (nw + ag), r1, nw, nh, "Cube in box v1",
+              f"new recording, final camera setup: "
               f"{int(R('data/so101_cubebox_v1/episodes')) - int(R('data/so101_cubebox_v1/held'))} demos + "
               f"{R('data/so101_cubebox_v1/held')} held out", edge=S.series["drtc"], size=14)
     a1 = line(s, x0 + nw + Inches(0.05), r1 + nh / 2, x0 + nw + ag - Inches(0.05), r1 + nh / 2, color=S.ink,
@@ -587,8 +589,8 @@ def t_data(prs, n):
               color=S.ink, weight=Pt(1.5), arrow=True)
     lab1 = text(s, x0 + nw - Inches(0.3), r1 + nh + Inches(0.05), Inches(1.0) + ag, Inches(0.3), "wrist camera",
                 size=10, color=S.accent, font=S.body, align=PP_ALIGN.CENTER)
-    lab2 = text(s, x0 + 2 * nw + ag - Inches(0.3), r1 + nh + Inches(0.05), Inches(1.0) + ag, Inches(0.3),
-                "more demos", size=10, color=S.accent, font=S.body, align=PP_ALIGN.CENTER)
+    lab2 = text(s, x0 + 2 * nw + ag - Inches(0.75), r1 + nh + Inches(0.05), Inches(1.9) + ag, Inches(0.3),
+                "re-recorded from scratch", size=10, color=S.accent, font=S.body, align=PP_ALIGN.CENTER)
     srt = node(s, x0 + 2 * (nw + ag), r2, nw, nh, "Sorting v1",
                f"{int(R('data/so101_sort_one_v1/episodes')) - int(R('data/so101_sort_one_v1/held'))} demos + "
                f"{R('data/so101_sort_one_v1/held')} held out", edge=S.series["drtc"], size=14)
@@ -605,8 +607,9 @@ def t_data(prs, n):
                    "ones; trimmed automatically (raw copy kept).", {"color": S.muted})]], size=13, font=S.body)
     builds(s, [tasks, [first], [a1, lab1, v0], [a2, lab2, v1, used], [a3, a4, lab3, srt], [foot]])
     notes(s, "How our data grew. The first attempt had no wrist camera and every model scored 0 out of 10. Adding a "
-             "wrist camera gave cube in box v0; v1 repeats it with more demonstrations and a held-out set. Sorting was "
-             "recorded the same way. v1 and sorting are the datasets the experiments use.")
+             "wrist camera gave cube in box v0. v1 is not v0 with more episodes: it was recorded again from scratch "
+             "with the final camera arrangement, with more demonstrations and a held-out set. Sorting was recorded on "
+             "the same final setup. v1 and sorting are the datasets the experiments use.")
 
 
 def t_models(prs, n):
@@ -672,36 +675,75 @@ def t_lab(prs, n):
              "layer holds DRTC, smoothing and the fault injector.")
 
 
+def node2(s, x, y, w, h, title, sub, accent, *, size=15):
+    """A card with a coloured stripe on its left: the machine diagrams' node."""
+    out = [box(s, x, y, w, h, fill="#FFFFFF", line=S.panel_line, weight=Pt(1), radius=0.08),
+           box(s, x, y + Inches(0.12), Inches(0.07), h - Inches(0.24), fill=accent)]
+    out.append(text(s, x + Inches(0.25), y, w - Inches(0.35), h,
+                    [[(title, {"bold": True, "color": S.ink})], [(sub, {"color": S.muted, "size": 12})]],
+                    size=size, font=S.body, anchor=MSO_ANCHOR.MIDDLE, line=1.1))
+    return out
+
+
+def zone(s, x, y, w, h, label):
+    return [box(s, x, y, w, h, fill=S.panel, line=S.panel_line, weight=Pt(1), radius=0.04),
+            text(s, x + Inches(0.2), y + Inches(0.12), w - Inches(0.4), Inches(0.3), label.upper(), size=10,
+                 bold=True, color=S.muted, font=S.body, spacing=1.2)]
+
+
 def t_machines(prs, n):
     s = S.content(prs, n, "4 · What we built", "Four computers, and how work moves between them")
-    pi = node(s, M, TOP + Inches(1.3), Inches(2.2), Inches(1.2), "Raspberry Pi 5", "arm, cameras, client at 30 Hz",
-              edge=S.series["baseline"])
-    lap = node(s, M + Inches(3.3), TOP + Inches(1.3), Inches(2.6), Inches(1.2), "Laptop (RTX 4060)",
-               "recording, development; the Pi's network", edge=S.series["baseline"])
-    e1 = [line(s, M + Inches(2.2), TOP + Inches(1.9), M + Inches(3.3), TOP + Inches(1.9), color=S.ink),
-          edge_label(s, M + Inches(2.2), TOP + Inches(1.58), Inches(1.1), "WiFi / cable")]
-    a100 = node(s, M + Inches(8.6), TOP + Inches(0.55), Inches(2.95), Inches(1.0), "A100 80 GB", "training, serving",
-                edge=S.series["faults"])
-    h200 = node(s, M + Inches(8.6), TOP + Inches(1.95), Inches(2.95), Inches(1.0), "H200 141 GB",
-                "training, serving, the bench", edge=S.series["faults"])
-    e2 = [line(s, M + Inches(5.9), TOP + Inches(1.9), M + Inches(8.6), TOP + Inches(1.05), color=S.ink),
-          line(s, M + Inches(5.9), TOP + Inches(1.9), M + Inches(8.6), TOP + Inches(2.45), color=S.ink),
-          edge_label(s, M + Inches(5.75), TOP + Inches(2.3), Inches(2.6), "campus network · SSH tunnel")]
-    hub = node(s, M + Inches(3.3), TOP + Inches(3.4), Inches(3.3), Inches(1.0), "Hugging Face Hub",
-               "datasets, models, results store", edge=S.series["drtc"])
-    e3 = [line(s, M + Inches(4.6), TOP + Inches(2.5), M + Inches(4.6), TOP + Inches(3.4), color=S.ink),
-          line(s, M + Inches(8.6), TOP + Inches(2.9), M + Inches(6.6), TOP + Inches(3.75), color=S.ink)]
-    wb = node(s, M + Inches(8.6), TOP + Inches(3.4), Inches(2.95), Inches(1.0), "wandb + Trackio",
-              "every training run logged", edge=S.series["smooth"])
-    e4 = [line(s, M + Inches(10.07), TOP + Inches(2.95), M + Inches(10.07), TOP + Inches(3.4), color=S.ink)]
-    gh = node(s, M + Inches(3.3), TOP - Inches(0.3), Inches(2.6), Inches(0.85), "GitHub", "code + registry")
-    e5 = [line(s, M + Inches(4.6), TOP + Inches(0.55), M + Inches(4.6), TOP + Inches(1.3), color=S.ink),
-          line(s, M + Inches(5.9), TOP + Inches(0.12), M + Inches(8.6), TOP + Inches(0.9), color=S.ink, dash=True),
-          edge_label(s, M + Inches(6.2), TOP - Inches(0.05), Inches(2.0), "git pull / push")]
-    builds(s, [[pi, lap] + e1, [a100, h200] + e2, [hub] + e3, [wb] + e4, [gh] + e5])
-    notes(s, "The Pi drives the arm. The laptop records and is the Pi's gateway. The two shared GPU servers train and "
-             "serve the models and run the bench. Datasets, models and every trial's record live on the Hugging Face "
-             "Hub; code and the registry live in git, so any machine can reproduce any step.")
+    zw, zh = Inches(3.5), Inches(3.0)
+    y0 = TOP - Inches(0.3)
+    lx, rx = M, W - M - zw
+    nw, nh = zw - Inches(0.4), Inches(1.0)
+    robot = zone(s, lx, y0, zw, zh, "At the robot")
+    pi = node2(s, lx + Inches(0.2), y0 + Inches(0.5), nw, nh, "Raspberry Pi 5", "drives the arm and cameras; "
+               "the client at 30 Hz", S.series["baseline"])
+    lap = node2(s, lx + Inches(0.2), y0 + Inches(1.85), nw, nh, "Laptop  ·  RTX 4060", "recording, development; "
+                "the Pi's gateway", S.series["baseline"])
+    cx = lx + zw / 2
+    link1 = [line(s, cx, y0 + Inches(0.5) + nh, cx, y0 + Inches(1.85), color=S.ink, weight=Pt(1.5)),
+             text(s, cx + Inches(0.1), y0 + Inches(1.5), Inches(1.5), Inches(0.3), "WiFi or cable", size=10,
+                  color=S.accent, font=S.body)]
+    gpu = zone(s, rx, y0, zw, zh, "University GPU servers")
+    a100 = node2(s, rx + Inches(0.2), y0 + Inches(0.5), nw, nh, "A100  ·  80 GB", "training and serving",
+                 S.series["faults"])
+    h200 = node2(s, rx + Inches(0.2), y0 + Inches(1.85), nw, nh, "H200  ·  141 GB", "training, serving, "
+                 "the bench", S.series["faults"])
+    # the network between the two zones: one bus, right angles only
+    ya, yh = y0 + Inches(0.5) + nh / 2, y0 + Inches(1.85) + nh / 2
+    xl, xr = lx + Inches(0.2) + nw, rx + Inches(0.2)
+    xb = rx - Inches(0.45)
+    net = [line(s, xl, yh, xb, yh, color=S.ink, weight=Pt(1.5)),
+           line(s, xb, ya, xb, yh, color=S.ink, weight=Pt(1.5)),
+           line(s, xb, ya, xr, ya, color=S.ink, weight=Pt(1.5), arrow=True),
+           line(s, xb, yh, xr, yh, color=S.ink, weight=Pt(1.5), arrow=True)]
+    mx0, mw = lx + zw + Inches(0.25), rx - (lx + zw) - Inches(0.5)
+    net.append(text(s, mx0, y0 + Inches(0.45), mw - Inches(0.5), Inches(1.4),
+                    [[("Campus network", {"bold": True, "color": S.ink, "size": 16})],
+                     [("SSH tunnel to the policy server", {"color": S.muted})],
+                     [("↑  2 images + 6 joints, 2.9 MB", {"color": S.accent})],
+                     [("↓  a chunk of actions", {"color": S.accent})]], size=13, font=S.body, line=1.3,
+                    align=PP_ALIGN.CENTER))
+    # shared online services
+    by, bh = y0 + zh + Inches(0.45), Inches(1.35)
+    band = zone(s, M, by, CW, bh, "Shared online")
+    sw = (CW - Inches(0.4) - Inches(0.5)) / 3
+    svc = []
+    for k, (t1, t2, col) in enumerate((("GitHub", "code and the registry", S.muted),
+                                       ("Hugging Face Hub", "datasets, models, the results store", S.series["drtc"]),
+                                       ("wandb + Trackio", "every training run logged", S.series["smooth"]))):
+        svc += node2(s, M + Inches(0.2) + (sw + Inches(0.25)) * k, by + Inches(0.42), sw, Inches(0.78), t1, t2, col,
+                     size=14)
+    down = [line(s, cx, y0 + zh, cx, by, color=S.ink, weight=Pt(1.5)),
+            line(s, rx + zw / 2, y0 + zh, rx + zw / 2, by, color=S.ink, weight=Pt(1.5))]
+    builds(s, [robot + pi + lap + link1, gpu + a100 + h200 + net, band + svc + down])
+    notes(s, "Left, at the robot: the Raspberry Pi drives the arm; the laptop records and is the Pi's network "
+             "gateway. Right: the university's two shared GPU servers train and serve the models and run the bench. "
+             "Between them the campus network: every request carries two images and the joints up, and a chunk of "
+             "actions comes back. Below: GitHub keeps the code and the registry; the Hugging Face Hub keeps datasets, "
+             "models and every trial's record; wandb and Trackio log every training run.")
 
 
 RERUN = {"bg": "#17191C", "grid": "#2B2F35", "text": "#C9CDD3", "muted": "#7E848D",
@@ -962,32 +1004,54 @@ def hbars(s, x, y, w, rows, vmax, *, label_w=Inches(3.3), row_h=Inches(0.62), co
 
 def t_e2(prs, n):
     s = S.content(prs, n, "6 · Results", "E2: which part of DRTC matters?")
-    sub = text(s, M, TOP - Inches(0.35), CW, Inches(0.35),
-               "Remove one part at a time; the extra stalling under the fault mix (median change, percentage points of "
-               "the run):", size=14, color=S.muted, font=S.body)
-    parts = [("a1_no_cooldown", "Without the “ask again” cooldown"),
-             ("a4_half_chunk_cap", "With DRTC's original cap (our fix undone)"),
-             ("a3_upstream_trigger", "With LeRobot's late trigger"),
-             ("a2_upstream_estimator", "With LeRobot's simple delay estimate")]
-    rows = []
-    for key, lab in parts:
+    sub = text(s, M, TOP - Inches(0.35), CW, Inches(0.6),
+               [[("We took DRTC apart, one piece at a time, and measured ", {"color": S.muted}),
+                 ("how much longer the arm stood still", {"bold": True, "color": S.ink}),
+                 (" under the fault mix (bench, 7 policies, both tasks).", {"color": S.muted})]], size=15,
+               font=S.body)
+
+    def pts(key):
         v = [float(R(f"v2/{t}/e2/{key}/mix/delta")) for t in ("sort_one", "cubebox_v1")]
-        w_ = [R(f"v2/{t}/e2/{key}/mix/worse") for t in ("sort_one", "cubebox_v1")]
-        rows.append((lab, v, f"worse for {w_[0]} | {w_[1]}"))
-    axis, groups = hbars(s, M, TOP + Inches(0.25), CW, rows, 30, unit=" pp")
-    leg = text(s, M + Inches(3.3), TOP + Inches(0.25) + Inches(0.62) * 4 + Inches(0.05), Inches(6), Inches(0.3),
-               [[("■ ", {"color": S.accent}), ("sorting   ", {"color": S.muted}),
-                 ("■ ", {"color": S.series["drtc"]}), ("cube in box   ", {"color": S.muted}),
-                 ("(policies out of 7)", {"color": S.muted})]], size=11, font=S.body)
-    take = text(s, M, TOP + Inches(3.45), CW, Inches(0.9),
-                [[("The cooldown carries almost all of DRTC's benefit. ", {"bold": True, "color": S.ink}),
-                  ("The delay estimate and the early trigger matter little on a steady link; DRTC's original cap gives "
-                   "up replies too early, which our first fix removed.", {"color": S.muted})]], size=15, font=S.body)
-    builds(s, [[sub, axis, leg]] + groups + [[take]])
-    notes(s, "E2 on the bench, every policy, both tasks. Removing the cooldown re-request adds about 25 points of "
-             "stalling under the fault mix for all seven policies. Putting back DRTC's original cap, which we removed as "
-             "our first fix, adds 19 to 26 points. LeRobot's trigger and estimator instead of ours change almost "
-             "nothing.")
+        return v
+    rows = [("a1_no_cooldown", "Remove “ask again”", "the client waits for a lost reply instead of "
+             "asking again", "Essential", S.alert),
+            ("a4_half_chunk_cap", "Undo our fix", "DRTC's original limit gives up on replies before they can "
+             "arrive", "Essential", S.alert),
+            ("a3_upstream_trigger", "Ask later", "LeRobot's trigger instead of asking early", "Small", S.muted),
+            ("a2_upstream_estimator", "Simpler estimate", "LeRobot's delay estimate instead of ours", "No effect",
+             S.muted)]
+    cw, gap = Inches(2.65), Inches(0.32)
+    groups = []
+    for i, (key, title, what, verdict, col) in enumerate(rows):
+        x = M + (cw + gap) * i
+        v = pts(key)
+        lo, hi = min(v), max(v)
+        big = f"+{round(lo)}" if abs(hi - lo) < 2 else f"+{max(0, round(lo))}\u2013{round(hi)}"
+        if hi < 1:
+            big = "≈ 0"
+        y = TOP + Inches(0.45)
+        g = [box(s, x, y, cw, Inches(3.0), fill=S.panel, line=col if verdict == "Essential" else S.panel_line,
+                 weight=Pt(1.5 if verdict == "Essential" else 1), radius=S.card_radius),
+             text(s, x + Inches(0.22), y + Inches(0.2), cw - Inches(0.44), Inches(0.35), title, size=16, bold=True,
+                  color=S.ink, font=S.body),
+             text(s, x + Inches(0.22), y + Inches(0.6), cw - Inches(0.44), Inches(0.8), what, size=12,
+                  color=S.muted, font=S.body, line=1.1),
+             text(s, x + Inches(0.22), y + Inches(1.4), cw - Inches(0.44), Inches(0.6), big, size=32, bold=True,
+                  color=col if verdict == "Essential" else S.ink, font=S.heading),
+             text(s, x + Inches(0.22), y + Inches(2.0), cw - Inches(0.44), Inches(0.35), "points more standing still",
+                  size=11, color=S.muted, font=S.body),
+             box(s, x + Inches(0.22), y + Inches(2.45), Inches(1.15), Inches(0.32), fill=col, radius=0.5,
+                 runs=verdict, size=11, bold=True, color="#FFFFFF", font=S.body)]
+        groups.append(g)
+    take = text(s, M, TOP + Inches(3.7), CW, Inches(0.6),
+                [[("Asking again after a lost reply is what makes DRTC work.", {"bold": True, "color": S.ink}),
+                  ("  Points = percent of the run the arm stood still, more than with full DRTC.",
+                   {"color": S.muted, "size": 12})]], size=16, font=S.body)
+    builds(s, [[sub]] + groups + [[take]])
+    notes(s, "We removed one piece of DRTC at a time on the bench. Without asking again, the arm stands still about "
+             "25 percent more of the run under the faults, for all seven policies. Undoing our first fix, DRTC's "
+             "original limit on how long to wait, is almost as bad. Asking later, or a simpler delay estimate, makes "
+             "little or no difference. So the single idea that matters is: when a reply is lost, ask again.")
 
 
 def t_e3a(prs, n):
@@ -1061,20 +1125,6 @@ def t_stack_choice(prs, n):
              "chose RTC as the seam method. E3b then removed one part at a time: removing RTC lowered the stalls on "
              "every RTC policy-task pair at the same jerk. So the robot experiment uses temporal ensembling for the "
              "seams instead; we report this openly as a correction to the rule.")
-
-
-def t_shortchunk(prs, n):
-    s = S.content(prs, n, "Discussion", "When a scheduler can help: chunk length against round trip")
-    pic = picture(s, MEDIA / "diagrams" / "whendrtc.png", M, TOP - Inches(0.2), h=Inches(4.5))
-    x = M + pic.width + Inches(0.4)
-    rows = bullets(s, x, TOP - Inches(0.1), W - M - x, [
-        ("Above the line", "the chunk outlasts the round trip: a good client keeps the queue full"),
-        ("GR00T N1.5 / N1.7", "16 moves = 0.53 s, replies 0.86-0.97 s: the queue runs dry before every reply"),
-        ("Their remedy", "slower playback or a shorter round trip (cable, compressed images), not the scheduler"),
-    ], size=15, gap=Inches(1.15))
-    builds(s, [[pic]] + rows)
-    notes(s, "Why the GR00T models stall even without faults: their chunk is shorter than their round trip, so no "
-             "scheduler can keep the queue full. This is why adaptive playback matters most for them.")
 
 
 def t_baselines(prs, n):
@@ -1195,7 +1245,7 @@ SLIDES = [t_title, t_hook, t_outline,
           t_eval_kinds, t_bench, t_robot_eval, t_records, t_map,
           lambda p, n: S.section_slide(p, n, 6, "Results", "Baselines, the bench studies, the robot experiment"),
           t_baselines, t_e1, t_e2, t_e3a, t_stack_choice, t_e3, t_e4, t_e4_video, t_e4_motion, t_pi,
-          t_shortchunk, t_contrib, t_limits, t_conclusion, t_thanks]
+          t_contrib, t_limits, t_conclusion, t_thanks]
 
 
 def main() -> None:
