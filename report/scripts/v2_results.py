@@ -280,7 +280,7 @@ def _e3b(df, ds, write, setn, names) -> None:
 
 def robot_v2(results, write, setn, names, wilson, fisher_p) -> None:
     """E4 (sort_one_drtc_v2) and the baselines: success per condition / model with Wilson intervals."""
-    plans = [("sort_one_drtc_v2", "e4"), ("sort_one_baseline", "base_sort_one"),
+    plans = [("sort_one_drtc_v2", "e4"), ("cubebox_v1_drtc_v2", "e4_cubebox_v1"), ("sort_one_baseline", "base_sort_one"),
              ("cubebox_v1_baseline", "base_cubebox_v1")]
     for plan, key in plans:
         f = results / "evals" / plan / "metrics.csv"

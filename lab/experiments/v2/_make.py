@@ -197,19 +197,29 @@ def bench_evals(stack_parts: list[str] | None) -> None:
                                                                           for p in parts],
                             "video": False, "robot": "replay"})
     if stack_parts:
+        # E4 (user, 2026-11-26, after the robot baselines): the four best policies on both tasks, and the stack WITHOUT
+        # RTC for all four (E3b: RTC hurt; Diffusion and GR00T N1.7 cannot use it). The RTC stack
+        # (v2_robot/drtc_stack__mix) is kept for a later run.
         conds = {"upstream_patient__none": "v2_robot/upstream_patient__none",
                  "upstream_patient__mix": "v2_robot/upstream_patient__mix", "drtc__mix": "v2_robot/drtc__mix",
-                 "drtc_stack__mix": "v2_robot/drtc_stack__mix"}
+                 "drtc_stack_nortc__mix": "v2_robot/drtc_stack_nortc__mix"}
         cmp = ["upstream_patient__mix vs upstream_patient__none", "drtc__mix vs upstream_patient__mix",
-               "drtc_stack__mix vs drtc__mix"]
-        write_eval("sort_one_drtc_v2",
-                   f"# Setup v2 E4 (lab/PLAN.md): the DRTC experiment on the robot, sort_one, SmolVLA + GR00T N1.5, the\n"
-                   f"# final stack ({' + '.join(stack_parts)}). Grows by `trials` (lab/WORKFLOW.md, Growing an eval).\n",
-                   {"description": "DRTC v2, sort_one - upstream patient, + mix, DRTC + mix, DRTC + stack + mix",
-                    "success": "The cube is fully inside the square of its colour and the gripper has let go of it, "
-                               "before the time limit.", "time_limit_s": 30, "trials": 10, "seed": 0,
-                    "models": ["smolvla_sort_one_v1_full", "groot_sort_one_v1_full"], "conditions": conds,
-                    "comparisons": cmp, "primary": list(cmp), "video": True})
+               "drtc_stack_nortc__mix vs drtc__mix"]
+        nr = " + ".join("ensemble" if p == "rtc" else p for p in stack_parts)
+        for ds, label, success in [
+                ("sort_one", "sort_one", "The cube is fully inside the square of its colour and the gripper has let go "
+                                         "of it, before the time limit."),
+                ("cubebox_v1", "cube in box v1", "The green cube ends inside the box and the gripper is open, before "
+                                                 "the time limit.")]:
+            write_eval(f"{ds}_drtc_v2",
+                       f"# Setup v2 E4 (lab/docs/PLAN.md): the DRTC experiment on the robot, {label}, the four best\n"
+                       f"# baseline policies, the final stack without RTC ({nr}). Grows by `trials`.\n",
+                       {"description": f"DRTC v2, {ds} - upstream patient, + mix, DRTC + mix, DRTC + stack (no RTC) "
+                                       f"+ mix",
+                        "success": success, "time_limit_s": 30, "trials": 10, "seed": 0,
+                        "models": [f"{m}_{ds}_v1_full".replace("_v1_v1", "_v1") for m in
+                                   ("grootn17", "smolvla", "diffusion", "pi05")],
+                        "conditions": conds, "comparisons": cmp, "primary": list(cmp), "video": True})
 
 
 def main() -> None:
@@ -233,6 +243,7 @@ def main() -> None:
             nr = [("ensemble" if p == "rtc" else p) for p in parts]
             systems["stack_nortc"] = (f"DRTC + the final stack, no RTC ({' + '.join(nr)})", stack_settings(nr),
                                       ["none", "mix"])
+            robot["drtc_stack_nortc"] = (systems["stack_nortc"][0], stack_settings(nr), ["mix"])
             for p in nr:
                 rest = [q for q in nr if q != p]
                 systems[f"stack_nortc_minus_{p}"] = (f"DRTC + the final stack (no RTC) without {p}",
