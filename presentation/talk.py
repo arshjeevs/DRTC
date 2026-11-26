@@ -20,15 +20,18 @@ from pathlib import Path
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.util import Inches, Pt
 
+import json
 import subprocess
+
+import numpy as np
 
 from build import ASSETS, CW, M, TOP, card, notes, para, photo, stat, table
 from deck import FIGS, W, bar_panel, box, builds, line, movie, new_deck, picture, text
 from drtc.evals.metrics import wilson
 from results import R, title_page
 from style import Style
-from talk_draw import (JOINTS, chunk_plot, dot, fault_row, first_chunk_curves, first_state, marker,
-                       mini_panel, plot_curve, problem_curves)
+from talk_draw import (JOINT_COLOURS, JOINTS, chunk_plot, curve, dot, fault_row, first_chunk_curves, first_state,
+                       mapper, marker, mini_panel, plot_curve, problem_curves)
 
 S = Style()
 HERE = Path(__file__).resolve().parent
@@ -134,7 +137,7 @@ def t_outline(prs, n):
     parts = [("1", "How a robot is driven by an AI model", "cameras and joints in, motion out"),
              ("2", "The problem", "control over a network, and the seven faults"),
              ("3", "Our solution", "DRTC and motion smoothing"),
-             ("4", "What we built", "hardware, data, training, testing"),
+             ("4", "What we built", "hardware, our lab platform, data, training, testing"),
              ("5", "Results", "on the bench and on the real robot")]
     rows = [para(s, M, TOP + Inches(0.85) * i, CW, f"{a}   {b}", c, size=22, h=Inches(0.8))
             for i, (a, b, c) in enumerate(parts)]
@@ -569,6 +572,257 @@ def t_testing(prs, n):
              "tested with Fisher's exact test (success) and Mann-Whitney (motion), Holm-corrected.")
 
 
+MONO = "Consolas"
+
+
+def node(s, x, y, w, h, title, sub, *, edge=None, fill=None, ink=None, sub_ink=None, size=15):
+    return box(s, x, y, w, h, fill=fill or S.panel, line=edge or S.panel_line, weight=Pt(1.5), radius=S.card_radius,
+               runs=[[(title, {"bold": True, "color": ink or S.ink})],
+                     [(sub, {"color": sub_ink or S.muted, "size": 12})]], size=size, font=S.body, line_spacing=1.1)
+
+
+def edge_label(s, x, y, w, words):
+    return text(s, x, y, w, Inches(0.3), words, size=11, color=S.accent, font=S.body, align=PP_ALIGN.CENTER)
+
+
+def t_lab(prs, n):
+    s = S.content(prs, n, "4 · What we built", "Our lab platform: one layer on top of LeRobot")
+    lw = Inches(7.6)
+    base = box(s, M, TOP + Inches(2.85), lw, Inches(0.95), fill=S.grid, radius=S.card_radius,
+               runs=[[("LeRobot 0.7  ·  unchanged", {"bold": True})],
+                     [("training · policy server · robot drivers · safety checks",
+                       {"color": S.muted, "size": 12})]], size=15, font=S.body)
+    bw, gap = Inches(1.78), Inches(0.163)
+    blocks = [("Registry", "small files: rig, dataset, recipe, model, host, condition, evaluation"),
+              ("Plugins", "our GR00T N1.5 port; the replay robot for the bench"),
+              ("Control layer", "DRTC, smoothing, fault injector"),
+              ("Evaluation", "frozen plans, trial records, metrics, reports")]
+    mids = [node(s, M + (bw + gap) * i, TOP + Inches(0.75), bw, Inches(1.95), a, b, edge=S.accent)
+            for i, (a, b) in enumerate(blocks)]
+    top = box(s, M, TOP - Inches(0.25), lw, Inches(0.8), fill=S.dark, radius=S.card_radius,
+              runs=[[("lab", {"bold": True, "color": S.dark_accent, "font": MONO, "size": 18}),
+                     ("   record · trim · train · serve · eval",
+                      {"color": S.dark_text, "font": MONO, "size": 15})],
+                    [("one command for every step; it builds the exact LeRobot command",
+                      {"color": S.dark_muted, "size": 11})]], size=15, font=S.body)
+    x = M + lw + Inches(0.45)
+    sw = W - M - x
+    st = [stat(s, x, TOP - Inches(0.2), sw, R("software/tests"), "automated tests, run without a GPU or a robot",
+               size=30),
+          stat(s, x, TOP + Inches(1.3), sw, "7 kinds of file", "everything an experiment depends on, named and "
+               "versioned in git", size=26),
+          stat(s, x, TOP + Inches(2.8), sw, "Pinned", "LeRobot is never edited: every change of ours is in our "
+               "own, tested code", size=26)]
+    builds(s, [[base], mids, [top], st[0], st[1], st[2]])
+    notes(s, "We did not fork LeRobot. Everything of ours is a layer on top: the registry says what an experiment "
+             "uses, the lab command runs each step, two plugins add GR00T N1.5 and the replay robot, and the control "
+             "layer holds DRTC, smoothing and the fault injector.")
+
+
+def t_machines(prs, n):
+    s = S.content(prs, n, "4 · What we built", "Four computers, and how work moves between them")
+    pi = node(s, M, TOP + Inches(1.3), Inches(2.2), Inches(1.2), "Raspberry Pi 5", "arm, cameras, client at 30 Hz",
+              edge=S.series["baseline"])
+    lap = node(s, M + Inches(3.3), TOP + Inches(1.3), Inches(2.6), Inches(1.2), "Laptop (RTX 4060)",
+               "recording, development; the Pi's network", edge=S.series["baseline"])
+    e1 = [line(s, M + Inches(2.2), TOP + Inches(1.9), M + Inches(3.3), TOP + Inches(1.9), color=S.ink),
+          edge_label(s, M + Inches(2.2), TOP + Inches(1.58), Inches(1.1), "WiFi / cable")]
+    a100 = node(s, M + Inches(8.6), TOP + Inches(0.55), Inches(2.95), Inches(1.0), "A100 80 GB", "training, serving",
+                edge=S.series["faults"])
+    h200 = node(s, M + Inches(8.6), TOP + Inches(1.95), Inches(2.95), Inches(1.0), "H200 141 GB",
+                "training, serving, the bench", edge=S.series["faults"])
+    e2 = [line(s, M + Inches(5.9), TOP + Inches(1.9), M + Inches(8.6), TOP + Inches(1.05), color=S.ink),
+          line(s, M + Inches(5.9), TOP + Inches(1.9), M + Inches(8.6), TOP + Inches(2.45), color=S.ink),
+          edge_label(s, M + Inches(5.75), TOP + Inches(2.3), Inches(2.6), "campus network · SSH tunnel")]
+    hub = node(s, M + Inches(3.3), TOP + Inches(3.4), Inches(3.3), Inches(1.0), "Hugging Face Hub",
+               "datasets, models, results store", edge=S.series["drtc"])
+    e3 = [line(s, M + Inches(4.6), TOP + Inches(2.5), M + Inches(4.6), TOP + Inches(3.4), color=S.ink),
+          line(s, M + Inches(8.6), TOP + Inches(2.9), M + Inches(6.6), TOP + Inches(3.75), color=S.ink)]
+    wb = node(s, M + Inches(8.6), TOP + Inches(3.4), Inches(2.95), Inches(1.0), "wandb + Trackio",
+              "every training run logged", edge=S.series["smooth"])
+    e4 = [line(s, M + Inches(10.07), TOP + Inches(2.95), M + Inches(10.07), TOP + Inches(3.4), color=S.ink)]
+    gh = node(s, M + Inches(3.3), TOP - Inches(0.3), Inches(2.6), Inches(0.85), "GitHub", "code + registry")
+    e5 = [line(s, M + Inches(4.6), TOP + Inches(0.55), M + Inches(4.6), TOP + Inches(1.3), color=S.ink),
+          line(s, M + Inches(5.9), TOP + Inches(0.12), M + Inches(8.6), TOP + Inches(0.9), color=S.ink, dash=True),
+          edge_label(s, M + Inches(6.2), TOP - Inches(0.05), Inches(2.0), "git pull / push")]
+    builds(s, [[pi, lap] + e1, [a100, h200] + e2, [hub] + e3, [wb] + e4, [gh] + e5])
+    notes(s, "The Pi drives the arm. The laptop records and is the Pi's gateway. The two shared GPU servers train and "
+             "serve the models and run the bench. Datasets, models and every trial's record live on the Hugging Face "
+             "Hub; code and the registry live in git, so any machine can reproduce any step.")
+
+
+def t_trimming(prs, n):
+    s = S.content(prs, n, "4 · What we built", "Trimming: cut the idle start and end")
+    d = json.loads((MEDIA / "data" / "trim_episode0.json").read_text())
+    a = np.array(d["action"])
+    fps, st, en = d["fps"], d["start"], d["end"]
+    t = np.arange(len(a)) / fps
+    why = text(s, M, TOP - Inches(0.3), CW, Inches(0.5),
+               [[("Why: ", {"bold": True, "color": S.ink}),
+                 ("trained on still starts, a model learns that not moving is a valid first move (“never starts”).",
+                  {"color": S.muted})]], size=15, font=S.body)
+    px, py, pw, ph = M + Inches(0.1), TOP + Inches(0.35), CW - Inches(0.1), Inches(1.9)
+    curves = []
+    for j, col in enumerate(JOINT_COLOURS):
+        v = a[:, j]
+        lo, hi = v.min(), v.max()
+        span = (hi - lo) or 1
+        f = mapper(px, py, pw, ph, 0, t[-1], lo - 0.1 * span, hi + 0.1 * span)
+        curves.append(curve(s, [f(tt, vv) for tt, vv in zip(t, v)], col, weight=Pt(1.75)))
+    axis = [line(s, px, py + ph, px + pw, py + ph, color=S.muted, weight=Pt(0.75)),
+            text(s, px, py + ph + Inches(0.03), Inches(8), Inches(0.25),
+                 f"one demonstration, all six joints  ·  {len(a) / fps:.1f} s at {fps} frames a second",
+                 size=11, color=S.muted, font=S.body)]
+    fx = lambda tt: int(px + pw * tt / t[-1])  # noqa: E731
+    cut = []
+    for x0, x1, label in ((0, st / fps, f"idle {st / fps:.1f} s"), (en / fps, t[-1], f"idle {(len(a) - en) / fps:.1f} s")):
+        cut.append(box(s, fx(x0), py - Inches(0.05), fx(x1) - fx(x0), ph + Inches(0.05), fill=S.ink, alpha=0.12))
+        cut.append(text(s, fx(x0), py - Inches(0.32), max(fx(x1) - fx(x0), Inches(1.0)), Inches(0.25), label,
+                        size=11, bold=True, color=S.alert, font=S.body))
+        for xx in (x1,) if x0 == 0 else (x0,):
+            cut.append(line(s, fx(xx), py - Inches(0.05), fx(xx), py + ph, color=S.alert, weight=Pt(1.5), dash=True))
+    cw, gap = Inches(3.6), Inches(0.37)
+    cy = TOP + Inches(2.75)
+    cards = [("Raw copy", "the recording as made; the only copy ever edited"),
+             ("Trimmed copy", "rebuilt from the raw one after every edit; the one models train on"),
+             ("Editing tools", "view, delete bad episodes, set a manual trim, undo, push")]
+    cs = [node(s, M + (cw + gap) * i, cy, cw, Inches(1.0), a_, b_, edge=S.accent) for i, (a_, b_) in enumerate(cards)]
+    num = text(s, M, cy + Inches(1.15), CW, Inches(0.35),
+               [[("Automatic: ", {"bold": True, "color": S.ink}),
+                 ("the cut is where the arm is still, measured against the recording's own joint noise. Over the three "
+                  "datasets 69,864 → 58,104 frames (−17 %).", {"color": S.muted})]], size=13, font=S.body)
+    builds(s, [[why] + axis + [(c, "wipe_right") for c in curves], cut, cs + [num]])
+    notes(s, "A real raw demonstration. The grey parts are the operator getting ready and letting go: the arm is "
+             "still. The trim finds them automatically from the joints' own noise level. We keep the raw recording "
+             "untouched and rebuild the trimmed copy from it after every edit.")
+
+
+def t_offline(prs, n):
+    s = S.content(prs, n, "4 · What we built", "Before the robot: offline evaluation")
+    a = fig(s, "fig_offline", M, TOP - Inches(0.2), w=Inches(5.7), centre=False)
+    b = fig(s, "fig_sizespeed", M + Inches(5.95), TOP - Inches(0.2), w=Inches(5.6), centre=False)
+    cap = text(s, M, TOP + Inches(4.15), CW, Inches(0.6),
+               [[("Held-out episodes: ", {"bold": True, "color": S.ink}),
+                 ("the model predicts every step and we compare with what the person did (error in degrees); "
+                  "inference time measured on the H200.", {"color": S.muted})]], size=14, font=S.body)
+    builds(s, [[a], [b], [cap]])
+    notes(s, "Before any robot time: how close each model's actions are to the human's on held-out episodes, and how "
+             "long it takes to answer. Bigger models are slower; that matters on a network.")
+
+
+def t_bench(prs, n):
+    s = S.content(prs, n, "4 · What we built", "The bench: the robot replayed, everything else real")
+    bw, gap = Inches(2.0), Inches(0.39)
+    y = TOP + Inches(0.1)
+    items = [("Recorded episode", "camera frames + joints from a real trial", S.panel_line),
+             ("Replay robot", "plays them in place of the arm (our plugin)", S.accent),
+             ("Client", "LeRobot or DRTC, with or without smoothing", S.accent),
+             ("Fault injector", "this run's fault, seeded", S.alert),
+             ("Policy server", "the real trained model on the GPU", S.series["drtc"])]
+    nodes, arrows = [], []
+    for i, (a_, b_, col) in enumerate(items):
+        x = M + (bw + gap) * i
+        nodes.append(node(s, x, y, bw, Inches(1.35), a_, b_, edge=col, size=14))
+        if i:
+            arrows.append(line(s, x - gap + Inches(0.04), y + Inches(0.5), x - Inches(0.04), y + Inches(0.5),
+                               color=S.ink, weight=Pt(1.25), arrow=True))
+    xr = M + (bw + gap) * 4 + bw / 2
+    xc = M + (bw + gap) * 2 + bw / 2
+    back = [line(s, xr, y + Inches(1.35), xr, y + Inches(1.75), color=S.ink, weight=Pt(1.25)),
+            line(s, xr, y + Inches(1.75), xc, y + Inches(1.75), color=S.ink, weight=Pt(1.25)),
+            line(s, xc, y + Inches(1.75), xc, y + Inches(1.38), color=S.ink, weight=Pt(1.25), arrow=True),
+            edge_label(s, xc, y + Inches(1.8), xr - xc, "the chunk comes back through the same faults")]
+    sy = TOP + Inches(2.45)
+    st = [stat(s, M, sy, Inches(3.6), "2,912", "runs per task for E1 + E2: 7 policies × 52 conditions × 8 "
+               "runs", size=30),
+          stat(s, M + Inches(3.97), sy, Inches(3.6), "14 s", "per run; timing and motion measured, not task success",
+               size=30),
+          stat(s, M + Inches(7.94), sy, Inches(3.6), "Same seed", "every client meets exactly the same faults",
+               size=30)]
+    builds(s, [nodes[:2] + arrows[:1], nodes[2:3] + arrows[1:2], nodes[3:] + arrows[2:], back, st[0] + st[1] + st[2]])
+    notes(s, "On the bench the arm is replaced by a recording of a real trial: its camera frames and joint states are "
+             "played back by our replay robot. Everything else is real: the client, the fault injector, the network "
+             "and the trained model on the GPU. So we can run every fault for every policy thousands of times, "
+             "identically for each client. It cannot tell us task success; that is what the robot experiment is for.")
+
+
+def t_records(prs, n):
+    s = S.content(prs, n, "4 · What we built", "Every trial is recorded")
+    tree = [("trials/<condition>/<model>/t01/", S.ink, ""),
+            ("  video/scene.mp4, wrist.mp4", S.ink, "both cameras"),
+            ("  ticks.csv", S.ink, "every 33 ms: queue, command, measured joints"),
+            ("  chunks.csv", S.ink, "every request: sent, received, turnaround"),
+            ("  trial.json", S.ink, "outcome, timing, machine, server")]
+    paras = []
+    for path, col, what in tree:
+        paras.append([(path, {"font": MONO, "color": col, "size": 14})] +
+                     ([(f"   {what}", {"color": S.muted, "size": 12})] if what else []))
+    card_ = box(s, M, TOP - Inches(0.15), Inches(7.0), Inches(2.4), fill=S.panel, line=S.panel_line,
+                radius=S.card_radius)
+    tr = text(s, M + Inches(0.3), TOP + Inches(0.05), Inches(6.5), Inches(2.1), paras, size=14, font=S.body,
+              line=1.45)
+    rows = bullets(s, M, TOP + Inches(2.5), Inches(7.0), [
+        ("Plans frozen", "models, conditions and trials fixed before the first run"),
+        ("Rounds interleaved", "conditions alternate within each session"),
+        ("Results store", "every record pushed to the Hugging Face Hub"),
+    ], size=15, gap=Inches(0.55))
+    x = M + Inches(7.5)
+    st = [stat(s, x, TOP - Inches(0.1), Inches(4.0), "300", "robot trials: 140 baselines + 160 in E4", size=32),
+          stat(s, x, TOP + Inches(1.35), Inches(4.0), "5,824", "bench runs for E1 + E2 on the two tasks", size=32),
+          stat(s, x, TOP + Inches(2.8), Inches(4.0), "1 run discarded", "its labels were entered by another person; "
+               "archived with the reason, run again", size=24, color=S.alert)]
+    builds(s, [[card_, tr], sum(rows, []), st[0] + st[1], st[2]])
+    notes(s, "Every number in the results comes from these raw files, so any table can be rebuilt. One cube-in-box "
+             "run was discarded because someone else entered its labels; it is kept in an archive with the reason, "
+             "and the run was repeated from scratch.")
+
+
+def t_map(prs, n):
+    s = S.content(prs, n, "5 · Results", "Five studies, five questions")
+    cw, gap = Inches(2.15), Inches(0.2)
+    rows = [("Baselines", "robot", "How well does each policy do the task?", "7 policies × 2 tasks × 10 = 140"),
+            ("E1", "bench", "Does DRTC recover where LeRobot's client does not?", "7 policies, 2 tasks, every fault"),
+            ("E2", "bench", "Which part of DRTC matters?", "remove one part at a time"),
+            ("E3", "bench", "Which smoothing, and does the stack help?", "each method alone, then the stack"),
+            ("E4", "robot", "Does it hold on the real arm?", "4 policies × 4 conditions × 10 = 160")]
+    groups = []
+    for i, (a_, where, q, size) in enumerate(rows):
+        x = M + (cw + gap) * i
+        col = S.series["drtc"] if where == "robot" else S.accent
+        g = [box(s, x, TOP - Inches(0.1), cw, Inches(3.6), fill=S.panel, line=S.panel_line, radius=S.card_radius),
+             text(s, x + Inches(0.2), TOP + Inches(0.1), cw - Inches(0.4), Inches(0.5), a_, size=26, bold=True,
+                  font=S.heading, color=col),
+             text(s, x + Inches(0.2), TOP + Inches(0.7), cw - Inches(0.4), Inches(0.3), where.upper(), size=11,
+                  bold=True, color=S.muted, font=S.body, spacing=1.2),
+             text(s, x + Inches(0.2), TOP + Inches(1.05), cw - Inches(0.4), Inches(1.4), q, size=15, bold=True,
+                  font=S.body, color=S.ink, line=1.1),
+             text(s, x + Inches(0.2), TOP + Inches(2.6), cw - Inches(0.4), Inches(0.8), size, size=12,
+                  color=S.muted, font=S.body, line=1.15)]
+        groups.append(g)
+    foot = text(s, M, TOP + Inches(3.75), CW, Inches(0.5),
+                [[("Written down before the first run: ", {"bold": True, "color": S.ink}),
+                  ("the questions, the comparisons that are tested, and the rule that picks the smoothing stack.",
+                   {"color": S.muted})]], size=14, font=S.body)
+    builds(s, groups + [[foot]])
+    notes(s, "The map of the results. Baselines on the robot first, then three bench studies, then the robot "
+             "experiment E4 with DRTC under faults.")
+
+
+def t_contrib(prs, n):
+    s = S.content(prs, n, "Close", "What we contributed")
+    items = [("A platform on LeRobot 0.7", "registry, one command, two plugins, four machines"),
+             ("Data and policies", "three datasets with automatic trimming; seven policies, original recipes"),
+             ("DRTC inside LeRobot's runtime", "with four fixes found on the real robot"),
+             ("Six smoothing methods", "and a rule fixed in advance for combining them"),
+             ("Network fault injection", "seven fault types, seeded per trial"),
+             ("An evaluation framework", "offline, bench and robot; frozen plans; raw records"),
+             ("The experiments", "140 baseline trials, the bench studies, 160 E4 trials, the Pi as robot computer")]
+    rows = [para(s, M, TOP - Inches(0.2) + Inches(0.62) * i, CW, f"{i + 1}   {a_}", b_, size=17, h=Inches(0.6))
+            for i, (a_, b_) in enumerate(items)]
+    builds(s, rows)
+    notes(s, "Seven contributions, in the order of the talk.")
+
+
 def t_baselines(prs, n):
     s = S.content(prs, n, "5 · Results", "First: how well does each policy do the task?")
     fig(s, "fig_baselines", M, TOP - Inches(0.15), h=Inches(4.6))
@@ -593,8 +847,8 @@ def t_e3(prs, n):
 def t_e4(prs, n):
     s = S.content(prs, n, "5 · Results", "On the robot: DRTC brings success back")
     models = ["diffusion", "grootn17", "pi05", "smolvla"]
-    conds = [("upstream_patient__none", "LeRobot\nno faults", S.series["baseline"]),
-             ("upstream_patient__mix", "LeRobot\n+ faults", S.series["faults"]),
+    conds = [("upstream_patient__none", "Patient LeRobot\nno faults", S.series["baseline"]),
+             ("upstream_patient__mix", "Patient LeRobot\n+ faults", S.series["faults"]),
              ("drtc__mix", "DRTC\n+ faults", S.series["drtc"]),
              ("drtc_stack_nortc__mix", "DRTC + stack\n+ faults", S.series["smooth"])]
     bars = []
@@ -606,7 +860,7 @@ def t_e4(prs, n):
     static, per = bar_panel(s, M, TOP - Inches(0.3), Inches(7.6), Inches(4.9), "Cube in box, four policies, 160 trials",
                             bars, ink=S.ink, muted=S.muted, grid=S.grid, font=S.body, size=14)
     x = M + Inches(8.1)
-    sa = stat(s, x, TOP, Inches(3.4), "68 → 13 %", "the fault mix breaks LeRobot's client", color=S.alert)
+    sa = stat(s, x, TOP, Inches(3.4), "68 → 13 %", "the fault mix breaks LeRobot's client, even set to wait the whole trial", color=S.alert)
     sb = stat(s, x, TOP + Inches(1.5), Inches(3.4), "→ 65 %", "DRTC restores it")
     sc = stat(s, x, TOP + Inches(3.0), Inches(3.4), "→ 75 %", "with the stack, and about 3× smoother",
               color=S.series["smooth"])
@@ -681,11 +935,12 @@ SLIDES = [t_title, t_hook, t_outline,
           t_loop, t_fault, t_faults, t_question,
           lambda p, n: S.section_slide(p, n, 3, "Our solution", "DRTC and motion smoothing"),
           t_drtc_idea, t_drtc_media, t_jerk, t_stack,
-          lambda p, n: S.section_slide(p, n, 4, "What we built", "Hardware, data, training, testing"),
-          t_hardware, t_record, t_first_attempt, t_data, t_models, t_testing,
+          lambda p, n: S.section_slide(p, n, 4, "What we built", "Hardware, our lab platform, data, training, testing"),
+          t_hardware, t_lab, t_machines, t_record, t_trimming, t_first_attempt, t_data, t_models, t_offline,
+          t_testing, t_bench, t_records,
           lambda p, n: S.section_slide(p, n, 5, "Results", "On the bench and on the real robot"),
-          t_baselines, t_e1, t_e3, t_e4, t_e4_video, t_e4_motion, t_pi,
-          t_limits, t_conclusion, t_thanks]
+          t_map, t_baselines, t_e1, t_e3, t_e4, t_e4_video, t_e4_motion, t_pi,
+          t_contrib, t_limits, t_conclusion, t_thanks]
 
 
 def main() -> None:
