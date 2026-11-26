@@ -30,8 +30,9 @@ from deck import FIGS, W, bar_panel, box, builds, line, movie, new_deck, picture
 from drtc.evals.metrics import wilson
 from results import R, title_page
 from style import Style
-from talk_draw import (JOINT_COLOURS, JOINTS, chunk_plot, curve, dot, fault_row, first_chunk_curves, first_state,
-                       mapper, marker, mini_panel, plot_curve, problem_curves)
+from talk_draw import (JOINT_COLOURS, JOINTS, chunk_plot, curve, dot, e4_trial, fault_labels, fault_row, fault_windows,
+                       first_chunk_curves, first_state, mapper, marker, mini_panel, moving_segments, plot_curve,
+                       problem_curves, resends, time_axis, timeline_row)
 
 S = Style()
 HERE = Path(__file__).resolve().parent
@@ -73,14 +74,35 @@ MEDIA_SLOTS = {
 }
 
 
+def media_file(key):
+    for ext in (".mp4", ".mov", ".png", ".jpg"):
+        if (MEDIA / f"{key}{ext}").is_file():
+            return MEDIA / f"{key}{ext}"
+    return None
+
+
+def fit_picture(s, path, x, y, w, h):
+    """A picture scaled to fit inside the box, centred in it."""
+    pic = picture(s, path, x, y, w=w)
+    if pic.height > h:
+        pic.width = int(pic.width * h / pic.height)
+        pic.height = int(h)
+    pic.left = int(x + (w - pic.width) / 2)
+    pic.top = int(y + (h - pic.height) / 2)
+    return pic
+
+
 def slot(s, key, x, y, w, h):
-    """A media slot: the file in presentation/media when present, else a dashed box describing it."""
-    for ext in (".mp4", ".mov"):
-        if (MEDIA / f"{key}{ext}").is_file():
-            return movie(s, MEDIA / f"{key}{ext}", x, y, w, h)
-    for ext in (".png", ".jpg"):
-        if (MEDIA / f"{key}{ext}").is_file():
-            return picture(s, MEDIA / f"{key}{ext}", x, y, w=w, h=h)
+    """A media slot: presentation/media/<key>.* when present; else a stand-in from media/fallback/ (a real frame or
+    figure); else a dashed box describing what goes there."""
+    f = media_file(key)
+    if f is not None and f.suffix in (".mp4", ".mov"):
+        return movie(s, f, x, y, w, h)
+    if f is not None:
+        return fit_picture(s, f, x, y, w, h)
+    for fb in (MEDIA / "fallback" / f"{key}.jpg", MEDIA / "fallback" / f"{key}.png", MEDIA / "diagrams" / f"{key}.png"):
+        if fb.is_file():
+            return fit_picture(s, fb, x, y, w, h)
     kind, title, length, what = MEDIA_SLOTS[key]
     return box(s, x, y, w, h, fill=S.panel, line=S.alert, dash=True, weight=Pt(1.5), radius=S.card_radius,
                runs=[[(f"{kind.upper()}  ·  {length}", {"bold": True, "color": S.alert, "size": 12})],
@@ -294,47 +316,133 @@ def t_chunks(prs, n):
 
 def t_why_server(prs, n):
     s = S.content(prs, n, "1 · Robot control with a VLA", "The model is too big for the robot's computer")
-    a = stat(s, M, TOP, Inches(3.5), "0.45-5.6 B", "parameters in the VLAs we trained")
+    a = stat(s, M, TOP, Inches(3.5), "0.05-5.6 B", "parameters in the policies we trained")
     b = stat(s, M, TOP + Inches(1.5), Inches(3.5), "Raspberry Pi 5", "the robot's computer: no GPU")
     c = stat(s, M, TOP + Inches(3.0), Inches(3.5), "A100 · H200", "the GPU servers that run the models")
-    v = slot(s, "why_server", M + Inches(4.2), TOP - Inches(0.1), CW - Inches(4.2), Inches(4.6))
-    builds(s, [a, b, c])
-    notes(s, "So the model runs on a GPU server, and the robot sends it images over the network. This is remote "
+    x0 = M + Inches(4.2)
+    if media_file("why_server"):
+        slot(s, "why_server", x0, TOP - Inches(0.1), CW - Inches(4.2), Inches(4.6))
+        builds(s, [a, b, c])
+        return
+    w = W - M - x0
+    nw = Inches(1.6)
+    half = (w - nw - Inches(0.3)) / 2
+    hdr = [text(s, x0 + nw, TOP - Inches(0.25), half, Inches(0.3), "SIZE (BILLIONS OF PARAMETERS)", size=10,
+                bold=True, color=S.muted, font=S.body, spacing=1.1),
+           text(s, x0 + nw + half + Inches(0.3), TOP - Inches(0.25), half, Inches(0.3), "TIME PER CHUNK ON THE GPU",
+                size=10, bold=True, color=S.muted, font=S.body, spacing=1.1)]
+    rh = Inches(0.58)
+    rows = []
+    for i, (name, size, ms) in enumerate(SIZE_SPEED):
+        y = TOP + Inches(0.15) + rh * i
+        bw1 = int((half - Inches(0.75)) * size / 5.6)
+        bw2 = int((half - Inches(0.75)) * ms / 450)
+        x2 = x0 + nw + half + Inches(0.3)
+        rows.append([text(s, x0, y, nw, rh, name, size=13, color=S.ink, font=S.body, anchor=MSO_ANCHOR.MIDDLE),
+                     box(s, x0 + nw, y + Inches(0.15), max(bw1, Pt(2)), rh - Inches(0.3), fill=S.accent),
+                     text(s, x0 + nw + max(bw1, Pt(2)) + Inches(0.06), y, Inches(0.7), rh, f"{size:g} B", size=11,
+                          color=S.ink, font=S.body, anchor=MSO_ANCHOR.MIDDLE),
+                     box(s, x2, y + Inches(0.15), bw2, rh - Inches(0.3), fill=S.series["smooth"]),
+                     text(s, x2 + bw2 + Inches(0.06), y, Inches(0.8), rh, f"{ms} ms", size=11, color=S.ink,
+                          font=S.body, anchor=MSO_ANCHOR.MIDDLE)])
+    cap = text(s, x0, TOP + Inches(0.2) + rh * 7, w, Inches(0.4),
+               "Even on an H200 the larger models need up to 0.43 s per chunk; a Raspberry Pi has no GPU at all.",
+               size=12, color=S.muted, font=S.body)
+    builds(s, [a, b, c, hdr + sum(rows, []) + [cap]])
+    notes(s, "So the model runs on a GPU server, and the robot sends it images over the network. Even there, the "
+             "big models take a few hundred milliseconds per chunk (median over our robot trials). This is remote "
              "inference, and it is where our problem starts.")
 
 
-# Part 2 -----------------------------------------------------------------------------------------------------------
-
 def t_loop(prs, n):
     s = S.content(prs, n, "2 · The problem", "Every move now depends on the network")
-    slot(s, "loop", M, TOP - Inches(0.1), Inches(7.4), Inches(4.6))
     x = M + Inches(7.8)
     rows = bullets(s, x, TOP, Inches(3.8), [
         ("Up:", "2 images + 6 joints, 2.9 MB"),
         ("Down:", "a chunk of moves"),
-        ("Round trip:", f"about {R('edge/smolvla/rtt')} (SmolVLA, from the Pi)"),
+        ("Round trip:", "0.6-1 s from the Pi"),
         ("Queue:", "the moves still waiting to be played"),
     ], size=17, gap=Inches(0.8))
-    builds(s, rows)
+    if media_file("loop"):
+        slot(s, "loop", M, TOP - Inches(0.1), Inches(7.4), Inches(4.6))
+        builds(s, rows)
+        return
+    bw, bh = Inches(2.3), Inches(1.45)
+    ry, sx = TOP + Inches(0.25), M + Inches(5.0)
+    robot = box(s, M, ry, bw, bh, fill=S.dark, radius=S.card_radius,
+                runs=[[("Robot computer", {"bold": True})], [("Raspberry Pi 5, 30 Hz", {"color": S.dark_muted,
+                                                                                         "size": 12})],
+                      [("cameras + arm", {"color": S.dark_muted, "size": 12})]], size=16, font=S.body,
+                color=S.dark_text)
+    server = box(s, sx, ry, bw, bh, fill=S.dark, radius=S.card_radius,
+                 runs=[[("GPU server", {"bold": True})], [("the policy (H200)", {"color": S.dark_muted, "size": 12})]],
+                 size=16, font=S.body, color=S.dark_text)
+    net = box(s, M + bw + Inches(0.75), ry + bh / 2 - Inches(0.2), Inches(1.2), Inches(0.4), fill=S.panel,
+              line=S.panel_line, radius=0.5, runs="network", size=12, font=S.body, color=S.muted)
+    up = [line(s, M + bw + Inches(0.05), ry + Inches(0.35), sx - Inches(0.05), ry + Inches(0.35), color=S.accent,
+               weight=Pt(2.25), arrow=True),
+          text(s, M + bw, ry - Inches(0.2), sx - M - bw, Inches(0.3), "observation: 2 images + 6 joints", size=12,
+               color=S.accent, font=S.body, align=PP_ALIGN.CENTER)]
+    down = [line(s, sx - Inches(0.05), ry + bh - Inches(0.35), M + bw + Inches(0.05), ry + bh - Inches(0.35),
+                 color=S.series["drtc"], weight=Pt(2.25), arrow=True),
+            text(s, M + bw, ry + bh - Inches(0.3), sx - M - bw, Inches(0.3), "a chunk of 50 actions", size=12,
+                 color=S.series["drtc"], font=S.body, align=PP_ALIGN.CENTER)]
+    qy = ry + bh + Inches(0.55)
+    cells = []
+    for k in range(20):
+        filled = k < 13
+        cells.append(box(s, M + Inches(0.13) * 0 + Inches(0.29) * k, qy, Inches(0.25), Inches(0.42),
+                         fill=S.series["drtc"] if filled else "#ECEAE3", radius=0.15))
+    qlab = text(s, M, qy + Inches(0.5), Inches(6.2), Inches(0.6),
+                [[("The queue", {"bold": True, "color": S.ink}),
+                  ("  actions waiting to be played, one every 33 ms; the next chunk must arrive before it runs dry",
+                   {"color": S.muted})]], size=13, font=S.body, line=1.15)
+    arm = [line(s, M + Inches(0.29) * 20 + Inches(0.05), qy + Inches(0.21), M + Inches(6.6), qy + Inches(0.21),
+                color=S.ink, weight=Pt(1.5), arrow=True),
+           text(s, M + Inches(6.65), qy, Inches(0.8), Inches(0.42), "arm", size=14, bold=True, color=S.ink,
+                font=S.body, anchor=MSO_ANCHOR.MIDDLE)]
+    builds(s, [[robot, server, net], up + rows[0], down + rows[1], cells + [qlab] + arm + rows[3], rows[2]])
     notes(s, "The robot computer sends the images and joint angles; the server answers with a chunk; the robot keeps "
-             "a queue of moves. As long as the next chunk arrives before the queue empties, the arm moves smoothly.")
+             "a queue of moves and plays one every 33 ms. As long as the next chunk arrives before the queue empties, "
+             "the arm moves smoothly.")
 
 
 def t_fault(prs, n):
-    s = S.content(prs, n, "2 · The problem", "When a reply is late, the arm stops")
-    slot(s, "fault", M, TOP - Inches(0.1), Inches(7.4), Inches(4.6))
+    s = S.content(prs, n, "2 · The problem", "When a reply is lost, the arm stops for good")
     x = M + Inches(7.8)
     rows = bullets(s, x, TOP, Inches(3.8), [
-        ("Late reply", "the queue runs dry"),
-        ("Arm stops", "nothing left to play"),
         ("LeRobot as shipped", "ends the run after 1 s without moves"),
         ("Even when patient", "set to wait the whole trial, it never asks again after a lost reply"),
-    ], size=17, gap=Inches(0.85))
-    builds(s, rows)
-    notes(s, "LeRobot is the open-source robot-learning library we build on. As shipped, its remote client gives up "
-             "after one second with an empty queue. We also run it 'patient', allowed to wait the whole trial, as a "
-             "fair baseline: it no longer gives up, but a lost reply is still never asked for again, so the arm can "
-             "wait forever.")
+    ], size=17, gap=Inches(1.0))
+    if media_file("fault"):
+        slot(s, "fault", M, TOP - Inches(0.1), Inches(7.4), Inches(4.6))
+        builds(s, rows)
+        return
+    p, d = e4_trial("upstream_patient__mix"), e4_trial("drtc__mix")
+    faults = fault_windows(d)
+    tmax = 18
+    w = Inches(7.4)
+    segs = moving_segments(p)
+    last = max(b for a, b in segs)
+    ry = TOP + Inches(0.6)
+    base, mv, fl, ak, en = timeline_row(s, M, ry, w, tmax, segs, faults, label="Patient LeRobot",
+                                        sub="GR00T N1.7, trial 1", colour=S.series["baseline"],
+                                        end=(16.5, "run ended"), end_ok=False, row_h=Inches(0.75))
+    axis = time_axis(s, M, ry + Inches(0.95), w, tmax)
+    fls = fault_labels(s, M, ry - Inches(0.3), w, tmax, faults)
+    leg = text(s, M, TOP - Inches(0.25), w, Inches(0.3),
+               [[("■ ", {"color": S.series["drtc"]}), ("arm moving   ", {"color": S.muted}),
+                 ("■ ", {"color": S.alert}), ("network fault", {"color": S.muted})]], size=11, font=S.body)
+    expl = text(s, M, ry + Inches(1.45), w, Inches(1.8),
+                [[("A real robot trial. ", {"bold": True, "color": S.ink}),
+                  (f"The arm moved until {last:.1f} s. A reply lost in the faults was never asked for again, so no "
+                   "new actions came, even after the network was back. After 10 s without actions LeRobot ended the "
+                   "run.", {"color": S.muted})]], size=14, font=S.body, line=1.25)
+    builds(s, [base + axis + [leg] + mv, fl + fls, en + [expl]] + rows)
+    notes(s, "A real trial from our robot experiment: GR00T N1.7 with LeRobot's client set to be patient. The green "
+             "bars are when the arm moved. The orange windows are the injected faults: a late reply, a second of lost "
+             "replies, and a 1.5 s outage. One request was lost; the client never asked again, so the arm stood "
+             "still until LeRobot's 10 s deadline ended the run. LeRobot as shipped would have ended it after 1 s.")
 
 
 FAULTS = [("none", "a good network", "the cost of being careful"),
@@ -418,9 +526,41 @@ def t_drtc_idea(prs, n):
 
 
 def t_drtc_media(prs, n):
-    s = S.content(prs, n, "3 · Our solution", "DRTC at work")
-    slot(s, "drtc", M, TOP - Inches(0.1), CW, Inches(4.7))
-    notes(s, "The same fault, two clients: LeRobot waits and stops; DRTC asks again and keeps going.")
+    s = S.content(prs, n, "3 · Our solution", "DRTC at work: the same trial, the same faults")
+    if media_file("drtc"):
+        slot(s, "drtc", M, TOP - Inches(0.1), CW, Inches(4.7))
+        return
+    p, d = e4_trial("upstream_patient__mix"), e4_trial("drtc__mix")
+    faults = fault_windows(d)
+    tmax = 18
+    key = json.loads((d / "trial.json").read_text()).get("key_time_s") or 13.1
+    leg = text(s, M, TOP - Inches(0.3), CW, Inches(0.3),
+               [[("■ ", {"color": S.series["drtc"]}), ("arm moving    ", {"color": S.muted}),
+                 ("■ ", {"color": S.alert}), ("network fault    ", {"color": S.muted}),
+                 ("● ", {"color": S.accent}), ("DRTC asks again", {"color": S.muted})]], size=12, font=S.body)
+    fls = fault_labels(s, M, TOP + Inches(0.1), CW, tmax, faults)
+    y1, y2 = TOP + Inches(0.4), TOP + Inches(1.45)
+    b1, m1, f1, _, e1 = timeline_row(s, M, y1, CW, tmax, moving_segments(p), faults, label="Patient LeRobot",
+                                     sub="waits for the lost reply", colour=S.series["baseline"],
+                                     end=(16.5, "run ended"), end_ok=False, row_h=Inches(0.8))
+    segs = moving_segments(d)
+    before, after = _split(segs, faults[-1][0])
+    b2, m2, f2, a2, e2 = timeline_row(s, M, y2, CW, tmax, segs, faults, label="DRTC", sub="asks again",
+                                      colour=S.series["drtc"], asks=resends(d), end=(key, "✓ task done"),
+                                      row_h=Inches(0.8))
+    m2_before, m2_after = m2[:len(before)], m2[len(before):]
+    axis = time_axis(s, M, y2 + Inches(1.0), CW, tmax)
+    expl = text(s, M, y2 + Inches(1.4), CW, Inches(1.0),
+                [[("Same robot, same policy, same trial number, so the same faults at the same moments. ",
+                   {"bold": True, "color": S.ink}),
+                  ("When a reply does not come within its cooldown, DRTC sends a fresh request; after the outage the "
+                   "second one gets through, and the arm moves again about a second after the link returns.",
+                   {"color": S.muted})]], size=14, font=S.body, line=1.25)
+    builds(s, [[leg] + axis + fls + b1 + m1 + f1 + e1, b2 + m2_before + f2, a2, m2_after + e2, [expl]])
+    notes(s, "Top: the patient client from the previous slide. Bottom: DRTC in the same trial. Both meet the same "
+             "late reply, lost replies and outage. The blue dots are DRTC giving up on a reply and asking again with "
+             "a fresh observation. The second one, after the outage, gets an answer, the arm moves again, and the cube "
+             "is in the box at 13 seconds.")
 
 
 SMOOTH = [("seam", "Seams", "a new chunk starts somewhere else: the arm jumps",
@@ -859,39 +999,41 @@ def t_offline(prs, n):
 
 
 def t_bench(prs, n):
-    s = S.content(prs, n, "5 · How we evaluate", "The bench: the robot replayed, everything else real")
+    s = S.content(prs, n, "5 · How we evaluate", "The bench: the arm replayed, the model and server real")
     bw, gap = Inches(2.0), Inches(0.39)
     y = TOP + Inches(0.1)
-    items = [("Recorded episode", "camera frames + joints from a real trial", S.panel_line),
+    items = [("Recorded episode", "camera frames + joints from a held-out demonstration", S.panel_line),
              ("Replay robot", "plays them in place of the arm (our plugin)", S.accent),
              ("Client", "LeRobot or DRTC, with or without smoothing", S.accent),
-             ("Fault injector", "this run's fault, seeded", S.alert),
+             ("Network + faults", "simulated: 250 ms as measured on the robot, plus this run's fault", S.alert),
              ("Policy server", "the real trained model on the GPU", S.series["drtc"])]
     nodes, arrows = [], []
     for i, (a_, b_, col) in enumerate(items):
         x = M + (bw + gap) * i
-        nodes.append(node(s, x, y, bw, Inches(1.35), a_, b_, edge=col, size=14))
+        nodes.append(node(s, x, y, bw, Inches(1.45), a_, b_, edge=col, size=14))
         if i:
             arrows.append(line(s, x - gap + Inches(0.04), y + Inches(0.5), x - Inches(0.04), y + Inches(0.5),
                                color=S.ink, weight=Pt(1.25), arrow=True))
     xr = M + (bw + gap) * 4 + bw / 2
     xc = M + (bw + gap) * 2 + bw / 2
-    back = [line(s, xr, y + Inches(1.35), xr, y + Inches(1.75), color=S.ink, weight=Pt(1.25)),
-            line(s, xr, y + Inches(1.75), xc, y + Inches(1.75), color=S.ink, weight=Pt(1.25)),
-            line(s, xc, y + Inches(1.75), xc, y + Inches(1.38), color=S.ink, weight=Pt(1.25), arrow=True),
-            edge_label(s, xc, y + Inches(1.8), xr - xc, "the chunk comes back through the same faults")]
+    back = [line(s, xr, y + Inches(1.45), xr, y + Inches(1.8), color=S.ink, weight=Pt(1.25)),
+            line(s, xr, y + Inches(1.8), xc, y + Inches(1.8), color=S.ink, weight=Pt(1.25)),
+            line(s, xc, y + Inches(1.8), xc, y + Inches(1.48), color=S.ink, weight=Pt(1.25), arrow=True),
+            edge_label(s, xc, y + Inches(1.85), xr - xc, "the chunk comes back through the same network")]
     sy = TOP + Inches(2.45)
     st = [stat(s, M, sy, Inches(3.6), "2,912", "runs per task for E1 + E2: 7 policies × 52 conditions × 8 "
                "runs", size=30),
-          stat(s, M + Inches(3.97), sy, Inches(3.6), "14 s", "per run; timing and motion measured, not task success",
-               size=30),
+          stat(s, M + Inches(3.97), sy, Inches(3.6), "14 s", "per run; timing and motion measured. Nothing moves, "
+               "so no task success", size=30),
           stat(s, M + Inches(7.94), sy, Inches(3.6), "Same seed", "every client meets exactly the same faults",
                size=30)]
     builds(s, [nodes[:2] + arrows[:1], nodes[2:3] + arrows[1:2], nodes[3:] + arrows[2:], back, st[0] + st[1] + st[2]])
-    notes(s, "On the bench the arm is replaced by a recording of a real trial: its camera frames and joint states are "
-             "played back by our replay robot. Everything else is real: the client, the fault injector, the network "
-             "and the trained model on the GPU. So we can run every fault for every policy thousands of times, "
-             "identically for each client. It cannot tell us task success; that is what the robot experiment is for.")
+    notes(s, "On the bench the arm is replaced by a held-out demonstration: its camera frames and joint states are "
+             "played back by our replay robot. The client and the trained model on the GPU are real; the network to "
+             "the robot is simulated, 250 ms with up to 20 ms of jitter as measured on the robot, plus the run's "
+             "fault. So every fault can be run for every policy thousands of times, identically for each client. "
+             "Because the images do not react to the actions, the bench has no task success: that is what the robot "
+             "experiment is for.")
 
 
 def t_records(prs, n):
@@ -1170,12 +1312,96 @@ def t_stack_choice(prs, n):
              "seams instead; we report this openly as a correction to the rule.")
 
 
+SIZE_SPEED = [("ACT", 0.05, 76), ("SmolVLA", 0.45, 65), ("Diffusion Policy", 0.27, 193), ("GR00T N1.5", 2.7, 246),
+              ("GR00T N1.7", 3.1, 334), ("MolmoAct 2", 5.6, 353), ("π0.5", 4.1, 434)]
+
+
+def _split(segs, t):
+    return [x for x in segs if x[0] < t], [x for x in segs if x[0] >= t]
+
+
+def t_fair(prs, n):
+    s = S.content(prs, n, "5 · How we evaluate", "A fair test: what we changed after the pilot")
+    rows = [("The baseline gave up after 1 s", "beating it would only show LeRobot's default is fragile",
+             "Compare with a patient LeRobot client, same time limits as DRTC"),
+            ("DRTC changed two things at once", "its scheduling and its patience",
+             "Same limits for both: only the scheduling differs"),
+            ("Two smoothing methods added at once", "no way to tell which one helped",
+             "Each method alone first; then a stack by a rule fixed in advance")]
+    hx, lw_ = M, Inches(5.2)
+    rx = M + lw_ + Inches(0.9)
+    hdr = [text(s, hx, TOP - Inches(0.3), lw_, Inches(0.3), "THE PILOT (20 NOV)", size=11, bold=True,
+                color=S.alert, font=S.body, spacing=1.2),
+           text(s, rx, TOP - Inches(0.3), W - M - rx, Inches(0.3), "SETUP V2 (22 NOV): WHAT ALL RESULTS USE", size=11,
+                bold=True, color=S.series["drtc"], font=S.body, spacing=1.2)]
+    rh = Inches(1.05)
+    groups = []
+    for i, (a_, b_, c_) in enumerate(rows):
+        y = TOP + Inches(0.1) + rh * i
+        groups.append([
+            box(s, hx, y, lw_, rh - Inches(0.2), fill=S.panel, line=S.panel_line, radius=S.card_radius,
+                runs=[[(a_, {"bold": True, "color": S.ink})], [(b_, {"color": S.muted, "size": 12})]], size=15,
+                font=S.body, align=PP_ALIGN.LEFT, margin=Inches(0.2)),
+            line(s, hx + lw_ + Inches(0.1), y + (rh - Inches(0.2)) / 2, rx - Inches(0.1), y + (rh - Inches(0.2)) / 2,
+                 color=S.ink, weight=Pt(1.5), arrow=True),
+            box(s, rx, y, W - M - rx, rh - Inches(0.2), fill="#FFFFFF", line=S.series["drtc"], radius=S.card_radius,
+                runs=c_, size=15, bold=True, font=S.body, color=S.ink, align=PP_ALIGN.LEFT, margin=Inches(0.2))])
+    foot = text(s, M, TOP + Inches(3.35), CW, Inches(0.5),
+                "The pilot's results are not used anywhere in this work.", size=13, color=S.muted, font=S.body)
+    builds(s, [hdr] + groups + [[foot]])
+    notes(s, "Our first robot design had three flaws, and we redesigned before collecting the results. First, its "
+             "baseline was LeRobot as shipped, which gives up after one second: beating that proves little. Second, "
+             "the DRTC condition changed both the scheduling and the waiting time. Third, two smoothing methods were "
+             "added at once. Setup v2 fixes each, and every result in this talk comes from it.")
+
+
+E4_POL = [("grootn17", "GR00T N1.7", "16 (0.5 s)"), ("diffusion", "Diffusion Policy", "24 (0.8 s)"),
+          ("smolvla", "SmolVLA", "50 (1.7 s)"), ("pi05", "π0.5", "50 (1.7 s)")]
+
+
+E4_COND = ["upstream_patient__none", "upstream_patient__mix", "drtc__mix", "drtc_stack_nortc__mix"]
+
+
+def t_e4_policy(prs, n):
+    s = S.content(prs, n, "6 · Results", "E4 per policy: DRTC helps most where the chunk is short")
+    rows = []
+    for key, name, chunk in E4_POL:
+        vals = [n_of(f"e4_cubebox_v1/{key}/{c}/M1") for c in E4_COND]
+        rows.append([name, chunk] + [f"{v}/10" for v in vals])
+    g = table(s, M, TOP - Inches(0.15), [Inches(2.3), Inches(1.5), Inches(1.85), Inches(1.85), Inches(1.85),
+                                          Inches(2.2)],
+              ["POLICY", "CHUNK", "PATIENT, NO FAULTS", "PATIENT + FAULTS", "DRTC + FAULTS", "DRTC + STACK + FAULTS"],
+              rows, size=17, row_h=Inches(0.58))
+    take = box(s, M, TOP + Inches(3.2), CW, Inches(1.2), fill=S.dark, radius=0.08,
+               runs=[[("Short chunks lose almost everything to the faults, and DRTC wins it back: ",
+                       {"color": S.dark_text}),
+                      ("GR00T N1.7 0 → 8, Diffusion Policy 1 → 8.", {"bold": True, "color": S.dark_accent})],
+                     [("π0.5's long chunk rides out short faults on its own queue: it lost least and gained least.",
+                       {"color": S.dark_muted, "size": 14})]], size=16, font=S.body, line_spacing=1.25)
+    builds(s, [sum(g, []), [take]])
+    notes(s, "The same 160 trials, per policy. GR00T N1.7 and Diffusion Policy have short chunks, half a second to "
+             "0.8 s: the faults took them to 0 and 1 success out of 10, and DRTC brought both back to 8. Pi 0.5 has a "
+             "1.7 s chunk, enough to ride out short faults, so it lost least and gained least. DRTC matters most where "
+             "a policy cannot ride out a fault on its own queue.")
+
+
 def t_baselines(prs, n):
-    s = S.content(prs, n, "6 · Results", "First: how well does each policy do the task?")
-    fig(s, "fig_baselines", M, TOP - Inches(0.15), h=Inches(4.6))
-    notes(s, f"Normal network, LeRobot as shipped, from the Raspberry Pi. GR00T N1.7 and SmolVLA reach "
-             f"{R('base_sort_one/grootn17/baseline/M1')} on sorting; Diffusion Policy "
-             f"{R('base_cubebox_v1/diffusion/baseline/M1')} on cube in box.")
+    s = S.content(prs, n, "6 · Results", "Baselines: how well each policy does the task")
+    fig(s, "fig_baselines", M, TOP - Inches(0.2), w=Inches(7.2), centre=False)
+    x = M + Inches(7.55)
+    rows = bullets(s, x, TOP - Inches(0.15), W - M - x, [
+        ("No single winner", "GR00T N1.7 and SmolVLA 90 % on sorting; Diffusion Policy 90 % on cube in box"),
+        ("Size does not decide", "SmolVLA (0.45 B) is among the best; GR00T N1.7 far ahead of N1.5"),
+        ("Every failure was the policy's own", "no trial was ended by the client"),
+        ("MolmoAct 2: 0 / 20", "its fine-tune is treated as broken"),
+    ], size=14, gap=Inches(0.98))
+    cap = text(s, M, TOP + Inches(3.95), Inches(7.2), Inches(0.5),
+               "Robot, normal network, patient LeRobot, 10 trials per policy and task, from the Raspberry Pi.",
+               size=11, color=S.muted, font=S.body)
+    builds(s, [[cap]] + rows)
+    notes(s, "Before any faults: each policy's success on the real robot, with LeRobot's client set to be patient and "
+             "a normal network, ten trials each, from the Pi. These are the reference the faults are measured "
+             "against. With ten trials the intervals are wide, about plus or minus 25 points.")
 
 
 def t_project(prs, n):
@@ -1234,7 +1460,7 @@ def t_e1(prs, n):
     hdr = [text(s, nx + nw_ + cw_ * j, y0 - Inches(0.42), cw_ - Inches(0.2), Inches(0.4),
                 [[(a_, {"bold": True, "color": col})], [(b_, {"color": S.muted, "size": 11})]], size=13,
                 font=S.body, line=1.0) for j, (_, a_, b_, col) in enumerate(cols)]
-    rh = Inches(0.58)
+    rh = Inches(0.52)
     totals = {k: [0, 0] for k, *_ in cols}
     groups = []
     for i, (f, what) in enumerate(faults):
@@ -1269,7 +1495,12 @@ def t_e1(prs, n):
                       (". As shipped, LeRobot gave up in ", {"color": S.dark_text}),
                       (f"{pct['ended']:.0f} %", {"bold": True, "color": S.dark_accent}),
                       (" of the runs.", {"color": S.dark_text})]], size=15, font=S.body)
-    builds(s, [[sub] + hdr] + groups + [[take]])
+    worse = text(s, M, y0 + rh * 5 + Inches(0.92), CW, Inches(0.5),
+                 [[("Where DRTC was worse: ", {"bold": True, "color": S.alert}),
+                   ("a rising latency. Every reply 0.4 s slower made DRTC stand still more than the patient client "
+                    "(SmolVLA 31 % against 6 %): its cooldown gives up replies that are only slow.",
+                    {"color": S.muted})]], size=13, font=S.body)
+    builds(s, [[sub] + hdr] + groups + [[take], [worse]])
     notes(s, "E1 on the bench. For every fault type we ask one plain question: after the fault, did the arm move "
              "again? LeRobot as shipped simply ends the run in most faults. The patient version waits, but after "
              "lost replies and outages it never asks again, so it often never recovers. DRTC asks again and "
@@ -1324,23 +1555,66 @@ def t_e4_video(prs, n):
 
 def t_e4_motion(prs, n):
     s = S.content(prs, n, "6 · Results", "E4 (robot): the stack makes the motion smoother")
-    fig(s, "fig_e4_motion", M, TOP - Inches(0.15), h=Inches(4.6))
-    notes(s, "Stall, jerk and recovery after the outage, per policy and condition.")
+    cols = [S.series["baseline"], S.series["faults"], S.series["drtc"], S.series["smooth"]]
+    labs = ["Patient", "+ faults", "DRTC", "+ stack"]
+    panels = [("Standing still", "% of the run", [39, 80, 58, 42], 90, "{:.0f}"),
+              ("Jerk while moving", "10³ °/s³", [60, 48, 52, 16], 70, "{:.0f}"),
+              ("Back in motion after the outage", "seconds", [None, 1.15, 0.90], 1.4, "{:.2f}")]
+    pw = (CW - Inches(0.6)) / 3
+    groups = []
+    for k, (title, unit, vals, vmax, fmt) in enumerate(panels):
+        x = M + (pw + Inches(0.3)) * k
+        top, bot = TOP + Inches(0.35), TOP + Inches(2.95)
+        g = [text(s, x, TOP - Inches(0.3), pw, Inches(0.35), title, size=15, bold=True, color=S.ink, font=S.body),
+             text(s, x, TOP + Inches(0.02), pw, Inches(0.3), unit, size=11, color=S.muted, font=S.body),
+             line(s, x, bot, x + pw, bot, color=S.muted, weight=Pt(0.75))]
+        vs = vals if len(vals) == 4 else [None] + vals[1:] if len(vals) == 3 else vals
+        if len(vals) == 3:
+            vs = [None, vals[1], vals[2], None]
+            vs = [None, None, vals[1], vals[2]]
+        slot_w = pw / 4
+        for i, v in enumerate(vs):
+            cx = x + slot_w * i
+            if v is None:
+                g.append(text(s, cx, bot - Inches(0.35), slot_w, Inches(0.3), "–" if i == 0 else "few",
+                              size=11, color=S.muted, font=S.body, align=PP_ALIGN.CENTER))
+            else:
+                hgt = int((bot - top) * v / vmax)
+                g.append(box(s, int(cx + slot_w * 0.15), bot - hgt, int(slot_w * 0.7), hgt, fill=cols[i]))
+                g.append(text(s, cx, bot - hgt - Inches(0.3), slot_w, Inches(0.28), fmt.format(v), size=12,
+                              bold=True, color=S.ink, font=S.body, align=PP_ALIGN.CENTER))
+            g.append(text(s, cx, bot + Inches(0.05), slot_w, Inches(0.3), labs[i], size=10, color=S.muted,
+                          font=S.body, align=PP_ALIGN.CENTER))
+        groups.append(g)
+    take = text(s, M, TOP + Inches(3.55), CW, Inches(0.8),
+                [[("The stack: ", {"bold": True, "color": S.ink}),
+                  ("about 3× less jerk than DRTC alone (52 → 16), less standing still (58 → 42 %), and "
+                   "faster back in motion after the outage (1.15 → 0.90 s); the cost is 1-2° of drift from "
+                   "the policy's own actions.", {"color": S.muted})]], size=14, font=S.body, line=1.2)
+    foot = text(s, M, TOP + Inches(4.3), CW, Inches(0.3), "Medians over all four policies, cube in box, 40 trials per "
+                "condition. After the outage the patient client got moving again in only a few trials.", size=10,
+                color=S.muted, font=S.body)
+    builds(s, groups + [[take, foot]])
+    notes(s, "How the arm moved in the same 160 trials. Under faults the patient client stood still 80 percent of the "
+             "run; DRTC cut that, and the stack cut it further while making the motion about three times smoother. "
+             "Jerk is counted only while the arm moves, so a stalled arm does not look smooth.")
 
 
 def t_pi(prs, n):
-    s = S.content(prs, n, "6 · Results", "The Raspberry Pi can be the robot's computer")
-    fig(s, "fig_edgertt", M, TOP - Inches(0.15), h=Inches(4.5), centre=False, maxw=Inches(7.5))
-    x = M + Inches(7.9)
-    a = stat(s, x, TOP, Inches(3.6), R("edge/hz").replace("--", "-").replace("~", " "),
-             "control loop on the Pi (target 30 Hz)")
-    b = stat(s, x, TOP + Inches(1.5), Inches(3.6), "0.87 → 0.64 s", "median round trip: WiFi → cable")
-    c = stat(s, x, TOP + Inches(3.0), Inches(3.6), "2.9 MB", "of raw images per request: the main cost")
+    s = S.content(prs, n, "6 · Results", "The Raspberry Pi can be the robot's computer; the link is the limit")
+    fig(s, "fig_edgertt", M, TOP - Inches(0.15), h=Inches(4.3), centre=False, maxw=Inches(7.3))
+    x = M + Inches(7.8)
+    a = stat(s, x, TOP - Inches(0.1), Inches(3.7), "29.9 Hz", "the Pi's control loop (median; never below 29.1)")
+    b = stat(s, x, TOP + Inches(1.45), Inches(3.7), "0.87 → 0.64 s", "median reply time, WiFi → cable")
+    c = stat(s, x, TOP + Inches(2.8), Inches(3.7), "Over WiFi", "DRTC's cooldown gave up every reply of the slower "
+             "policies, so E4 ran over a cable", color=S.alert, size=28)
     builds(s, [a, b, c])
-    notes(s, "The Pi keeps the loop at 30 Hz; the network, not the Pi, is the bottleneck. A cable helps.")
+    notes(s, "The Pi kept the control loop at 30 Hz in every trial: its CPU is not the limit. The link is: each "
+             "request carries 2.9 MB of uncompressed images, and over the Pi's WiFi a reply took 0.87 s at the "
+             "median, three to four times what the bench assumed. That was slow enough for DRTC's cooldown to give "
+             "up the slower policies' replies as lost, so the robot experiment ran over an Ethernet cable. A cooldown "
+             "that adapts to a slowing link is future work.")
 
-
-# Close --------------------------------------------------------------------------------------------------------------
 
 def t_limits(prs, n):
     s = S.content(prs, n, "Close", "Limitations and future work")
@@ -1391,9 +1665,9 @@ SLIDES = [t_title, t_hook, t_outline,
           lambda p, n: S.section_slide(p, n, 4, "What we built", "Hardware, our lab platform, data, training"),
           t_hardware, t_lab, t_machines, t_record, t_first_attempt, t_data, t_trimming, t_models,
           lambda p, n: S.section_slide(p, n, 5, "How we evaluate", "Offline, the bench, live robot trials"),
-          t_eval_kinds, t_offline, t_bench, t_robot_eval, t_records, t_map,
+          t_eval_kinds, t_offline, t_bench, t_robot_eval, t_records, t_fair, t_map,
           lambda p, n: S.section_slide(p, n, 6, "Results", "Baselines, the bench studies, the robot experiment"),
-          t_baselines, t_e1, t_e2, t_e3a, t_e3, t_stack_choice, t_e4, t_e4_video, t_e4_motion, t_pi,
+          t_baselines, t_e1, t_e2, t_e3a, t_e3, t_stack_choice, t_e4, t_e4_policy, t_e4_video, t_e4_motion, t_pi,
           t_conclusion, t_contrib, t_limits, t_thanks]
 
 

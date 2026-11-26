@@ -215,3 +215,95 @@ def chunk_plot(s, joint_box, queue_box, t0, t1, joint="shoulder_lift"):
         nxt = next((t for t in sends if a < t <= b), None)
         segs.append((jc, qc, a, nxt))
     return segs, fj, fq
+
+
+# --- the matched E4 trial: same policy, same trial number, so the same faults at the same moments --------------
+
+E4 = REPO / "results/evals/cubebox_v1_drtc_v2/sessions"
+
+
+def e4_trial(cond, model="grootn17_cubebox_v1_full", trial="t01"):
+    return next(E4.glob(f"*/trials/{cond}/{model}/{trial}"))
+
+
+def moving_segments(trial_dir, gap=0.12):
+    ts = sorted(float(r["t"]) for r in csv.DictReader(open(trial_dir / "ticks.csv")) if r["action"] == "1")
+    segs, a = [], None
+    for i, t in enumerate(ts):
+        if a is None:
+            a = t
+        if i + 1 == len(ts) or ts[i + 1] - t > gap:
+            segs.append((a, t + 1 / 30))
+            a = None
+    return segs
+
+
+def fault_windows(trial_dir):
+    """(start, end, label) of the spike, the drops and the outage, from the trial's own fault log."""
+    rows = list(csv.DictReader(open(trial_dir / "faults.csv")))
+    out = []
+    spike = next((float(r["t"]) for r in rows if r["fault"] == "spike"), None)
+    drop = next((float(r["t"]) for r in rows if r["fault"] == "drop_action"), None)
+    outage = next((float(r["t"]) for r in rows if r["fault"].startswith("disconnect")), None)
+    if spike is not None:
+        out.append((spike, spike + 1.0, "spike"))
+    if drop is not None:
+        out.append((drop, drop + 1.0, "replies lost"))
+    if outage is not None:
+        out.append((outage, outage + 1.5, "outage"))
+    return out
+
+
+def resends(trial_dir):
+    f = trial_dir / "recovery.csv"
+    if not f.is_file():
+        return []
+    return [float(r["t"]) for r in csv.DictReader(open(f)) if "resend" in r["action"]]
+
+
+def timeline_row(s, x, y, w, t_max, segs, faults, *, label, sub, colour, asks=(), end=None, end_ok=True,
+                 row_h=Inches(0.55)):
+    """One run on a time axis: green bars where the arm moved, orange windows where the faults were, blue dots
+    where the client asked again, and a flag where the run ended. Returns (base, segments, faults, asks, end)."""
+    lw = Inches(1.9)
+    gx, gw = x + lw, w - lw
+    f = lambda t: int(gx + gw * t / t_max)  # noqa: E731
+    base = [text(s, x, y, lw - Inches(0.1), row_h, [[(label, {"bold": True, "color": colour})],
+                                                     [(sub, {"color": S.muted, "size": 10})]],
+                 size=14, font=S.body, anchor=MSO_ANCHOR.MIDDLE, line=1.0),
+            box(s, gx, y + row_h * 0.3, gw, row_h * 0.4, fill="#ECEAE3")]
+    mv = [box(s, f(a), int(y + row_h * 0.3), max(f(b) - f(a), Pt(2)), int(row_h * 0.4), fill=S.series["drtc"])
+          for a, b in segs if a < t_max]
+    fl = []
+    for a, b, lab in faults:
+        fl.append(box(s, f(a), int(y + Inches(0.02)), f(b) - f(a), int(row_h - Inches(0.04)), fill=S.alert, alpha=0.28))
+    ak = [dot(s, f(t), y + row_h * 0.5, Inches(0.075), S.accent) for t in asks]
+    en = []
+    if end is not None:
+        t_end, words = end
+        col = S.series["drtc"] if end_ok else S.alert
+        en.append(line(s, f(t_end), y - Inches(0.02), f(t_end), y + row_h + Inches(0.02), color=col, weight=Pt(2.5)))
+        en.append(text(s, f(t_end) + Inches(0.06), y + Inches(0.02), Inches(2.6), row_h, words, size=11, bold=True,
+                       color=col, font=S.body, anchor=MSO_ANCHOR.MIDDLE))
+    return base, mv, fl, ak, en
+
+
+def time_axis(s, x, y, w, t_max, step=2):
+    lw = Inches(1.9)
+    gx, gw = x + lw, w - lw
+    out = [line(s, gx, y, gx + gw, y, color=S.muted, weight=Pt(0.75))]
+    for t in range(0, int(t_max) + 1, step):
+        xx = int(gx + gw * t / t_max)
+        out.append(text(s, xx - Inches(0.3), y + Inches(0.03), Inches(0.6), Inches(0.22), f"{t} s", size=9,
+                        color=S.muted, font=S.body, align=PP_ALIGN.CENTER))
+    return out
+
+
+def fault_labels(s, x, y, w, t_max, faults):
+    lw = Inches(1.9)
+    gx, gw = x + lw, w - lw
+    out = []
+    for k, (a, b, lab) in enumerate(faults):  # alternate heights, so close windows keep their labels apart
+        out.append(text(s, int(gx + gw * a / t_max) - Inches(0.05), y - (Inches(0.2) if k % 2 else 0), Inches(1.4),
+                        Inches(0.25), lab, size=10, bold=True, color=S.alert, font=S.body))
+    return out
