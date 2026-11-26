@@ -328,11 +328,13 @@ def t_fault(prs, n):
         ("Late reply", "the queue runs dry"),
         ("Arm stops", "nothing left to play"),
         ("LeRobot as shipped", "ends the run after 1 s without moves"),
-        ("Lost reply", "never asked for again"),
-    ], size=17, gap=Inches(0.8))
+        ("Even when patient", "set to wait the whole trial, it never asks again after a lost reply"),
+    ], size=17, gap=Inches(0.85))
     builds(s, rows)
-    notes(s, "LeRobot is the open-source robot-learning library we build on. Its remote client gives up after one "
-             "second with an empty queue, and if a reply is lost it never asks again.")
+    notes(s, "LeRobot is the open-source robot-learning library we build on. As shipped, its remote client gives up "
+             "after one second with an empty queue. We also run it 'patient', allowed to wait the whole trial, as a "
+             "fair baseline: it no longer gives up, but a lost reply is still never asked for again, so the arm can "
+             "wait forever.")
 
 
 FAULTS = [("none", "a good network", "the cost of being careful"),
@@ -623,7 +625,11 @@ def t_models(prs, n):
     x = M + Inches(7.9)
     st = stat(s, x, TOP, Inches(3.6), "A100 · H200", "trained on the shared GPU servers; every run logged")
     st2 = stat(s, x, TOP + Inches(1.6), Inches(3.6), "2 tasks", "a model per policy and task")
-    builds(s, [sum(g, []), [*st, *st2]])
+    why = text(s, x, TOP + Inches(3.1), Inches(3.6), Inches(1.4),
+               [[("Why these seven: ", {"bold": True, "color": S.ink}),
+                 ("chosen from published SO-101 results before any training, from the smallest and fastest (ACT) to "
+                  "the strongest VLA (\u03c00.5).", {"color": S.muted})]], size=14, font=S.body, line=1.2)
+    builds(s, [sum(g, []), [*st, *st2], [why]])
     notes(s, "Two small classic policies without language (ACT, Diffusion Policy) and five VLAs. Short chunks will "
              "matter later: GR00T's 16 moves last only half a second.")
 
@@ -815,16 +821,41 @@ def t_trimming(prs, n):
 
 
 def t_offline(prs, n):
-    s = S.content(prs, n, "4 · What we built", "Before the robot: offline evaluation")
-    a = fig(s, "fig_offline", M, TOP - Inches(0.2), w=Inches(5.7), centre=False)
-    b = fig(s, "fig_sizespeed", M + Inches(5.95), TOP - Inches(0.2), w=Inches(5.6), centre=False)
-    cap = text(s, M, TOP + Inches(4.15), CW, Inches(0.6),
-               [[("Held-out episodes: ", {"bold": True, "color": S.ink}),
-                 ("the model predicts every step and we compare with what the person did (error in degrees); "
-                  "inference time measured on the H200.", {"color": S.muted})]], size=14, font=S.body)
-    builds(s, [[a], [b], [cap]])
-    notes(s, "Before any robot time: how close each model's actions are to the human's on held-out episodes, and how "
-             "long it takes to answer. Bigger models are slower; that matters on a network.")
+    s = S.content(prs, n, "5 · How we evaluate", "Offline: checking each model before robot time")
+    sub = text(s, M, TOP - Inches(0.35), CW, Inches(0.4),
+               "On held-out demonstrations, each trained model predicts every step; we compare with what the person "
+               "did, and time how long it takes to answer. Four policies, sorting task.", size=14, color=S.muted,
+               font=S.body)
+    err = [("SmolVLA", 2.13), ("Diffusion Policy", 2.43), ("GR00T N1.5", 3.03), ("ACT", 3.20)]
+    ms = [("ACT", 42), ("SmolVLA", 97), ("GR00T N1.5", 167), ("Diffusion Policy", 179)]
+    pw = (CW - Inches(0.5)) / 2
+
+    def panel(x, title, rows, vmax, fmt, col):
+        out = [text(s, x, TOP + Inches(0.3), pw, Inches(0.35), title, size=15, bold=True, color=S.ink,
+                    font=S.body)]
+        rh = Inches(0.55)
+        for i, (name, v) in enumerate(rows):
+            y = TOP + Inches(0.8) + rh * i
+            out.append(text(s, x, y, Inches(1.8), rh, name, size=14, color=S.ink, font=S.body,
+                            anchor=MSO_ANCHOR.MIDDLE))
+            bw = int((pw - Inches(2.8)) * v / vmax)
+            out.append(box(s, x + Inches(1.85), y + Inches(0.12), bw, rh - Inches(0.24), fill=col))
+            out.append(text(s, x + Inches(1.95) + bw, y, Inches(1.0), rh, fmt(v), size=14, bold=True,
+                            color=S.ink, font=S.body, anchor=MSO_ANCHOR.MIDDLE))
+        return out
+    a = panel(M, "How close to the person  (arm error)", err, 3.5, lambda v: f"{v:.1f}°", S.accent)
+    b = panel(M + pw + Inches(0.5), "Time to answer one chunk  (H200)", ms, 200, lambda v: f"{v} ms",
+              S.series["smooth"])
+    take = text(s, M, TOP + Inches(3.25), CW, Inches(0.9),
+                [[("Every model learned the task to within 2-3°; their answer times differ fourfold. ",
+                   {"bold": True, "color": S.ink}),
+                  ("On the robot the larger VLAs are slower still (π0.5 about 0.43 s per chunk), and that time "
+                   "adds to every network round trip.", {"color": S.muted})]], size=15, font=S.body)
+    builds(s, [[sub], a, b, [take]])
+    notes(s, "The first of the three ways to evaluate: no robot at all. Held-out demonstrations never seen in "
+             "training; the model predicts each step and we measure how far its arm command is from the person's, "
+             "and how long one chunk takes on the server. All are within a few degrees; the slower models will "
+             "matter once the network is in the loop.")
 
 
 def t_bench(prs, n):
@@ -929,7 +960,7 @@ def t_contrib(prs, n):
     s = S.content(prs, n, "Close", "What we contributed")
     items = [("A platform on LeRobot 0.7", "registry, one command, two plugins, four machines"),
              ("Data and policies", "three datasets with automatic trimming; seven policies, original recipes"),
-             ("DRTC inside LeRobot's runtime", "with four fixes found on the real robot"),
+             ("DRTC inside LeRobot's runtime", "with fixes found on the real robot"),
              ("Six smoothing methods", "and a rule fixed in advance for combining them"),
              ("Network fault injection", "seven fault types, seeded per trial"),
              ("An evaluation framework", "offline, bench and robot; frozen plans; raw records"),
@@ -1147,17 +1178,113 @@ def t_baselines(prs, n):
              f"{R('base_cubebox_v1/diffusion/baseline/M1')} on cube in box.")
 
 
+def t_project(prs, n):
+    s = S.content(prs, n, "2 · The problem", "What exists, and what this project does")
+    lw = Inches(5.3)
+    gap_h = text(s, M, TOP - Inches(0.3), lw, Inches(0.3), "THE GAP", size=11, bold=True, color=S.alert,
+                 font=S.body, spacing=1.2)
+    gaps = bullets(s, M, TOP + Inches(0.05), lw, [
+        ("LeRobot's client", "stops the task on a short fault, and never replaces a lost reply"),
+        ("DRTC (Vial, 2026)", "designed for unreliable networks, but tested only by its author, on their own setup"),
+        ("No study", "on a physical robot against a fair, patient baseline, with task success, motion, and the "
+                     "method taken apart"),
+    ], size=15, gap=Inches(1.0))
+    x = M + lw + Inches(0.5)
+    did_h = text(s, x, TOP - Inches(0.3), W - M - x, Inches(0.3), "WHAT WE DID", size=11, bold=True,
+                 color=S.accent, font=S.body, spacing=1.2)
+    did = bullets(s, x, TOP + Inches(0.05), W - M - x, [
+        ("Ported DRTC", "into LeRobot 0.7's own runtime, and fixed it on the real robot"),
+        ("Built six smoothing methods", "and chose a stack by a rule fixed in advance"),
+        ("Injected seven network faults", "seeded, the same for every client"),
+        ("Tested it", "on a replay bench (7 policies, 2 tasks) and on the real arm from a Raspberry Pi"),
+    ], size=15, gap=Inches(0.8))
+    builds(s, [[gap_h] + sum(gaps, []), [did_h] + sum(did, [])])
+    notes(s, "Where this project sits. LeRobot's default client fails on short faults. DRTC was designed for this, but "
+             "nobody had tested it apart from its author. Our project ports it into LeRobot, fixes what broke on our "
+             "real setup, adds smoothing, and tests it properly: on a bench and on a real low-cost arm, against a fair "
+             "baseline.")
+
+
+E1_POLICIES = ["act", "diffusion", "groot", "grootn17", "molmoact2", "pi05", "smolvla"]
+
+
+def _frac(key):
+    v = R(key)
+    if "/" not in v:
+        return None
+    a, b = v.split("/")
+    return int(a), int(b)
+
+
 def t_e1(prs, n):
     s = S.content(prs, n, "6 · Results", "E1 (bench): DRTC recovers from every fault")
-    fig(s, "fig_v2_e1_cubebox_v1", M, TOP - Inches(0.15), h=Inches(4.6))
-    notes(s, "E1: DRTC recovered from every injected fault for all seven policies on both tasks, where the waiting "
-             "client often did not. E2: removing the cooldown removes almost all of the benefit.")
+    sub = text(s, M, TOP - Inches(0.4), CW, Inches(0.4),
+               [[("After each fault, ", {"color": S.muted}), ("did the arm start moving again?", {"bold": True,
+                                                                                               "color": S.ink}),
+                 ("  Bench, 7 policies, both tasks, 8 runs each.", {"color": S.muted})]], size=15, font=S.body)
+    faults = [("spike", "one reply 1 s late"), ("drops", "replies lost for 1 s"),
+              ("outage", "link dead for 1.5 s"), ("rise", "replies 0.4 s slower"),
+              ("mix", "spike + drops + outage")]
+    cols = [("ended", "LeRobot as shipped", "ended the run", S.alert),
+            ("patientrec", "Patient LeRobot", "recovered", S.series["baseline"]),
+            ("drtcrec", "DRTC", "recovered", S.series["drtc"])]
+    nx, nw_ = M, Inches(2.7)
+    cw_ = (CW - nw_) / 3
+    y0 = TOP + Inches(0.5)
+    hdr = [text(s, nx + nw_ + cw_ * j, y0 - Inches(0.42), cw_ - Inches(0.2), Inches(0.4),
+                [[(a_, {"bold": True, "color": col})], [(b_, {"color": S.muted, "size": 11})]], size=13,
+                font=S.body, line=1.0) for j, (_, a_, b_, col) in enumerate(cols)]
+    rh = Inches(0.58)
+    totals = {k: [0, 0] for k, *_ in cols}
+    groups = []
+    for i, (f, what) in enumerate(faults):
+        y = y0 + rh * i
+        g = [text(s, nx, y, nw_, rh, [[(f, {"bold": True, "color": S.ink})], [(what, {"color": S.muted,
+                                                                                    "size": 11})]],
+                  size=15, font=S.body, anchor=MSO_ANCHOR.MIDDLE, line=1.0)]
+        for j, (key, _, _, col) in enumerate(cols):
+            k = m = 0
+            for t in ("sort_one", "cubebox_v1"):
+                for p in E1_POLICIES:
+                    fr = _frac(f"v2/{t}/e1/{f}/{p}/{key}")
+                    if fr:
+                        k, m = k + fr[0], m + fr[1]
+            totals[key][0] += k
+            totals[key][1] += m
+            pct = 100 * k / m if m else 0
+            bx = nx + nw_ + cw_ * j
+            bw = int((cw_ - Inches(1.0)) * pct / 100)
+            g.append(box(s, bx, y + Inches(0.14), cw_ - Inches(1.0), rh - Inches(0.28), fill=S.grid))
+            g.append(box(s, bx, y + Inches(0.14), max(bw, Pt(2)), rh - Inches(0.28), fill=col))
+            g.append(text(s, bx + cw_ - Inches(0.92), y, Inches(0.8), rh, f"{pct:.0f} %", size=14, bold=True,
+                          color=S.ink, font=S.body, anchor=MSO_ANCHOR.MIDDLE))
+        g.append(line(s, M, y + rh, W - M, y + rh, color=S.grid, weight=Pt(0.5)))
+        groups.append(g)
+    pct = {k: 100 * a / b for k, (a, b) in totals.items() if b}
+    take = box(s, M, y0 + rh * 5 + Inches(0.25), CW, Inches(0.62), fill=S.dark, radius=0.15,
+               runs=[[("DRTC got the arm moving again after ", {"color": S.dark_text}),
+                      (f"{pct['drtcrec']:.0f} %", {"bold": True, "color": S.dark_accent}),
+                      (" of the faults; the patient client after ", {"color": S.dark_text}),
+                      (f"{pct['patientrec']:.0f} %", {"bold": True, "color": S.dark_accent}),
+                      (". As shipped, LeRobot gave up in ", {"color": S.dark_text}),
+                      (f"{pct['ended']:.0f} %", {"bold": True, "color": S.dark_accent}),
+                      (" of the runs.", {"color": S.dark_text})]], size=15, font=S.body)
+    builds(s, [[sub] + hdr] + groups + [[take]])
+    notes(s, "E1 on the bench. For every fault type we ask one plain question: after the fault, did the arm move "
+             "again? LeRobot as shipped simply ends the run in most faults. The patient version waits, but after "
+             "lost replies and outages it never asks again, so it often never recovers. DRTC asks again and "
+             "recovers almost every time, for every policy on both tasks.")
 
 
 def t_e3(prs, n):
-    s = S.content(prs, n, "6 · Results", "E3b (bench): the stack against DRTC alone")
-    fig(s, "fig_v2_stack", M, TOP - Inches(0.15), h=Inches(4.6))
-    notes(s, "E3: each smoothing method alone, then the stack against DRTC alone.")
+    s = S.content(prs, n, "6 · Results", "E3b (bench): the combined stack against DRTC alone")
+    fig(s, "fig_v2_stack", M, TOP - Inches(0.15), h=Inches(4.3))
+    cap = text(s, M, S.bottom - Inches(0.3), CW, Inches(0.3),
+               "Grey: DRTC alone; orange: DRTC + the stack; each line one policy; numbers on the right: how many "
+               "times smoother the stack made it.", size=11, color=S.muted, font=S.body, align=PP_ALIGN.CENTER)
+    notes(s, "The methods combined into one stack, chosen by a rule written down before the bench ran (next slide). "
+             "Against DRTC alone, under the fault mix, it cut the stalls of the slow policies and made every policy "
+             "3 to 20 times smoother.")
 
 
 def t_e4(prs, n):
@@ -1176,11 +1303,15 @@ def t_e4(prs, n):
     static, per = bar_panel(s, M, TOP - Inches(0.3), Inches(7.6), Inches(4.9), "Cube in box, four policies, 160 trials",
                             bars, ink=S.ink, muted=S.muted, grid=S.grid, font=S.body, size=14)
     x = M + Inches(8.1)
-    sa = stat(s, x, TOP, Inches(3.4), "68 → 13 %", "the fault mix breaks LeRobot's client, even set to wait the whole trial", color=S.alert)
-    sb = stat(s, x, TOP + Inches(1.5), Inches(3.4), "→ 65 %", "DRTC restores it")
-    sc = stat(s, x, TOP + Inches(3.0), Inches(3.4), "→ 75 %", "with the stack, and about 3× smoother",
+    sa = stat(s, x, TOP, Inches(3.4), "68 → 13 %", "the fault mix breaks LeRobot's client, even when patient", color=S.alert)
+    sb = stat(s, x, TOP + Inches(1.3), Inches(3.4), "→ 65 %", "DRTC restores it")
+    sc = stat(s, x, TOP + Inches(2.45), Inches(3.4), "→ 75 %", "with the stack, and about 3× smoother",
               color=S.series["smooth"])
-    builds(s, [per[0], per[1] + sa, per[2] + sb, per[3] + sc])
+    cav = text(s, x, TOP + Inches(3.75), Inches(3.4), Inches(0.75),
+               "10 trials per policy per bar: only GR00T N1.7's gain (0 \u2192 80 %) is significant on its own after "
+               "the Holm correction; the pooled change is exploratory.", size=10, color=S.muted, font=S.body,
+               line=1.1)
+    builds(s, [per[0], per[1] + sa, per[2] + sb, per[3] + sc, [cav]])
     notes(s, "160 robot trials. With the Holm correction only GR00T N1.7's DRTC-vs-faults difference is significant "
              "on its own; pooled, the effect is large but exploratory. Ten trials per cell give wide intervals.")
 
@@ -1212,32 +1343,38 @@ def t_pi(prs, n):
 # Close --------------------------------------------------------------------------------------------------------------
 
 def t_limits(prs, n):
-    s = S.content(prs, n, "Close", "What this does not show yet")
-    rows = bullets(s, M, TOP, CW, [
+    s = S.content(prs, n, "Close", "Limitations and future work")
+    lw = Inches(6.2)
+    lim_h = text(s, M, TOP - Inches(0.3), lw, Inches(0.3), "LIMITATIONS", size=11, bold=True, color=S.alert,
+                 font=S.body, spacing=1.2)
+    lims = bullets(s, M, TOP + Inches(0.05), lw, [
         ("Ten trials per condition", "wide intervals; only large differences are significant"),
         ("One task on the robot", "the bench covers two tasks and seven policies"),
         ("Simulated faults", "fixed shapes, not a recorded real network"),
         ("Slow links", "DRTC can give up replies that are only slow (seen over the Pi's WiFi)"),
-    ], size=19, gap=Inches(0.8))
-    builds(s, rows)
-    notes(s, "Be upfront about the limits.")
+    ], size=15, gap=Inches(0.85))
+    x = M + lw + Inches(0.5)
+    fut_h = text(s, x, TOP - Inches(0.3), W - M - x, Inches(0.3), "FUTURE WORK", size=11, bold=True,
+                 color=S.accent, font=S.body, spacing=1.2)
+    fut = bullets(s, x, TOP + Inches(0.05), W - M - x, [
+        ("A cooldown for slow links", "one that follows a slowing network"),
+        ("Compressed images", "a shorter round trip over WiFi"),
+        ("More trials, more tasks", "20 trials per cell; sorting on the robot"),
+    ], size=15, gap=Inches(0.85))
+    builds(s, [[lim_h] + sum(lims, []), [fut_h] + sum(fut, [])])
+    notes(s, "Be upfront about the limits, and each points at the next step.")
 
 
 def t_conclusion(prs, n):
-    s = S.content(prs, n, "Close", "Conclusion and future work")
-    rows = bullets(s, M, TOP, Inches(6.6), [
-        ("Faults break remote control:", "68 → 13 % success"),
-        ("DRTC restores it:", "65 %; asking again does the work"),
-        ("Smoothing keeps it:", "75 %, about 3× smoother"),
-        ("A full platform:", "record, train, serve, test, from a Pi"),
-    ], size=18, gap=Inches(0.8))
-    x = M + Inches(7.2)
-    fut = text(s, x, TOP, Inches(4.3), Inches(3.8),
-               [[("Next", {"bold": True, "color": S.accent, "size": 13})],
-                [("A cooldown that follows a slowing link")], [("Compressed images")],
-                [("More trials, more tasks")]], size=17, font=S.body, line=1.6, color=S.ink)
-    builds(s, rows + [[fut]])
-    notes(s, "Close on the numbers and what comes next.")
+    s = S.content(prs, n, "Close", "Conclusion")
+    rows = bullets(s, M, TOP, CW, [
+        ("Network faults break remote control:", "task success 68 → 13 % with LeRobot's client"),
+        ("DRTC restores it:", "65 %; asking again after a lost reply does the work"),
+        ("Smoothing keeps it:", "75 %, and the motion about 3× smoother"),
+        ("All of it from a Raspberry Pi,", "on a platform that records, trains, serves and tests"),
+    ], size=20, gap=Inches(0.9))
+    builds(s, rows)
+    notes(s, "The four things to remember.")
 
 
 def t_thanks(prs, n):
@@ -1248,16 +1385,16 @@ SLIDES = [t_title, t_hook, t_outline,
           lambda p, n: S.section_slide(p, n, 1, "Robot control with a VLA", "Cameras and joints in, motion out"),
           t_vla_what, t_vla_video, t_chunks, t_why_server,
           lambda p, n: S.section_slide(p, n, 2, "The problem", "Control over an unreliable network"),
-          t_loop, t_fault, t_faults, t_question,
+          t_loop, t_fault, t_faults, t_question, t_project,
           lambda p, n: S.section_slide(p, n, 3, "Our solution", "DRTC and motion smoothing"),
           t_drtc_idea, t_drtc_media, t_jerk, t_stack,
           lambda p, n: S.section_slide(p, n, 4, "What we built", "Hardware, our lab platform, data, training"),
-          t_hardware, t_lab, t_machines, t_record, t_first_attempt, t_data, t_trimming, t_models, t_offline,
+          t_hardware, t_lab, t_machines, t_record, t_first_attempt, t_data, t_trimming, t_models,
           lambda p, n: S.section_slide(p, n, 5, "How we evaluate", "Offline, the bench, live robot trials"),
-          t_eval_kinds, t_bench, t_robot_eval, t_records, t_map,
+          t_eval_kinds, t_offline, t_bench, t_robot_eval, t_records, t_map,
           lambda p, n: S.section_slide(p, n, 6, "Results", "Baselines, the bench studies, the robot experiment"),
-          t_baselines, t_e1, t_e2, t_e3a, t_stack_choice, t_e3, t_e4, t_e4_video, t_e4_motion, t_pi,
-          t_contrib, t_limits, t_conclusion, t_thanks]
+          t_baselines, t_e1, t_e2, t_e3a, t_e3, t_stack_choice, t_e4, t_e4_video, t_e4_motion, t_pi,
+          t_conclusion, t_contrib, t_limits, t_thanks]
 
 
 def main() -> None:
