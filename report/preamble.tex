@@ -45,7 +45,7 @@
 \usepackage{graphicx}
 \usepackage{xcolor}            % used only inside figures
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta,positioning,fit,backgrounds,calc,shapes.geometric}
+\usetikzlibrary{arrows.meta,positioning,fit,backgrounds,calc,shapes.geometric,decorations.pathreplacing}
 \usepackage{float}
 \usepackage{placeins}
 % Captions as in the template: "Fig 3.1 Title" (10 pt, centred) below a figure; "Table 9.1: Title" below a table.
@@ -118,3 +118,6 @@
   \textbf{Results to be added.} #1}}\par}
 % \textslot{what this part will say}: text to be written in the text pass (plan stage 4)
 \newcommand{\textslot}[1]{\par\noindent{\small\itshape [To be written: #1]}\par}
+% A drawn diagram (figures/<file>.tex), scaled down to the text width when wider.
+\newcommand{\diagram}[3]{\begin{figure}[htbp]\centering
+  \begin{adjustbox}{max width=\textwidth}\input{figures/#1}\end{adjustbox}\caption{#2}\label{#3}\end{figure}}

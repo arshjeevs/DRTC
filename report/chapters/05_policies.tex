@@ -103,11 +103,7 @@ robot; the last checkpoint, with its training state, is kept as well. Because he
 and diffusion models~\cite{valloss2026}, the offline evaluation reports the action error of both
 (Section~\ref{sec:offline}).
 
-\figslot{fig:trainpipe}{The training pipeline, from a recipe to a model on the Hub.}{D5.1 Diagram}{A recipe (the
-authors' published settings) and a pinned dataset $\rightarrow$ automatic preparation (download once, convert, compute
-statistics) $\rightarrow$ \texttt{lab train} on the A100 or the H200 (shared GPUs, inside tmux) $\rightarrow$ logs to
-Weights \& Biases and Trackio $\rightarrow$ checkpoints pushed to the Hugging Face Hub $\rightarrow$ a frozen commit
-used by the evaluations.}
+\diagram{trainpipe}{The training pipeline, from a recipe to a model on the Hub.}{fig:trainpipe}
 
 \section{What was trained}\label{sec:trained}
 

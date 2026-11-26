@@ -3,7 +3,7 @@
 \section{Introduction}
 \textslot{what was recorded, how, and how it became training data; walks through Figure~\ref{fig:datapipe}.}
 
-\figslot{fig:datapipe}{The data pipeline, from teleoperation to a versioned dataset on the Hub.}{D4.1 Diagram}{Leader arm moved by a person $\rightarrow$ follower arm copies it $\rightarrow$ the recorder saves both cameras and the joint states at 30~fps $\rightarrow$ episodes are reviewed (bad ones deleted, re-recorded) $\rightarrow$ idle starts and ends are trimmed automatically $\rightarrow$ the dataset is split (training and held-out) and pushed to the Hub with a pinned revision.}
+\diagram{datapipe}{The data pipeline, from teleoperation to a versioned dataset on the Hub.}{fig:datapipe}
 
 \section{Tasks}\label{sec:tasks}
 
@@ -42,9 +42,7 @@ Two tasks were recorded, on three datasets (Table~\ref{tab:datasets}, Figure~\re
   \label{fig:tasks}
 \end{figure}
 
-\figslot{fig:layouts}{The task layouts, seen from above.}{D4.2 Diagram}{Top views of the table: for sorting, the
-coloured squares and the cube's taped start marks with the rotation of layouts; for cube in box, the box and the cube's
-start marks. Drawn to scale from the taped layouts.}
+\diagram{layouts}{The task layouts, seen from above (schematic, not to scale).}{fig:layouts}
 
 \section{Recording}\label{sec:recording}
 

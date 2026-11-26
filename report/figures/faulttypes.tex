@@ -1,0 +1,31 @@
+% D6.5 The fault types on a common timeline (bench trial, 14 s; on the robot shifted by 0 or 4 s).
+\input{figures/colors}
+\begin{tikzpicture}[font=\footnotesize, x=8.5mm, y=7.5mm]
+\def\rows{{"none","spike","drops","outage","rise","loss","mix"}}
+\foreach \n/\y in {none/6, spike/5, drops/4, outage/3, rise/2, loss/1, mix/0} {
+  \node[anchor=east, font=\footnotesize\bfseries] at (-0.2,\y) {\n};
+  \draw[ink2!40] (0,\y) -- (14,\y);}
+% spike: one reply delayed 1 s at 2 s
+\fill[serverline!70] (2,4.8) rectangle (3,5.2); \node[anchor=west, fill=white, inner sep=1pt] at (3.15,5) {one reply delayed by 1~s};
+% drops: replies lost 4-5 s
+\fill[purpleline!70] (4,3.8) rectangle (5,4.2); \node[anchor=west, fill=white, inner sep=1pt] at (5.15,4) {every reply lost};
+% outage: both directions lost 6-7.5 s
+\fill[ink!70] (6,2.8) rectangle (7.5,3.2); \node[anchor=west, fill=white, inner sep=1pt] at (7.65,3) {both directions lost (link down)};
+% rise: +400 ms 2-7 s
+\fill[serverline!35] (2,1.8) rectangle (7,2.2); \node[anchor=west, fill=white, inner sep=1pt] at (7.15,2) {every reply 400~ms slower};
+% loss: random, whole run
+\foreach \x in {0.7,2.3,3.1,5.6,8.4,9.2,11.8,13.1} \fill[purpleline!70] (\x,0.82) rectangle ++(0.18,0.36);
+\node[anchor=west, fill=white, inner sep=1pt] at (9.6,1.45) {each reply lost with probability 0.1};
+% mix: spike + drops + outage
+\fill[serverline!70] (2,-0.2) rectangle (3,0.2); \fill[purpleline!70] (4,-0.2) rectangle (5,0.2);
+\fill[ink!70] (6,-0.2) rectangle (7.5,0.2); \node[anchor=west, fill=white, inner sep=1pt] at (7.65,0) {spike + drops + outage (the robot's fault)};
+\node[anchor=west, text=ink2, fill=white, inner sep=1pt] at (0.2,6.0) {no fault (the reference)};
+% shifted mix
+\begin{scope}[opacity=0.35]
+\fill[serverline] (6,-0.75) rectangle (7,-0.45); \fill[purpleline] (8,-0.75) rectangle (9,-0.45); \fill[ink] (10,-0.75) rectangle (11.5,-0.45);
+\end{scope}
+\node[anchor=west, text=ink2, font=\scriptsize] at (11.65,-0.6) {mix shifted by 4~s};
+% axis
+\draw[-{Latex[length=2mm]}, thick] (0,-1.2) -- (14.4,-1.2) node[right] {s};
+\foreach \t in {0,2,...,14} {\draw (\t,-1.2) -- (\t,-1.3) node[below, font=\scriptsize] {\t};}
+\end{tikzpicture}

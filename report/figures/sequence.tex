@@ -1,0 +1,21 @@
+% D6.1 One request and its reply between the robot computer and the model server.
+\input{figures/colors}
+\begin{tikzpicture}[font=\small, x=10mm, y=-6.5mm,
+  act/.style={font=\footnotesize, align=left, anchor=west}]
+\node[draw=robotline, thick, fill=robotfill, rounded corners=2pt, minimum width=34mm, minimum height=8mm] (r) at (0,0)
+  {\bfseries Robot computer};
+\node[draw=serverline, thick, fill=serverfill, rounded corners=2pt, minimum width=34mm, minimum height=8mm] (s) at (9,0)
+  {\bfseries Model server (GPU)};
+\draw[robotline, thick] (0,0.7) -- (0,9.8); \draw[serverline, thick] (9,0.7) -- (9,9.8);
+\fill[robotfill] (-0.12,1.2) rectangle (0.12,2.0); \node[act] at (-3.4,1.6) {observe: 2 images,\\ 6 joint angles};
+\draw[-{Latex[length=2mm]}, thick] (0,2.2) -- node[above, font=\footnotesize, sloped]{observation (about 2.9~MB, through the SSH tunnel)} (9,3.4);
+\fill[serverfill] (8.88,3.6) rectangle (9.12,6.0); \node[act] at (9.3,4.2) {queue, then run the policy};
+\node[act] at (9.3,5.2) {(inference time)};
+\draw[-{Latex[length=2mm]}, thick, greenline] (9,6.2) -- node[above, font=\footnotesize, sloped]{chunk of $H$ actions} (0,7.2);
+\fill[robotfill] (-0.12,7.4) rectangle (0.12,8.2); \node[act] at (-3.4,7.8) {merge into the\\ action queue};
+\node[act] at (-3.4,9.2) {execute at 30~Hz};
+\draw[{Latex[length=1.6mm]}-{Latex[length=1.6mm]}, ink2] (-0.6,2.2) -- node[left, font=\footnotesize, text=ink2]{round
+  trip} (-0.6,7.2);
+\node[font=\scriptsize, text=ink2, align=left, anchor=west] at (1.2,8.9) {meanwhile the arm keeps executing the
+  previous chunk;\\ the next request is sent before the queue runs dry};
+\end{tikzpicture}

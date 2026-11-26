@@ -43,11 +43,7 @@ temporal ensembling, the Butterworth filter and the resume ramp) for all four po
 use RTC, and one stack for every policy keeps the comparison simple; the choice is discussed with the bench results
 (Section~\ref{sec:res-e3}). The stack with RTC is kept for a later run.
 
-\figslot{fig:e4ladder}{The four conditions of E4 and what each comparison shows.}{D8.1 Diagram}{A ladder of the four
-conditions: 1 patient LeRobot, normal network $\rightarrow$ 2 the same under the fault mix (what the faults cost)
-$\rightarrow$ 3 \drtc{} under the mix (what \drtc{} wins back, the main result) $\rightarrow$ 4 \drtc{} with the stack
-under the mix (what smoothing adds); with the fault mix drawn once (a 1~s latency spike, 1~s of lost replies, a 1.5~s
-outage, shifted by 0 or 4~s).}
+\diagram{e4ladder}{The four conditions of E4 and what each comparison shows.}{fig:e4ladder}
 
 \paragraph{Claims and primary comparisons.} Table~\ref{tab:claims} lists the comparisons that are tested; everything
 else is exploratory (Section~\ref{sec:stats}).

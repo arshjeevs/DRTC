@@ -1,0 +1,27 @@
+% D1.1 The project in one flow (report plan).
+\input{figures/colors}
+\begin{tikzpicture}[font=\small, node distance=4mm and 6mm,
+  st/.style={draw=#1, thick, rounded corners=3pt, fill=white, align=center, text width=27mm, minimum height=27mm,
+             inner sep=4pt},
+  hd/.style={font=\bfseries\small},
+  arr/.style={-{Latex[length=2.4mm]}, very thick, ink2}]
+\node[st=robotline] (hw) {{\bfseries 1. Hardware}\\[3pt]\footnotesize SO-101 leader and follower arms\\ wrist camera,
+  phone camera\\ laptop, Raspberry Pi~5};
+\node[st=robotline, right=of hw] (data) {{\bfseries 2. Data}\\[3pt]\footnotesize teleoperated demonstrations\\ 2 tasks,
+  3 datasets\\ trimmed, versioned};
+\node[st=serverline, right=of data] (train) {{\bfseries 3. Training}\\[3pt]\footnotesize 7 policies\\ authors' recipes\\
+  A100 and H200 GPUs};
+\node[st=netfill!60!ink2, right=of train] (serve) {{\bfseries 4. Serving}\\[3pt]\footnotesize remote inference\\ over the
+  network\\ DRTC, smoothing};
+\node[st=greenline, right=of serve] (eval) {{\bfseries 5. Evaluation}\\[3pt]\footnotesize offline, robot, bench\\ frozen
+  plans\\ network faults};
+\node[st=purpleline, right=of eval] (res) {{\bfseries 6. Results}\\[3pt]\footnotesize baselines\\ DRTC under faults\\
+  report, built from raw files};
+\foreach \a/\b in {hw/data, data/train, train/serve, serve/eval, eval/res} \draw[arr] (\a) -- (\b);
+\node[below=3mm of data, font=\scriptsize, text=ink2] {Hugging Face Hub};
+\node[below=3mm of train, font=\scriptsize, text=ink2] {Weights \& Biases};
+\node[below=3mm of serve, font=\scriptsize, text=ink2] {SSH tunnel, Zenoh};
+\node[below=3mm of eval, font=\scriptsize, text=ink2] {results store};
+\node[above=2mm of hw, font=\scriptsize, text=robotline] {robot side};
+\node[above=2mm of train, font=\scriptsize, text=serverline] {GPU servers};
+\end{tikzpicture}

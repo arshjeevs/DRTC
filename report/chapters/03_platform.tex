@@ -18,11 +18,7 @@ project, from a recorded dataset to the report; the following chapters take its 
 \section{Overall system architecture}\label{sec:architecture-overview}
 \textslot{the system as a whole and how its parts connect; walks through Figure~\ref{fig:sysarch}.}
 
-\figslot{fig:sysarch}{The system architecture: robot side, network and model servers.}{D3.1 Diagram}{The robot side
-(SO-101 follower and leader arms, wrist camera, phone as the scene camera, the laptop or the Raspberry Pi 5 as the robot
-computer), the links (USB, the Pi's cable or WiFi to the laptop, the campus network, SSH tunnels), and the server side
-(H200 and A100 GPU servers in containers, the laptop's RTX 4060), with the Hugging Face Hub (datasets, models, results
-store) and Weights \& Biases.}
+\diagram{sysarch}{The system architecture: robot side, network and model servers.}{fig:sysarch}
 
 \section{Hardware}\label{sec:hardware}
 
@@ -38,9 +34,10 @@ store) and Weights \& Biases.}
     Wrist camera & Zebronics Zeb Live Pro on the gripper, $800\times600$ MJPG at 30~fps \\
     Scene camera & An Android phone over USB, bridged to a virtual video device (DroidCam), $800\times600$ at 30~fps;
                    always the same phone, on a fixed mount \\
-    Robot computer & Laptop: Linux, NVIDIA RTX~4060 Laptop GPU (8~GB). Runs the arm, the cameras and the client at
-                     30~Hz; the robot computer of every official experiment \\
-    Edge computer & Raspberry Pi~5 (8~GB, no GPU), as an alternative robot computer (Chapter~\ref{ch:edge}) \\
+    Laptop & Linux, NVIDIA RTX~4060 Laptop GPU (8~GB). Recording, development, and the network gateway of the Pi
+                     (WiFi hotspot and cable) \\
+    Robot computer & Raspberry Pi~5 (8~GB, no GPU). Runs the arm, the cameras and the client at 30~Hz in the official
+                     robot trials (Chapter~\ref{ch:edge}) \\
     GPU server 1 & NVIDIA A100 80~GB PCIe on a shared server (driver for CUDA $\le$ 12.8) \\
     GPU server 2 & NVIDIA H200 NVL 141~GB on a shared server, inside a container (driver for CUDA $\le$ 13.0) \\
     Network & Laptop to server over WiFi and the local network; the Pi reaches the laptop through its hotspot \\
@@ -102,10 +99,7 @@ The software runs on Linux on every machine: Python~3.12, PyTorch~2.14.1 built f
 LeRobot's optional dependencies for the robot, the cameras and the policies. The layer is covered by
 \R{software/tests} automated tests, which run on the laptop without a GPU or a robot.
 
-\figslot{fig:swlayers}{The software layers: LeRobot 0.7 and the layer this project adds on top.}{D3.2 Diagram}{Three
-layers: LeRobot 0.7 unmodified (robots, cameras, datasets, policies, the remote-inference runtime) $\rightarrow$ our
-layer (registry, GR00T~N1.5 and replay-robot plugins, \drtc{} scheduler, smoothing, fault injector, evaluation
-framework) $\rightarrow$ the \texttt{lab} command (record, train, serve, eval run, report).}
+\diagram{swlayers}{The software layers: LeRobot 0.7 and the layer this project adds on top.}{fig:swlayers}
 
 \section{The registry}\label{sec:registry}
 

@@ -5,11 +5,7 @@
 \textslot{one page on the project as a whole: a low-cost SO-101 arm, learned policies served from a GPU server, the
 network between them, and what this project built and measured; walks through Figure~\ref{fig:projectflow}.}
 
-\figslot{fig:projectflow}{The project in one flow, from the hardware to the results.}{D1.1 Diagram}{The whole project
-as one flow: hardware and rig (SO-101 arms, cameras, laptop, Raspberry Pi) $\rightarrow$ data collection
-(teleoperation, recording, trimming) $\rightarrow$ training (seven policies, original recipes, GPU servers)
-$\rightarrow$ serving (remote inference over the network, DRTC, smoothing) $\rightarrow$ evaluation (offline, robot,
-bench) $\rightarrow$ results and report.}
+\diagram{projectflow}{The project in one flow, from the hardware to the results.}{fig:projectflow}
 
 \section{Motivation}
 
@@ -31,10 +27,7 @@ reply is late or lost, the robot's queue of actions empties and the arm stops. T
 LeRobot~0.7~\cite{lerobot}, the open robot-learning library this project builds on, ends a run after one second without
 actions and never replaces a lost reply, so a short fault ends or stalls the task.
 
-\figslot{fig:problem}{The problem: a network fault empties the robot's action queue and the arm stops.}{D1.2 Diagram}{
-The robot's action queue over time (actions left against seconds): the queue is refilled by each reply; a latency
-spike or a lost reply arrives, the queue runs dry, and the arm stops until the next reply; shaded: the time the arm
-stands still.}
+\diagram{problem}{The problem: a network fault empties the robot's action queue and the arm stops.}{fig:problem}
 
 Distributed Real-Time Chunking (\drtc)~\cite{vial2026drtc} is a recent scheduling method for exactly this setting: it
 requests the next chunk early, estimates the latency the way TCP estimates round-trip times, and re-requests with a

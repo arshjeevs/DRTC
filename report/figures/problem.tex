@@ -1,0 +1,18 @@
+% D1.2 The problem: a network fault empties the action queue and the arm stops.
+\input{figures/colors}
+\begin{tikzpicture}[font=\small, x=11mm, y=4.2mm]
+\fill[faultc!45] (5.6,0) rectangle (8.2,11.2);
+\node[font=\scriptsize, text=ink2, align=center] at (6.9,12.2) {reply lost\\[-1pt] (network fault)};
+\fill[serverfill] (7.25,0) rectangle (8.2,10.6); \node[font=\scriptsize, text=serverline, align=center] at (7.73,-1.6) {arm\\[-2pt]stopped};
+\draw[-{Latex[length=2mm]}, thick] (0,0) -- (11.4,0) node[right, font=\scriptsize] {time (s)};
+\draw[-{Latex[length=2mm]}, thick] (0,0) -- (0,11.6) node[above, font=\scriptsize, align=center] {actions left\\ in the queue};
+\foreach \t in {0,...,10} \draw (\t,0) -- (\t,-0.2) node[below, font=\tiny] {\t};
+\draw[dashed, ink2] (0,4) -- (11,4) node[right, font=\scriptsize, text=ink2] {request sent};
+% queue: sawtooth, refilled at each reply; the reply due at ~5.7 s is lost
+\draw[robotline, very thick] (0,10) -- (1.9,4.3) -- (2.4,2.8) -- (2.4,10) -- (4.3,4.3) -- (4.8,2.8) -- (4.8,10)
+  -- (6.7,4.3) -- (7.25,2.6) -- (7.25,0) -- (8.2,0) -- (8.2,10) -- (10.1,4.3) -- (10.6,2.8) -- (10.6,10) -- (11,8.8);
+\foreach \x in {2.4,4.8,10.6} \draw[-{Latex[length=1.6mm]}, greenline, thick] (\x,11) -- (\x,10.2);
+\node[font=\scriptsize, text=greenline] at (3.6,11.2) {replies refill the queue};
+\draw[-{Latex[length=1.6mm]}, greenline, thick] (8.2,11) -- (8.2,10.2);
+\node[font=\scriptsize, text=greenline, align=left, anchor=west] at (8.3,11.2) {late reply};
+\end{tikzpicture}

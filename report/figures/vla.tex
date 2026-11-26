@@ -1,0 +1,56 @@
+% D2.1 How a vision-language-action model works (generic, as in SmolVLA, pi0.5 and GR00T); drawn top to bottom.
+\input{figures/colors}
+\begin{tikzpicture}[font=\small, node distance=5mm and 4mm,
+  inp/.style={draw=robotline, thick, rounded corners=2pt, fill=robotfill, align=center, text width=30mm,
+              minimum height=13mm},
+  blk/.style={draw=#1, thick, rounded corners=3pt, fill=white, align=center},
+  tok/.style={draw=#1, fill=#1!25, minimum width=3.2mm, minimum height=3.2mm, inner sep=0pt},
+  note/.style={font=\footnotesize\itshape, text=ink2, align=left, anchor=west},
+  arr/.style={-{Latex[length=2.4mm]}, thick, ink2}]
+% inputs
+\node[inp] (wrist) {{\bfseries Wrist camera}\\ \footnotesize image};
+\node[inp, right=of wrist] (scene) {{\bfseries Scene camera}\\ \footnotesize image};
+\node[inp, right=of scene] (text) {{\bfseries Instruction}\\ \footnotesize \enquote{put the green cube in the box}};
+\node[inp, right=of text] (state) {{\bfseries Joint state}\\ \footnotesize 6 joint angles};
+% encoders
+\node[blk=purpleline, text width=64mm, minimum height=14mm, below=7mm of wrist.south west, anchor=north west] (venc)
+  {{\bfseries Vision encoder}\\ \footnotesize a vision transformer cuts each image into patches and turns each patch into a token};
+\node[blk=purpleline, text width=30mm, minimum height=14mm, below=7mm of text] (tokz) {{\bfseries Tokeniser}\\ \footnotesize words $\rightarrow$ tokens};
+\node[blk=purpleline, text width=30mm, minimum height=14mm, below=7mm of state] (proj) {{\bfseries Projection}\\ \footnotesize angles $\rightarrow$ a token};
+\draw[arr] (wrist) -- (wrist|-venc.north); \draw[arr] (scene) -- (scene|-venc.north);
+\draw[arr] (text) -- (tokz); \draw[arr] (state) -- (proj);
+% token sequence
+\coordinate (ts) at ([yshift=-9mm]venc.south west);
+\foreach \i in {0,...,15} \node[tok=robotline] at ([xshift=4mm+\i*4mm]ts) {};
+\foreach \i in {16,...,22} \node[tok=greenline] at ([xshift=4mm+\i*4mm]ts) {};
+\node[tok=serverline] at ([xshift=4mm+23*4mm]ts) {};
+\node[note] at ([xshift=4mm+24*4mm]ts) {one token sequence};
+\draw[arr] (venc.south) -- ([yshift=2.5mm]venc.south|-ts); \draw[arr] (tokz.south) -- ([yshift=2.5mm]tokz.south|-ts);
+\draw[arr] (proj.south) -- ([xshift=4mm+23*4mm, yshift=2.5mm]ts);
+% backbone
+\node[blk=purpleline, fill=purplefill, minimum height=19mm, text width=124mm, below=11mm of ts, anchor=north west]
+  (vlm) {{\bfseries Vision-language backbone}\\[2pt] \footnotesize a transformer language model reads all the tokens
+  together and builds a representation of the scene and the task: what is where, and what was asked\\[2pt]
+  \itshape pretrained on large amounts of web image--text data};
+\draw[arr] ([xshift=50mm, yshift=-2.5mm]ts) -- ([xshift=50mm]ts|-vlm.north);
+% action expert
+\node[blk=serverline, fill=serverfill, minimum height=23mm, text width=124mm, below=9mm of vlm] (act)
+  {{\bfseries Action expert}\\[2pt] \footnotesize a smaller transformer that starts from random noise and refines it,
+  in a few steps, into a sequence of future actions (flow matching or diffusion), attending to the backbone's
+  features and to the joint state\\[2pt] \itshape trained on robot demonstrations};
+\draw[arr] (vlm) -- node[right, font=\footnotesize]{features} (act);
+% chunk and robot
+\node[below=9mm of act.south west, anchor=north west, font=\small\bfseries, text=serverline] (chl) {Action chunk};
+\coordinate (cs) at ([yshift=-3mm]chl.south west);
+\foreach \i in {0,...,11} \draw[serverline, fill=serverfill] ([xshift=\i*6.2mm]cs) rectangle ++(5.4mm,-8mm);
+\node[font=\footnotesize\itshape, text=ink2, anchor=north west] at ([yshift=-10mm]cs) {$H$ future joint targets, e.g.
+  50 actions = 1.7~s, 6 joint angles each};
+\draw[arr] (act.south-|chl.east) -- ++(0,-6mm);
+\node[blk=robotline, fill=robotfill, text width=34mm, minimum height=15mm, anchor=west] (robot) at ([xshift=83mm,
+  yshift=-4mm]cs) {{\bfseries Robot}\\ \footnotesize executes one action per tick at 30~Hz};
+\draw[arr] ([xshift=74mm, yshift=-4mm]cs) -- (robot.west);
+\draw[arr, dashed] (robot.east) -- ++(32mm,0) |- node[pos=0.25, right, font=\footnotesize, align=left, text=ink2]
+  {next observation,\\ while the chunk\\ is still running} (state.east);
+\node[note, anchor=north west] at ([yshift=-17mm]cs) {The whole model is fine-tuned on our demonstrations with its
+  authors' recipe (Chapter~\ref{ch:policies}).};
+\end{tikzpicture}

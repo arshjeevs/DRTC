@@ -1,0 +1,21 @@
+% D2.3 Action chunking with asynchronous requests: execute one chunk while the next is computed.
+\input{figures/colors}
+\begin{tikzpicture}[font=\small, x=9mm, y=7mm]
+\draw[-{Latex[length=2mm]}, thick] (0,0) -- (15.6,0) node[right, font=\scriptsize] {time};
+% chunk 1 executed
+\foreach \i in {0,...,23} \fill[robotline!70] ({0.5*\i},0.35) rectangle ++(0.38,0.5);
+\node[font=\scriptsize, text=robotline, anchor=west] at (0,1.3) {chunk 1: actions executed one per tick (30~Hz)};
+% request 2
+\draw[-{Latex[length=2mm]}, serverline, thick] (8.0,0.9) -- (8.0,3.6);
+\node[font=\scriptsize, text=serverline, anchor=east, align=right] at (7.9,2.4) {request chunk 2\\[-2pt] (fresh observation)};
+\fill[serverfill] (8.0,3.6) rectangle (12.0,4.4); \draw[serverline] (8.0,3.6) rectangle (12.0,4.4);
+\node[font=\scriptsize] at (10.0,4.0) {server computes chunk 2};
+\draw[-{Latex[length=2mm]}, serverline, thick] (12.0,3.6) -- (12.0,0.9);
+\node[font=\scriptsize, text=serverline, anchor=west] at (12.1,2.4) {chunk 2 arrives};
+% chunk 2 executed
+\foreach \i in {0,...,6} \fill[greenline!75] ({12+0.5*\i},0.35) rectangle ++(0.38,0.5);
+\node[font=\scriptsize, text=greenline, anchor=east] at (15.4,-0.6) {chunk 2 takes over};
+% round trip and actions left
+\draw[{Latex[length=1.6mm]}-{Latex[length=1.6mm]}, ink2] (8.0,-0.6) -- node[below, font=\scriptsize]{round trip} (12.0,-0.6);
+\node[font=\scriptsize, text=ink2, align=center] at (10.0,-1.55) {the actions left when the request is sent\\[-2pt] must last the whole round trip};
+\end{tikzpicture}

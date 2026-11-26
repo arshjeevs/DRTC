@@ -1,0 +1,25 @@
+% D6.4 Where each smoothing method acts on the action path; the E4 stack highlighted.
+\input{figures/colors}
+\begin{tikzpicture}[font=\footnotesize, node distance=4mm and 5mm,
+  st/.style={draw=ink2, thick, rounded corners=3pt, fill=white, align=center, text width=22mm, minimum height=13mm},
+  m/.style={draw=#1, thick, rounded corners=2pt, fill=#1!12, align=center, text width=22mm, minimum height=8mm,
+            font=\scriptsize},
+  arr/.style={-{Latex[length=2mm]}, thick, ink2}]
+\node[st, draw=serverline] (pol) {{\bfseries Policy}\\ on the server};
+\node[st, right=of pol] (mrg) {{\bfseries Merge}\\ new chunk into the queue};
+\node[st, right=of mrg] (q) {{\bfseries Action queue}\\ played out};
+\node[st, right=of q] (flt) {{\bfseries Filter}\\ on the commands};
+\node[st, right=of flt] (rmp) {{\bfseries After a stall}};
+\node[st, draw=robotline, right=of rmp] (arm) {{\bfseries Motors}\\ 30~Hz};
+\foreach \a/\b in {pol/mrg, mrg/q, q/flt, flt/rmp, rmp/arm} \draw[arr] (\a) -- (\b);
+\node[m=ink2, below=of pol] (rtc) {RTC: in-paint the new chunk's start};
+\node[m=greenline, below=of mrg] (ens) {\textbf{temporal ensembling}: blend overlapping actions};
+\node[m=greenline, below=of q] (ada) {\textbf{adaptive playback}: slow down when few actions are left};
+\node[m=ink2, below=3mm of ada] (zl) {zero-lag smoothing of the queued actions};
+\node[m=greenline, below=of flt] (bw) {\textbf{Butterworth} low-pass filter};
+\node[m=greenline, below=of rmp] (rp) {\textbf{resume ramp}: ease back into motion};
+\foreach \a/\b in {rtc/pol, ens/mrg, ada/q, bw/flt, rp/rmp} \draw[thick, ink2, densely dotted] (\a) -- (\b);
+\draw[thick, ink2, densely dotted] (zl.east) -| (q.south east);
+\node[font=\scriptsize, text=ink2, align=left, anchor=north west] at ([yshift=-3mm]rtc.south west|-zl.south)
+  {green: the stack used in E4 (no RTC); grey: tested on the bench, not in the E4 stack};
+\end{tikzpicture}

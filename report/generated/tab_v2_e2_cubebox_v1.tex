@@ -1,0 +1,37 @@
+\begin{tabular}{l l c r}
+\toprule
+Ablation & Fault & Policies with more stalls & Median $\Delta$ stall (pp) \\
+\midrule
+A1 no cooldown & none & 1/7 & -0.3 \\
+ & spike & 4/7 & 0.1 \\
+ & drops & 6/7 & 25.5 \\
+ & outage & 7/7 & 20.2 \\
+ & mix & 7/7 & 25.6 \\
+ & rise & 0/7 & -17.2 \\
+ & loss & 6/7 & 7.6 \\
+\addlinespace
+A2 upstream estimator & none & 3/7 & -0.0 \\
+ & spike & 2/7 & -0.2 \\
+ & drops & 4/7 & 0.0 \\
+ & outage & 3/7 & -0.1 \\
+ & mix & 1/7 & -0.2 \\
+ & rise & 6/7 & 0.9 \\
+ & loss & 7/7 & 0.2 \\
+\addlinespace
+A3 upstream trigger & none & 3/7 & -0.1 \\
+ & spike & 5/7 & 3.1 \\
+ & drops & 5/7 & 0.6 \\
+ & outage & 7/7 & 1.7 \\
+ & mix & 4/7 & 0.2 \\
+ & rise & 5/7 & 1.5 \\
+ & loss & 5/7 & 1.3 \\
+\addlinespace
+A4 $H/2$ cooldown cap & none & 5/7 & 6.8 \\
+ & spike & 5/7 & 21.4 \\
+ & drops & 6/7 & 24.6 \\
+ & outage & 7/7 & 17.6 \\
+ & mix & 6/7 & 19.1 \\
+ & rise & 6/7 & 14.7 \\
+ & loss & 7/7 & 24.4 \\
+\bottomrule
+\end{tabular}

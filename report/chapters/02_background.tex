@@ -12,21 +12,14 @@ the SO-101~\cite{so101}, demonstrations are recorded by teleoperation: the opera
 and an identical \emph{follower} arm copies it, while cameras and joint encoders are recorded at a fixed rate. LeRobot
 stores such recordings as datasets of episodes and trains policies on them~\cite{lerobot}.
 
-\figslot{fig:illoop}{Imitation learning: from human demonstrations to a policy that drives the robot.}{D2.2 Diagram}{
-The imitation-learning loop: a person teleoperates the follower arm with the leader arm $\rightarrow$ episodes of
-camera images, joint states and actions are recorded $\rightarrow$ the dataset trains a policy $\rightarrow$ the policy
-maps new observations to actions and drives the arm.}
+\diagram{illoop}{Imitation learning: from human demonstrations to a policy that drives the robot.}{fig:illoop}
 
 \section{Vision-language-action models}\label{sec:bg-vla}
 \textslot{what a VLA is, how it is built from a pretrained vision-language model plus an action expert, how it is
 trained and why it needs a GPU; walks through Figure~\ref{fig:vla}.}
 
-\figslot{fig:vla}{How a vision-language-action model turns images, an instruction and the arm's state into a chunk of
-actions.}{D2.1 Diagram}{Inside a VLA: the inputs (the wrist and scene camera images, the written instruction, the
-arm's joint state) $\rightarrow$ a vision encoder turns each image into tokens $\rightarrow$ the language-model
-backbone reads the image and text tokens together $\rightarrow$ an action expert (flow matching or diffusion) turns
-its features and the joint state into a chunk of future joint targets (e.g. 50 actions, 1.7~s) $\rightarrow$ the
-robot executes the chunk at 30~Hz. Small labels: which parts are pretrained, which are fine-tuned.}
+\diagram{vla}{How a vision-language-action model turns images, an instruction and the arm's state into a chunk of
+actions.}{fig:vla}
 
 \section{Action chunking}
 
@@ -56,14 +49,27 @@ longer than one round trip leaves no reserve when a reply is late (Section~\ref{
 the SO-101 differ considerably between these policies~\cite{armnetbench,so101failure,valloss2026};
 Section~\ref{sec:shortlist} summarises them.
 
-\tabslot{tab:policies-compare}{The seven policies side by side.}{One row per policy (ACT, Diffusion Policy,
-\smolvla, GR00T~N1.5, GR00T~N1.7, \pizerofive, MolmoAct~2): architecture, backbone, parameters, chunk length (actions and
-seconds), absolute or relative actions, inputs, and the action head (CVAE, diffusion, flow matching).}
+\begin{table}[htbp]
+  \centering
+  \small
+  \begin{tabularx}{\textwidth}{l l X l c c c}
+    \toprule
+    Policy & Kind & Vision and language & Action head & Chunk (actions) & Chunk (s) & Actions \\
+    \midrule
+    ACT & task policy & ResNet image features, no language & CVAE transformer decoder & 100 & 3.33 & absolute \\
+    Diffusion Policy & task policy & ResNet image features, no language & denoising U-Net & 24 of 48 & 0.80 & absolute \\
+    \smolvla & VLA, $\approx$0.45B & SmolVLM2 & flow-matching expert & 50 & 1.67 & absolute \\
+    GR00T N1.5 & VLA, $\approx$3B & vision-language model & diffusion transformer & 16 & 0.53 & absolute \\
+    GR00T N1.7 & VLA, $\approx$3B & vision-language model & diffusion transformer & 16 & 0.53 & relative \\
+    \pizerofive & VLA, $\approx$3.4B & vision-language model & flow-matching expert & 50 & 1.67 & relative \\
+    MolmoAct 2 & VLA (LoRA) & Molmo vision-language model & flow matching (8 steps) & 30 & 1.00 & -- \\
+    \bottomrule
+  \end{tabularx}
+  \caption{The seven policies side by side. Chunk lengths are the ones served here (at 30~Hz); \enquote{relative}
+           actions are predicted as offsets from the current joint state.}\label{tab:policies-compare}
+\end{table}
 
-\figslot{fig:chunking}{Action chunking: chunks are requested, received and executed while the next one is computed.}{D2.3
-Diagram}{A timeline at 30~Hz: chunk 1 is executed action by action; partway through, the request for chunk 2 is
-sent; the server computes it while chunk 1 keeps the arm moving; chunk 2 arrives and takes over. Marked: the round
-trip, the actions left when the request is sent, and the switch-over point.}
+\diagram{chunking}{Action chunking: chunks are requested, received and executed while the next one is computed.}{fig:chunking}
 
 \section{Asynchronous and remote inference}\label{sec:bg-remote}
 
@@ -82,10 +88,8 @@ next chunk as an in-painting problem: while generating it with a flow-matching p
 executed from the current chunk are fixed as a prefix, so the new chunk continues them smoothly. RTC needs a
 flow-matching policy and an estimate of how many actions will be executed before the new chunk arrives.
 
-\figslot{fig:rtc}{Real-time chunking: the start of the new chunk is in-painted to continue the actions still to be
-executed.}{D2.4 Diagram}{Two chunks over time: the old chunk's remaining actions are frozen as a prefix; the new chunk is
-generated so that its first actions match the prefix and then follow the new observation; without RTC the switch
-shows a jump, with RTC it is continuous.}
+\diagram{rtc}{Real-time chunking: the start of the new chunk is in-painted to continue the actions still to be
+executed.}{fig:rtc}
 
 \section{Distributed Real-Time Chunking}\label{sec:bg-drtc}
 
@@ -108,10 +112,7 @@ runtime, compares it with LeRobot's client on task success and takes it apart. I
 scheduling (the trigger, the latency estimate, the cooldown and the message semantics); RTC is treated separately, as
 one of the smoothing methods (Section~\ref{sec:smoothing}), and is not part of the robot experiment.
 
-\figslot{fig:drtc}{\drtc's scheduling: when it requests, how it estimates the latency, and when it gives up a reply.}{D2.5
-Diagram}{A timeline of requests and replies: the trigger fires when $H - s_{\min}$ actions are left; the latency
-estimate (smoothed mean plus deviation) sets the cooldown; a reply that misses the cooldown is abandoned and a fresh
-observation is sent; the freshest reply wins.}
+\diagram{drtcsched}{\drtc's scheduling: when it requests, how it estimates the latency, and when it gives up a reply.}{fig:drtc}
 
 \section{Smoothing robot commands}
 
