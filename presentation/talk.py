@@ -286,12 +286,6 @@ def t_vla_what(prs, n):
              "plays it at 30 per second, and before it runs out the next moment is sent: the loop repeats.")
 
 
-def t_vla_video(prs, n):
-    s = S.content(prs, n, "1 · Robot control with a VLA", "From camera to motion")
-    slot(s, "vla", M, TOP - Inches(0.1), CW, Inches(4.7))
-    notes(s, "Walk through the video: capture, model, chunk, playback, ask again. Thirty times a second.")
-
-
 def t_chunks(prs, n):
     s = S.content(prs, n, "1 · Robot control with a VLA", "Chunk after chunk: the arm moves while the server computes")
     st = MEDIA / "stills"
@@ -375,55 +369,46 @@ def t_why_server(prs, n):
 
 def t_loop(prs, n):
     s = S.content(prs, n, "2 · The problem", "Every move now depends on the network")
-    x = M + Inches(7.8)
-    rows = bullets(s, x, TOP, Inches(3.8), [
-        ("Up:", "2 images + 6 joints, 2.9 MB"),
-        ("Down:", "a chunk of moves"),
-        ("Round trip:", "0.6-1 s from the Pi"),
-        ("Queue:", "the moves still waiting to be played"),
-    ], size=17, gap=Inches(0.8))
     if media_file("loop"):
-        slot(s, "loop", M, TOP - Inches(0.1), Inches(7.4), Inches(4.6))
-        builds(s, rows)
+        slot(s, "loop", M, TOP - Inches(0.1), CW, Inches(4.6))
         return
-    bw, bh = Inches(2.3), Inches(1.45)
-    ry, sx = TOP + Inches(0.25), M + Inches(5.0)
+    bw, bh = Inches(2.9), Inches(1.6)
+    ry, sx = TOP + Inches(0.2), W - M - Inches(2.9)
     robot = box(s, M, ry, bw, bh, fill=S.dark, radius=S.card_radius,
                 runs=[[("Robot computer", {"bold": True})], [("Raspberry Pi 5, 30 Hz", {"color": S.dark_muted,
                                                                                          "size": 12})],
-                      [("cameras + arm", {"color": S.dark_muted, "size": 12})]], size=16, font=S.body,
-                color=S.dark_text)
+                      [("cameras + arm + the queue of moves", {"color": S.dark_muted, "size": 12})]], size=17,
+                font=S.body, color=S.dark_text)
     server = box(s, sx, ry, bw, bh, fill=S.dark, radius=S.card_radius,
                  runs=[[("GPU server", {"bold": True})], [("the policy (H200)", {"color": S.dark_muted, "size": 12})]],
-                 size=16, font=S.body, color=S.dark_text)
-    net = box(s, M + bw + Inches(0.75), ry + bh / 2 - Inches(0.2), Inches(1.2), Inches(0.4), fill=S.panel,
-              line=S.panel_line, radius=0.5, runs="network", size=12, font=S.body, color=S.muted)
-    up = [line(s, M + bw + Inches(0.05), ry + Inches(0.35), sx - Inches(0.05), ry + Inches(0.35), color=S.accent,
-               weight=Pt(2.25), arrow=True),
-          text(s, M + bw, ry - Inches(0.2), sx - M - bw, Inches(0.3), "observation: 2 images + 6 joints", size=12,
-               color=S.accent, font=S.body, align=PP_ALIGN.CENTER)]
-    down = [line(s, sx - Inches(0.05), ry + bh - Inches(0.35), M + bw + Inches(0.05), ry + bh - Inches(0.35),
-                 color=S.series["drtc"], weight=Pt(2.25), arrow=True),
-            text(s, M + bw, ry + bh - Inches(0.3), sx - M - bw, Inches(0.3), "a chunk of 50 actions", size=12,
+                 size=17, font=S.body, color=S.dark_text)
+    x1, x2 = M + bw + Inches(0.05), sx - Inches(0.05)
+    up = [line(s, x1, ry + Inches(0.4), x2, ry + Inches(0.4), color=S.accent, weight=Pt(2.25), arrow=True),
+          text(s, x1, ry + Inches(0.05), x2 - x1, Inches(0.3), "up: 2 images + 6 joints, 2.9 MB, every request",
+               size=13, color=S.accent, font=S.body, align=PP_ALIGN.CENTER)]
+    down = [line(s, x2, ry + bh - Inches(0.4), x1, ry + bh - Inches(0.4), color=S.series["drtc"], weight=Pt(2.25),
+                 arrow=True),
+            text(s, x1, ry + bh - Inches(0.35), x2 - x1, Inches(0.3), "down: a chunk of 50 actions", size=13,
                  color=S.series["drtc"], font=S.body, align=PP_ALIGN.CENTER)]
-    qy = ry + bh + Inches(0.55)
-    cells = []
-    for k in range(20):
-        filled = k < 13
-        cells.append(box(s, M + Inches(0.13) * 0 + Inches(0.29) * k, qy, Inches(0.25), Inches(0.42),
-                         fill=S.series["drtc"] if filled else "#ECEAE3", radius=0.15))
-    qlab = text(s, M, qy + Inches(0.5), Inches(6.2), Inches(0.6),
-                [[("The queue", {"bold": True, "color": S.ink}),
-                  ("  actions waiting to be played, one every 33 ms; the next chunk must arrive before it runs dry",
-                   {"color": S.muted})]], size=13, font=S.body, line=1.15)
-    arm = [line(s, M + Inches(0.29) * 20 + Inches(0.05), qy + Inches(0.21), M + Inches(6.6), qy + Inches(0.21),
-                color=S.ink, weight=Pt(1.5), arrow=True),
-           text(s, M + Inches(6.65), qy, Inches(0.8), Inches(0.42), "arm", size=14, bold=True, color=S.ink,
-                font=S.body, anchor=MSO_ANCHOR.MIDDLE)]
-    builds(s, [[robot, server, net], up + rows[0], down + rows[1], cells + [qlab] + arm + rows[3], rows[2]])
-    notes(s, "The robot computer sends the images and joint angles; the server answers with a chunk; the robot keeps "
-             "a queue of moves and plays one every 33 ms. As long as the next chunk arrives before the queue empties, "
-             "the arm moves smoothly.")
+    net = box(s, M + bw + (x2 - x1) / 2 - Inches(1.4), ry + bh / 2 - Inches(0.2), Inches(2.8), Inches(0.4),
+              fill=S.panel, line=S.panel_line, radius=0.5, runs="network: 0.6-1 s round trip", size=11, font=S.body,
+              color=S.muted)
+    wy = ry + bh + Inches(0.55)
+    wrong_h = text(s, M, wy, CW, Inches(0.35), "WHAT CAN GO WRONG ON THIS LINK", size=11, bold=True, color=S.alert,
+                   font=S.body, spacing=1.2)
+    cw = (CW - Inches(0.5)) / 3
+    items = [("A reply is late", "the queue keeps draining while the robot waits"),
+             ("A reply is lost", "the robot waits for an answer that never comes"),
+             ("The link drops", "nothing gets through, in either direction")]
+    wrong = [box(s, M + (cw + Inches(0.25)) * i, wy + Inches(0.4), cw, Inches(0.95), fill=S.panel, line=S.alert,
+                 radius=S.card_radius, runs=[[(a, {"bold": True, "color": S.ink})], [(b, {"color": S.muted,
+                                                                                          "size": 12})]],
+                 size=16, font=S.body, align=PP_ALIGN.LEFT, margin=Inches(0.2)) for i, (a, b) in enumerate(items)]
+    builds(s, [[robot, server, net], up, down, [wrong_h], [wrong[0]], [wrong[1]], [wrong[2]]])
+    notes(s, "So every move depends on this link. The robot computer sends two images and the joint angles; the "
+             "server answers with a chunk of 50 actions; from the Pi a round trip takes 0.6 to 1 second. Three things "
+             "can go wrong on it: a reply comes late, a reply is lost, or the link drops altogether. Next: the seven "
+             "kinds of fault we inject to test exactly this.")
 
 
 def t_fault(prs, n):
@@ -1149,37 +1134,6 @@ def t_records(prs, n):
              "and the run was repeated from scratch.")
 
 
-def t_map(prs, n):
-    s = S.content(prs, n, "5 · How we evaluate", "Five studies, five questions (the experiment design)")
-    cw, gap = Inches(2.15), Inches(0.2)
-    rows = [("Baselines", "robot", "How well does each policy do the task?", "7 policies × 2 tasks × 10 = 140"),
-            ("E1", "bench", "Does DRTC recover where LeRobot's client does not?", "7 policies, 2 tasks, every fault"),
-            ("E2", "bench", "Which part of DRTC matters?", "remove one part at a time"),
-            ("E3", "bench", "Which smoothing, and does the stack help?", "each method alone, then the stack"),
-            ("E4", "robot", "Does it hold on the real arm?", "4 policies × 4 conditions × 10 = 160")]
-    groups = []
-    for i, (a_, where, q, size) in enumerate(rows):
-        x = M + (cw + gap) * i
-        col = S.series["drtc"] if where == "robot" else S.accent
-        g = [box(s, x, TOP - Inches(0.1), cw, Inches(3.6), fill=S.panel, line=S.panel_line, radius=S.card_radius),
-             text(s, x + Inches(0.2), TOP + Inches(0.1), cw - Inches(0.4), Inches(0.5), a_, size=26, bold=True,
-                  font=S.heading, color=col),
-             text(s, x + Inches(0.2), TOP + Inches(0.7), cw - Inches(0.4), Inches(0.3), where.upper(), size=11,
-                  bold=True, color=S.muted, font=S.body, spacing=1.2),
-             text(s, x + Inches(0.2), TOP + Inches(1.05), cw - Inches(0.4), Inches(1.4), q, size=15, bold=True,
-                  font=S.body, color=S.ink, line=1.1),
-             text(s, x + Inches(0.2), TOP + Inches(2.6), cw - Inches(0.4), Inches(0.8), size, size=12,
-                  color=S.muted, font=S.body, line=1.15)]
-        groups.append(g)
-    foot = text(s, M, TOP + Inches(3.75), CW, Inches(0.5),
-                [[("Written down before the first run: ", {"bold": True, "color": S.ink}),
-                  ("the questions, the comparisons that are tested, and the rule that picks the smoothing stack.",
-                   {"color": S.muted})]], size=14, font=S.body)
-    builds(s, groups + [[foot]])
-    notes(s, "The map of the results. Baselines on the robot first, then three bench studies, then the robot "
-             "experiment E4 with DRTC under faults.")
-
-
 def t_contrib(prs, n):
     s = S.content(prs, n, "Close", "What we contributed")
     items = [("A platform on LeRobot 0.7", "registry, one command, two plugins, four machines"),
@@ -1399,41 +1353,6 @@ def _split(segs, t):
     return [x for x in segs if x[0] < t], [x for x in segs if x[0] >= t]
 
 
-def t_fair(prs, n):
-    s = S.content(prs, n, "5 · How we evaluate", "A fair test: what we changed after the pilot")
-    rows = [("The baseline gave up after 1 s", "beating it would only show LeRobot's default is fragile",
-             "Compare with a patient LeRobot client, same time limits as DRTC"),
-            ("DRTC changed two things at once", "its scheduling and its patience",
-             "Same limits for both: only the scheduling differs"),
-            ("Two smoothing methods added at once", "no way to tell which one helped",
-             "Each method alone first; then a stack by a rule fixed in advance")]
-    hx, lw_ = M, Inches(5.2)
-    rx = M + lw_ + Inches(0.9)
-    hdr = [text(s, hx, TOP - Inches(0.3), lw_, Inches(0.3), "THE PILOT (20 NOV)", size=11, bold=True,
-                color=S.alert, font=S.body, spacing=1.2),
-           text(s, rx, TOP - Inches(0.3), W - M - rx, Inches(0.3), "SETUP V2 (22 NOV): WHAT ALL RESULTS USE", size=11,
-                bold=True, color=S.series["drtc"], font=S.body, spacing=1.2)]
-    rh = Inches(1.05)
-    groups = []
-    for i, (a_, b_, c_) in enumerate(rows):
-        y = TOP + Inches(0.1) + rh * i
-        groups.append([
-            box(s, hx, y, lw_, rh - Inches(0.2), fill=S.panel, line=S.panel_line, radius=S.card_radius,
-                runs=[[(a_, {"bold": True, "color": S.ink})], [(b_, {"color": S.muted, "size": 12})]], size=15,
-                font=S.body, align=PP_ALIGN.LEFT, margin=Inches(0.2)),
-            line(s, hx + lw_ + Inches(0.1), y + (rh - Inches(0.2)) / 2, rx - Inches(0.1), y + (rh - Inches(0.2)) / 2,
-                 color=S.ink, weight=Pt(1.5), arrow=True),
-            box(s, rx, y, W - M - rx, rh - Inches(0.2), fill="#FFFFFF", line=S.series["drtc"], radius=S.card_radius,
-                runs=c_, size=15, bold=True, font=S.body, color=S.ink, align=PP_ALIGN.LEFT, margin=Inches(0.2))])
-    foot = text(s, M, TOP + Inches(3.35), CW, Inches(0.5),
-                "The pilot's results are not used anywhere in this work.", size=13, color=S.muted, font=S.body)
-    builds(s, [hdr] + groups + [[foot]])
-    notes(s, "Our first robot design had three flaws, and we redesigned before collecting the results. First, its "
-             "baseline was LeRobot as shipped, which gives up after one second: beating that proves little. Second, "
-             "the DRTC condition changed both the scheduling and the waiting time. Third, two smoothing methods were "
-             "added at once. Setup v2 fixes each, and every result in this talk comes from it.")
-
-
 E4_POL = [("grootn17", "GR00T N1.7", "16 (0.5 s)"), ("diffusion", "Diffusion Policy", "24 (0.8 s)"),
           ("smolvla", "SmolVLA", "50 (1.7 s)"), ("pi05", "π0.5", "50 (1.7 s)")]
 
@@ -1618,17 +1537,6 @@ def t_e1(prs, n):
              "again? LeRobot as shipped simply ends the run in most faults. The patient version waits, but after "
              "lost replies and outages it never asks again, so it often never recovers. DRTC asks again and "
              "recovers almost every time, for every policy on both tasks.")
-
-
-def t_e3(prs, n):
-    s = S.content(prs, n, "6 · Results", "E3b (bench): the combined stack against DRTC alone")
-    fig(s, "fig_v2_stack", M, TOP - Inches(0.15), h=Inches(4.3))
-    cap = text(s, M, S.bottom - Inches(0.3), CW, Inches(0.3),
-               "Grey: DRTC alone; orange: DRTC + the stack; each line one policy; numbers on the right: how many "
-               "times smoother the stack made it.", size=11, color=S.muted, font=S.body, align=PP_ALIGN.CENTER)
-    notes(s, "The methods combined into one stack, chosen by a rule written down before the bench ran (next slide). "
-             "Against DRTC alone, under the fault mix, it cut the stalls of the slow policies and made every policy "
-             "3 to 20 times smoother.")
 
 
 def t_e4(prs, n):

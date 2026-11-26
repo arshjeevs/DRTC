@@ -3,7 +3,6 @@
 # store on the Hub) and a raw dataset episode from the Hub. Re-run after changing a label; then rebuild the deck.
 set -e
 cd ~/Projects/drtc-major
-S=/tmp/claude-1000/-home-arshjeeva-Projects-drtc/ec17fb0c-ae67-43bc-8910-839d051bc709/scratchpad
 E=results/evals/cubebox_v1_drtc_v2/sessions
 P=$(ls -d $E/*/trials/upstream_patient__mix/grootn17_cubebox_v1_full/t01)/video
 D=$(ls -d $E/*/trials/drtc__mix/grootn17_cubebox_v1_full/t01)/video
@@ -18,8 +17,13 @@ tag() { echo "drawtext=fontfile=$B:text='$1':x=$2:y=$3:fontsize=$4:fontcolor=whi
 ffmpeg -v error -y -i $P/scene.mp4 -vf "scale=960:720,$(tag 'network faults' 24 24 30 0xEB6834@0.92 ":enable='between(t,4.8,10.3)'"),$(tag 'no new actions - the arm waits' 24 660 30 0x15191F@0.85 ":enable='gte(t,7.4)'")" $ENC $O/hook.mp4
 
 # 2. record: a raw demonstration from the dataset on the Hub (cube in box v1, episode 0, 9.6 s)
-C1=$S/cbraw/videos/observation.images.camera1/chunk-000/file-000.mp4
-C2=$S/cbraw/videos/observation.images.camera2/chunk-000/file-000.mp4
+# the episode's videos, downloaded once from the Hub into the deck's cache (needs read access to the dataset)
+HUB=presentation/.cache/hub/so101_cubebox_v1_raw
+for c in camera1 camera2; do
+  [ -f $HUB/videos/observation.images.$c/chunk-000/file-000.mp4 ] || .venv/bin/python -c "from huggingface_hub import hf_hub_download; hf_hub_download('orangemoon599/so101_cubebox_v1_raw', 'videos/observation.images.$c/chunk-000/file-000.mp4', repo_type='dataset', local_dir='$HUB')"
+done
+C1=$HUB/videos/observation.images.camera1/chunk-000/file-000.mp4
+C2=$HUB/videos/observation.images.camera2/chunk-000/file-000.mp4
 ffmpeg -v error -y -t 9.57 -i $C2 -t 9.57 -i $C1 -filter_complex "[0:v]scale=800:600,$(tag 'scene camera' 16 548 24 0x15191F@0.85 '')[a];[1:v]scale=800:600,$(tag 'wrist camera' 16 548 24 0x15191F@0.85 '')[b];[a][b]hstack=inputs=2" $ENC $O/record.mp4
 
 # 3. robot_eval: a live trial, the DRTC run of the same trial, both cameras
