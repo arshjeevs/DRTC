@@ -13,11 +13,11 @@
 \node[blk=robotline, minimum width=30mm, below=of queue] (smooth) {Smoothing\\ (the stack)};
 \begin{scope}[on background layer]
   \node[draw=robotline, fill=robotfill, rounded corners=4pt, thick, fit=(cams)(arm)(sched)(queue)(smooth),
-        inner sep=5mm, label={[font=\small\bfseries, text=ink]above:Robot computer (laptop), 30~Hz}] (rc) {};
+        inner sep=5mm, label={[font=\small\bfseries, text=ink]above:Robot computer (Raspberry Pi 5 or laptop), 30~Hz}] (rc) {};
 \end{scope}
 % network
 \node[draw=ink2, fill=netfill, rounded corners=3pt, thick, minimum width=24mm, minimum height=33mm, align=center,
-      right=14mm of queue] (net) {Network\\ (WiFi)\\[6pt] \textbf{fault}\\ \textbf{injection}};
+      right=14mm of queue] (net) {Network\\ (WiFi or cable)\\[6pt] \textbf{fault}\\ \textbf{injection}};
 % server
 \node[blk=serverline, minimum width=30mm, right=14mm of net, yshift=8mm] (ps) {Policy server\\ (LeRobot 0.7)};
 \node[blk=serverline, minimum width=30mm, below=of ps] (pol) {Policy\\ (one of seven)};

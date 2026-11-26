@@ -6,14 +6,13 @@
 \fill[greenfill] (0,0) -- (1.6,1.6) -- (1.6,1.85) -- (0,1.85) -- cycle;
 \fill[serverfill] (0,0) -- (1.6,1.6) -- (1.6,0) -- cycle;
 \draw[ink2, thick] (0,0) -- (1.6,1.6) node[pos=0.93, above, sloped, font=\scriptsize, text=ink2] {chunk = round trip};
-\draw[ink2, dashed] (0,0) -- (0.925,1.85) node[pos=0.45, above, sloped, font=\scriptsize, text=ink2] {chunk = 2 $\times$ round trip};
+\draw[ink2, dashed] (0,0) -- (0.925,1.85) node[pos=0.22, above, sloped, font=\scriptsize, text=ink2] {chunk = 2 $\times$ round trip};
 \draw[-{Latex[length=2mm]}, thick] (0,0) -- (1.72,0) node[right]{round trip (s)};
 \draw[-{Latex[length=2mm]}, thick] (0,0) -- (0,1.95) node[above]{chunk duration (s)};
 \foreach \t in {0.5,1.0,1.5} {\draw (\t,0) -- (\t,-0.02) node[below, font=\scriptsize]{\t}; \draw (0,\t) -- (-0.02,\t) node[left, font=\scriptsize]{\t};}
 \node[font=\scriptsize, text=serverline, align=center] at (1.25,0.3) {chunk shorter than the round trip:\\ the queue runs
   dry every chunk,\\ whatever the client};
-\node[font=\scriptsize, text=greenline, align=center, fill=greenfill, inner sep=1pt] at (0.27,1.28) {chunk longer than the round trip:\\ a patient
-  client copes on a good link;\\ \drtc{} matters when a reply is lost};
+\node[font=\scriptsize, text=greenline, align=left, anchor=west] at (0.03,1.22) {chunk longer than\\ the round trip:\\ a patient client\\ copes on a good link;\\ \drtc{} matters when\\ a reply is lost};
 % policies: x = median turnaround (s), y = chunk duration (s); ACT (3.33 s) drawn at the top edge
 \foreach \x/\y/\n/\a in {0.683/1.667/SmolVLA/east, 1.064/1.667/{$\pi_{0.5}$}/west, 0.805/0.800/Diffusion/east,
   0.861/0.533/{GR00T N1.5}/east, 0.966/0.533/{GR00T N1.7}/west} {

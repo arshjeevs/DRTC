@@ -8,6 +8,18 @@ experiments run with it.
 
 \section{Three kinds of evaluation}\label{sec:three-evals}
 
+Figure~\ref{fig:pipeline} places the three kinds of evaluation in the project: every trained policy is evaluated
+offline, on the robot and on the replay bench.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/pipeline}
+  \caption{The path of the project. Datasets are recorded and trimmed on the laptop, policies are trained on the GPU
+           servers, and every trained policy is evaluated in three ways: offline, on the robot, and on the replay
+           bench. The report is rebuilt from the raw result files.}
+  \label{fig:pipeline}
+\end{figure}
+
 \begin{table}[htbp]
   \centering
   \small
@@ -19,7 +31,7 @@ experiments run with it.
       each condition? & what does each fault do to the timing and the motion? \\
     Arm moves & no & yes & no (replay robot) \\
     Operator & no & yes: sets the layout, judges success & no \\
-    Network & none & the real one (WiFi) & simulated, as measured on the robot \\
+    Network & none & the real one (WiFi or cable) & simulated, as measured on the robot \\
     Policy input & held-out recorded frames & the live cameras & held-out episodes, played as if live \\
     Metrics & M9, M10 & M1 and M2--M8, M11, M12 & M2--M8, M11, M12 \\
     \bottomrule
@@ -33,8 +45,8 @@ compared with the 15 recorded actions that follow (M9). Flow and diffusion polic
 The same run times 200 requests after 10 warm-up requests and records the peak GPU memory (M10). It runs for the served
 checkpoint and the last one, right after each training.
 
-\paragraph{Robot.} The real system end to end: the laptop drives the arm and sends observations over WiFi to a policy
-server; the operator sets the layout, starts each trial and judges success.
+\paragraph{Robot.} The real system end to end: the robot computer (the Raspberry Pi in the official trials) drives the
+arm and sends observations over the network (WiFi, or a cable for E4) to a policy server; the operator sets the layout, starts each trial and judges success.
 
 \paragraph{Bench.}\label{sec:bench-design} The same pipeline without the arm: the replay robot plays a held-out episode
 as its camera images and joint states, and the policy server runs on the same GPU machine. The network to the robot is

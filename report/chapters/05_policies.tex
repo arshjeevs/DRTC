@@ -25,7 +25,7 @@ and DOT and SFP (not in LeRobot; they would have needed their own plugins).
 \begin{table}[htbp]
   \centering
   \small
-  \begin{tabularx}{\textwidth}{l X r c c c}
+  \begin{tabularx}{\textwidth}{@{}l >{\raggedright\arraybackslash}X r c c c@{}}
     \toprule
     Policy & Kind & Chunk & Actions & Language & RTC \\
     \midrule
@@ -135,7 +135,7 @@ full one up to that step. Neither run logged a held-out loss, so the checkpoint 
 
 \chart{fig_losscurves}{Training loss of the seven policies on both tasks, from the Weights \& Biases runs (smoothed). Each policy has its own training objective, so the curves compare in shape, not in level; \pizerofive{} and MolmoAct~2 end where they were stopped.}{fig:losscurves}
 
-\chart{fig_sizespeed}{Model size against inference time.}{fig:sizespeed}
+\chart{fig_sizespeed}{Model size against the server's inference time per chunk (median over the robot-baseline trials of both tasks, H200).}{fig:sizespeed}
 
 \section{Offline evaluation}\label{sec:offline}
 
@@ -162,8 +162,8 @@ criteria do not always agree. On cube in box v1 the order of speed is the same, 
 \begin{figure}[htbp]
   \centering
   \genfigure{fig_offline}
-  \caption{Offline evaluation: held-out arm error on sorting (left) and inference time per chunk, median to 95th
-           percentile (right).}
+  \caption{Offline evaluation: held-out arm error on sorting (top) and inference time per chunk, median to 95th
+           percentile (bottom).}
   \label{fig:offline}
 \end{figure}
 

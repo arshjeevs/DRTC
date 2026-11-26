@@ -190,22 +190,19 @@ def charts(st: dict, b) -> None:
                 if len(g) and len(pr):
                     pts.append((p, t, float(pr.iloc[0]) / 1e9, float(g.median())))
         if pts:
-            fig, ax = plt.subplots(figsize=(st["width"] * 0.75, st["width"] * 0.45))
-            for t, tname in TASKS:
-                xs = [x for p, tt, x, y in pts if tt == t]
-                ys = [y for p, tt, x, y in pts if tt == t]
-                ax.scatter(xs, ys, s=st["dot"] * 2.2, color=TASK_COLORS[t], edgecolor="white", lw=0.8,
-                           label=tname, zorder=3)
+            fig, ax = plt.subplots(figsize=(st["width"] * 0.8, st["width"] * 0.48))
+            offs = {"grootn17": (-58, 6), "molmoact2": (6, -12), "groot": (6, -10), "pi05": (6, 2)}
             for p in POLICIES:
                 q = [(x, y) for pp, tt, x, y in pts if pp == p]
-                if q:
-                    x, y = np.mean([a for a, _ in q]), max(c for _, c in q)
-                    ax.annotate(names[p], (x, y), xytext=(5, 4), textcoords="offset points",
-                                fontsize=st["font"] * 0.85, color=b.INK2)
+                if not q:
+                    continue
+                x, y = q[0][0], float(np.median([c for _, c in q]))
+                ax.scatter([x], [y], s=st["dot"] * 2.4, color=b.SINGLE, edgecolor="white", lw=0.8, zorder=3)
+                ax.annotate(names[p], (x, y), xytext=offs.get(p, (6, 4)), textcoords="offset points",
+                            fontsize=st["font"] * 0.85, color=b.INK2)
             ax.set_xscale("log")
             ax.set_xlabel("parameters (billions, log scale)")
             ax.set_ylabel("server inference time per chunk (ms)")
-            ax.legend(loc="upper left")
             b.save(fig, "fig_sizespeed", st)
 
     # C9.1 baselines

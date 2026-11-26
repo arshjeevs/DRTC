@@ -27,6 +27,6 @@
   {\pgfmathtruncatemacro{\p}{\i-1}\node[box=robotline, text width=21mm, right=of l\p] (l\i) {\t};}
 \node[lay=robotline, fit=(l1)(l5)(cmd.east|-l1)] (lr) {};
 \node[ttl=robotline] at ([yshift=0.5mm]lr.north west) {LeRobot 0.7 (unmodified)};
-\draw[-{Latex[length=2mm]}, thick, ink2] (cmd.south) -- (cmd.south|-ours.north);
-\draw[-{Latex[length=2mm]}, thick, ink2] (ours.south) -- (ours.south|-lr.north);
+\draw[-{Latex[length=2mm]}, thick, ink2] ([xshift=-12mm]cmd.south east) -- ([xshift=-12mm]cmd.south east|-ours.north);
+\draw[-{Latex[length=2mm]}, thick, ink2] ([xshift=-12mm]ours.south east) -- ([xshift=-12mm]ours.south east|-lr.north);
 \end{tikzpicture}

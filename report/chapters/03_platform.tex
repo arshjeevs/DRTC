@@ -3,17 +3,10 @@
 \section{Introduction}
 
 This chapter describes what the experiments run on: the robot and its cameras, the computers, the software layer we
-built on LeRobot~0.7, and how work moves between the machines. Figure~\ref{fig:pipeline} shows the whole path of the
-project, from a recorded dataset to the report; the following chapters take its stages in turn.
+built on LeRobot~0.7, and how work moves between the machines. Figure~\ref{fig:sysarch} shows how
+the parts connect.
 
-\begin{figure}[htbp]
-  \centering
-  \input{figures/pipeline}
-  \caption{The path of the project. Datasets are recorded and trimmed on the laptop, policies are trained on the GPU
-           servers, and every trained policy is evaluated in three ways: offline, on the robot, and on the replay
-           bench. The report is rebuilt from the raw result files.}
-  \label{fig:pipeline}
-\end{figure}
+
 
 \section{Overall system architecture}\label{sec:architecture-overview}
 \textslot{the system as a whole and how its parts connect; walks through Figure~\ref{fig:sysarch}.}
@@ -40,7 +33,8 @@ project, from a recorded dataset to the report; the following chapters take its 
                      robot trials (Chapter~\ref{ch:edge}) \\
     GPU server 1 & NVIDIA A100 80~GB PCIe on a shared server (driver for CUDA $\le$ 12.8) \\
     GPU server 2 & NVIDIA H200 NVL 141~GB on a shared server, inside a container (driver for CUDA $\le$ 13.0) \\
-    Network & Laptop to server over WiFi and the local network; the Pi reaches the laptop through its hotspot \\
+    Network & Laptop to the servers over the campus network (wired); the Pi reaches the laptop over its WiFi hotspot
+                     or an Ethernet cable \\
     \bottomrule
   \end{tabularx}
   \caption{Hardware.}\label{tab:hardware}
@@ -140,19 +134,19 @@ everywhere.
   \input{figures/machines}
   \caption{The machines and the three places that carry work between them. Code and plans travel through git,
            datasets and models through the Hugging Face Hub, and every official result through a private results
-           store. During a robot session the laptop reaches the model server through an SSH tunnel.}
+           store. During a robot session the robot computer reaches the model server through an SSH tunnel.}
   \label{fig:machines}
 \end{figure}
 
 Work is never copied between machines by hand (Figure~\ref{fig:machines}). Git carries the code and the registry, so a
 GPU server learns about a new dataset or an evaluation plan with a \texttt{git pull}. The Hugging Face Hub carries the
-datasets and every checkpoint of every trained model. A private dataset repository on the Hub serves as the
+datasets and the best and the final checkpoint of every trained model. A private dataset repository on the Hub serves as the
 \emph{results store}: every official session is pushed there when it ends, and every report is rebuilt from it.
 
 Both GPU servers are shared with other users and cannot be changed, so the software adapts to them: each gets the
 PyTorch build its driver supports, long jobs run in terminal multiplexer sessions that survive a logout, the H200's
 work runs inside a container started the way the server's guide prescribes, and nothing outside the project's folder
-is ever written or deleted. During a robot session the laptop reaches the model server through one SSH connection
+is ever written or deleted. During a robot session the robot computer (the Pi or the laptop) reaches the model server through one SSH connection
 that forwards a port for every served model; on the H200 the connection reaches into the container.
 
 \section{Summary}

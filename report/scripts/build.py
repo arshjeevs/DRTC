@@ -610,7 +610,7 @@ def offline_outputs(rows: list[dict], sts: list[dict]) -> None:
     for st in sts:
         style_axes(st)
         w = st["width"]
-        fig, axes = plt.subplots(1, 2, figsize=(w, w * 0.42), gridspec_kw={"width_ratios": [1, 1.25]})
+        fig, axes = plt.subplots(2, 1, figsize=(w, w * 0.95), gridspec_kw={"height_ratios": [1, 2.2]})
         sort = [r for r in rows if r["ds"] == OFFLINE[0][0] and r["arm"] is not None]
         ax = axes[0]
         ys = np.arange(len(sort))[::-1]
@@ -636,7 +636,7 @@ def offline_outputs(rows: list[dict], sts: list[dict]) -> None:
         ax.set_xlabel(f"Inference per chunk (ms), median to p95, {rows[0]['gpu'] or 'GPU'}")
         ax.set_title("M10: inference time")
         ax.grid(axis="y", visible=False)
-        fig.subplots_adjust(wspace=0.75 if st["ext"] == "pdf" else 0.6)
+        fig.subplots_adjust(hspace=0.45)
         save(fig, "fig_offline", st)
 
 
@@ -660,7 +660,7 @@ def datasets_table() -> None:
         setn(f"data/{ds}/frames", f"{d.frames:,}".replace(",", "{,}"))
     write("tab_datasets.tex", "\n".join([
         "\\begin{tabularx}{\\textwidth}{l X r r l}", "\\toprule",
-        "Dataset & Task instruction & Episodes (train + held out) & Frames & Joint units \\\\", "\\midrule", *rows,
+        "Dataset & Task instruction & Episodes & Frames & Joint units \\\\", "\\midrule", *rows,
         "\\bottomrule", "\\end{tabularx}", ""]))
 
 

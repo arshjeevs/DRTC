@@ -199,7 +199,7 @@ Faults are injected in the client's transport, where a real network would cause 
 and the starvation logic all respond as they would to a real fault. Every injected fault is logged. The injector
 supports dropping, duplicating and reordering observations and replies, one-time latency spikes, windows of extra
 latency, random loss, disconnects of both directions, and on the bench a steady latency with jitter. The experiments
-use seven fault types (Table~\ref{tab:faults}, Figure~\ref{fig:faultmix}).
+use seven fault types (Table~\ref{tab:faults}, Figure~\ref{fig:faulttypes}).
 
 \begin{table}[htbp]
   \centering
@@ -226,13 +226,7 @@ number only: trial $k$ meets its faults at the same moments in every condition a
 stay comparable trial by trial, while the faults also hit the grasp and the place. Random loss is seeded by the trial
 number in the same way.
 
-\begin{figure}[htbp]
-  \centering
-  \input{figures/faultmix}
-  \caption{The fault mix before the shift, in seconds from the start of a trial. Each trial moves it by its own seeded
-           shift of 0--4~s.}
-  \label{fig:faultmix}
-\end{figure}
+
 
 \diagram{faulttypes}{The seven fault types on a timeline.}{fig:faulttypes}
 

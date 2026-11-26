@@ -10,7 +10,7 @@
 \node[dec, below=of cool] (rep) {reply before the cooldown ends?};
 \node[st, right=14mm of rep] (merge) {merge (last write wins); update the latency estimate};
 \node[st, below=of rep] (re) {give the request up; send a fresh observation};
-\node[st, right=14mm of re] (hold) {queue empty meanwhile: hold the arm (the run ends only if no reply comes within LeRobot's 10~s deadline)};
+\node[st, right=14mm of re, text width=48mm] (hold) {queue empty meanwhile: hold the arm; the run ends only if no reply comes within LeRobot's 10~s deadline};
 \draw[arr] (trig) -- (cool); \draw[arr] (cool) -- (rep);
 \draw[arr] (rep) -- node[lab, above]{yes} (merge); \draw[arr] (rep) -- node[lab, left]{no} (re);
 \draw[arr] (re.west) -- ++(-6mm,0) |- (cool.west);
@@ -22,7 +22,7 @@
 \node[fix] at ([xshift=-10mm, yshift=1mm]cool.north east) {3};
 \node[fix] at ([xshift=1mm, yshift=1mm]trig.north west) {4};
 \node[draw=purpleline, rounded corners=3pt, align=left, text width=95mm, font=\scriptsize, anchor=north west] at
-  ([yshift=-6mm]re.south west) {\textbf{Our fixes}\\[1pt]
+  ([yshift=-10mm]re.south west) {\textbf{Our fixes}\\[1pt]
   \textbf{1} the cooldown is never shorter than the measured latency (no $H/2$ cap)\\
   \textbf{2} it also covers the slowest of the last 10 replies\\
   \textbf{3} before the first reply, wait up to the start-up timeout\\

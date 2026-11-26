@@ -45,9 +45,9 @@ the E4 results are complete.}
 \item \textbf{Operator judgement.} Success is judged by the operator, who knows the condition; the success rule is
       written down before the first trial to limit this.
 \item \textbf{Shared servers.} Other users' jobs run on the A100 and H200, so inference times include contention.
-\item \textbf{A slower link.} \drtc's cooldown gives up replies that are only slower than recent ones; under a rising
-      latency it stalled more than the patient client (Section~\ref{sec:v2bench}). A cooldown that adapts faster is
-      open.
+\item \textbf{A slower link.} \drtc's cooldown is set from the replies seen so far, so a reply that is only slower
+      than the recent ones can be given up as lost; over the Pi's WiFi this abandoned every reply of the slower
+      policies (Section~\ref{sec:edge-cable}). A cooldown that adapts faster to a slower link is future work.
 \item \textbf{Simulated faults.} The faults follow fixed shapes, shifted per trial, rather than a recorded real network,
       and the bench simulates the latency.
 \item \textbf{Uncompressed images.} About 260~ms of each round trip is the network share, mostly the 2.9~MB of raw

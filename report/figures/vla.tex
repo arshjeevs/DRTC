@@ -48,14 +48,13 @@
 \node[below=9mm of act.south west, anchor=north west, font=\small\bfseries, text=serverline] (chl) {Action chunk};
 \coordinate (cs) at ([yshift=-3mm]chl.south west);
 \foreach \i in {0,...,11} \draw[serverline, fill=serverfill] ([xshift=\i*6.2mm]cs) rectangle ++(5.4mm,-8mm);
-\node[font=\footnotesize\itshape, text=ink2, anchor=north west] at ([yshift=-10mm]cs) {$H$ future joint targets, e.g.
+\node[font=\footnotesize\itshape, text=ink2, anchor=north west] at ([yshift=-14mm]cs) {$H$ future joint targets, e.g.
   50 actions = 1.7~s, 6 joint angles each};
 \draw[arr] (act.south-|chl.east) -- ++(0,-6mm);
 \node[blk=robotline, fill=robotfill, text width=34mm, minimum height=15mm, anchor=west] (robot) at ([xshift=83mm,
   yshift=-4mm]cs) {{\bfseries Robot}\\ \footnotesize executes one action per tick at 30~Hz};
 \draw[arr] ([xshift=74mm, yshift=-4mm]cs) -- (robot.west);
-\draw[arr, dashed] (robot.east) -- ++(32mm,0) |- node[pos=0.25, right, font=\footnotesize, align=left, text=ink2]
-  {the next observation\\ (images and joints),\\ while the chunk\\ is still running} (state.east);
-\node[note, anchor=north west] at ([yshift=-17mm]cs) {The whole model is fine-tuned on our demonstrations with its
-  authors' recipe (Chapter~\ref{ch:policies}).};
+\draw[arr, dashed] (robot.east) -- (robot.east -| state.east) -- ++(5mm,0) |- (state.east);
+\node[note, anchor=north west] at ([yshift=-20mm]cs) {Dashed: the next observation (images and joints) is sent while the chunk is still running.\\ The whole
+  model is fine-tuned on our demonstrations with its authors' recipe (Chapter~\ref{ch:policies}).};
 \end{tikzpicture}
