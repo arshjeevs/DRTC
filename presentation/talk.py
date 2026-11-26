@@ -1004,55 +1004,66 @@ def hbars(s, x, y, w, rows, vmax, *, label_w=Inches(3.3), row_h=Inches(0.62), co
 
 
 def t_e2(prs, n):
-    s = S.content(prs, n, "6 · Results", "E2: which part of DRTC matters?")
-    sub = text(s, M, TOP - Inches(0.35), CW, Inches(0.6),
-               [[("We took DRTC apart, one piece at a time, and measured ", {"color": S.muted}),
-                 ("how much longer the arm stood still", {"bold": True, "color": S.ink}),
-                 (" under the fault mix (bench, 7 policies, both tasks).", {"color": S.muted})]], size=15,
-               font=S.body)
+    s = S.content(prs, n, "6 · Results", "E2: which part of DRTC actually helps?")
+    sub = text(s, M, TOP - Inches(0.4), CW, Inches(0.6),
+               [[("DRTC has four parts. On the bench we ", {"color": S.muted}),
+                 ("switched off one part at a time", {"bold": True, "color": S.ink}),
+                 (", ran the same network faults, and measured how much more of the time the arm stood still.",
+                  {"color": S.muted})]], size=15, font=S.body, line=1.15)
 
-    def pts(key):
-        v = [float(R(f"v2/{t}/e2/{key}/mix/delta")) for t in ("sort_one", "cubebox_v1")]
-        return v
-    rows = [("a1_no_cooldown", "Remove “ask again”", "the client waits for a lost reply instead of "
-             "asking again", "Essential", S.alert),
-            ("a4_half_chunk_cap", "Undo our fix", "DRTC's original limit gives up on replies before they can "
-             "arrive", "Essential", S.alert),
-            ("a3_upstream_trigger", "Ask later", "LeRobot's trigger instead of asking early", "Small", S.muted),
-            ("a2_upstream_estimator", "Simpler estimate", "LeRobot's delay estimate instead of ours", "No effect",
-             S.muted)]
-    cw, gap = Inches(2.65), Inches(0.32)
+    def vals(key):
+        return [float(R(f"v2/{t}/e2/{key}/mix/delta")) for t in ("sort_one", "cubebox_v1")]
+    rows = [("a1_no_cooldown", "Ask again when a reply is lost", "no answer in time → send a fresh request",
+             "Needed", S.alert),
+            ("a4_half_chunk_cap", "Wait long enough before asking again", "our fix: never give up before the "
+             "measured delay", "Needed", S.alert),
+            ("a3_upstream_trigger", "Ask early", "request with about 1 s of moves left", "Barely", S.muted),
+            ("a2_upstream_estimator", "A careful delay estimate", "a TCP-style estimate instead of a simple one",
+             "Not needed", S.muted)]
+    nx, nw_ = M, Inches(4.4)
+    bx, bw_ = M + Inches(4.6), Inches(5.0)
+    vx = W - M - Inches(1.45)
+    y0 = TOP + Inches(0.7)
+    hdr = [text(s, nx, y0 - Inches(0.35), nw_, Inches(0.3), "PART OF DRTC", size=10, bold=True, color=S.muted,
+                font=S.body, spacing=1.2),
+           text(s, bx, y0 - Inches(0.35), bw_, Inches(0.3), "SWITCHED OFF: EXTRA SHARE OF THE RUN STANDING STILL", size=10,
+                bold=True, color=S.muted, font=S.body, spacing=1.2),
+           text(s, vx, y0 - Inches(0.35), Inches(1.45), Inches(0.3), "VERDICT", size=10, bold=True, color=S.muted,
+                font=S.body, spacing=1.2)]
+    rh = Inches(0.72)
+    vmax = 30.0
     groups = []
-    for i, (key, title, what, verdict, col) in enumerate(rows):
-        x = M + (cw + gap) * i
-        v = pts(key)
-        lo, hi = min(v), max(v)
-        big = f"+{round(lo)}" if abs(hi - lo) < 2 else f"+{max(0, round(lo))}\u2013{round(hi)}"
-        if hi < 1:
-            big = "≈ 0"
-        y = TOP + Inches(0.45)
-        g = [box(s, x, y, cw, Inches(3.0), fill=S.panel, line=col if verdict == "Essential" else S.panel_line,
-                 weight=Pt(1.5 if verdict == "Essential" else 1), radius=S.card_radius),
-             text(s, x + Inches(0.22), y + Inches(0.2), cw - Inches(0.44), Inches(0.35), title, size=16, bold=True,
-                  color=S.ink, font=S.body),
-             text(s, x + Inches(0.22), y + Inches(0.6), cw - Inches(0.44), Inches(0.8), what, size=12,
-                  color=S.muted, font=S.body, line=1.1),
-             text(s, x + Inches(0.22), y + Inches(1.4), cw - Inches(0.44), Inches(0.6), big, size=32, bold=True,
-                  color=col if verdict == "Essential" else S.ink, font=S.heading),
-             text(s, x + Inches(0.22), y + Inches(2.0), cw - Inches(0.44), Inches(0.35), "points more standing still",
-                  size=11, color=S.muted, font=S.body),
-             box(s, x + Inches(0.22), y + Inches(2.45), Inches(1.15), Inches(0.32), fill=col, radius=0.5,
-                 runs=verdict, size=11, bold=True, color="#FFFFFF", font=S.body)]
+    for i, (key, name, what, verdict, col) in enumerate(rows):
+        y = y0 + rh * i
+        v = vals(key)
+        mean = max(0.0, sum(v) / len(v))
+        lo, hi = max(0, round(min(v))), round(max(v))
+        lab = "≈ 0 %" if hi < 1 else (f"+{round(mean)} %" if hi - lo < 2 else f"+{lo} to {hi} %")
+        bl = int(bw_ * 0.8 * mean / vmax)
+        g = [text(s, nx, y, nw_, rh, [[(name, {"bold": True, "color": S.ink})], [(what, {"color": S.muted,
+                                                                                           "size": 12})]],
+                  size=16, font=S.body, anchor=MSO_ANCHOR.MIDDLE, line=1.05),
+             box(s, bx, y + Inches(0.2), max(bl, Pt(3)), rh - Inches(0.4), fill=col if verdict == "Needed" else S.grid),
+             text(s, bx + max(bl, Pt(3)) + Inches(0.12), y, Inches(1.6), rh, lab, size=17, bold=True,
+                  color=col if verdict == "Needed" else S.ink, font=S.heading, anchor=MSO_ANCHOR.MIDDLE),
+             box(s, vx, y + Inches(0.2), Inches(1.3), rh - Inches(0.4), fill=col if verdict == "Needed" else "#FFFFFF",
+                 line=None if verdict == "Needed" else S.panel_line, radius=0.5, runs=verdict, size=12, bold=True,
+                 color="#FFFFFF" if verdict == "Needed" else S.muted, font=S.body),
+             line(s, M, y + rh, W - M, y + rh, color=S.grid, weight=Pt(0.5))]
         groups.append(g)
-    take = text(s, M, TOP + Inches(3.7), CW, Inches(0.6),
-                [[("Asking again after a lost reply is what makes DRTC work.", {"bold": True, "color": S.ink}),
-                  ("  Points = percent of the run the arm stood still, more than with full DRTC.",
-                   {"color": S.muted, "size": 12})]], size=16, font=S.body)
-    builds(s, [[sub]] + groups + [[take]])
-    notes(s, "We removed one piece of DRTC at a time on the bench. Without asking again, the arm stands still about "
-             "25 percent more of the run under the faults, for all seven policies. Undoing our first fix, DRTC's "
-             "original limit on how long to wait, is almost as bad. Asking later, or a simpler delay estimate, makes "
-             "little or no difference. So the single idea that matters is: when a reply is lost, ask again.")
+    take = box(s, M, y0 + rh * 4 + Inches(0.2), CW, Inches(0.62), fill=S.dark, radius=0.15,
+               runs=[[("What makes DRTC work: ", {"bold": True, "color": S.dark_accent}),
+                      ("asking again when a reply is lost, and waiting just long enough before doing so.",
+                       {"color": S.dark_text})]], size=16, font=S.body)
+    foot = text(s, M, y0 + rh * 4 + Inches(0.88), CW, Inches(0.3),
+                "Bench, all 7 policies, both tasks, the fault mix; median increase in the share of the run the arm "
+                "stood still.", size=10, color=S.muted, font=S.body)
+    builds(s, [[sub] + hdr] + groups + [[take, foot]])
+    notes(s, "DRTC is four ideas. We switched each off in turn, on the bench, with the same faults. Switch off 'ask "
+             "again' and the arm stands still for about a quarter more of the run, for every policy. Switch off our "
+             "fix, so the client gives up on a reply before it could possibly arrive, and it is almost as bad. Asking "
+             "early helps a little; a more careful delay estimate makes no difference. So the one idea that matters "
+             "is: when a reply is lost, ask again, but not too soon.")
 
 
 def t_e3a(prs, n):
