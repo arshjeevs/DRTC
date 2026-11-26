@@ -1,6 +1,6 @@
 # Baseline on cubebox_v1 (lab/PLAN.md, setup v2 robot evals, 2026-11-22): upstream LeRobot with the starvation grace
 # raised to the whole trial (the same reference condition as E4), normal network, 10 trials per model.
-# The 5 trained models now; π0.5 and MolmoAct 2 are added to `models` when trained and frozen with
+# All 7 trained models (π0.5 and MolmoAct 2 added 2026-11-26, before the first freeze); later models are frozen with
 # `lab eval freeze` (append-only: the frozen models never change; lab/WORKFLOW.md, "Growing an eval").
 description: Baseline, cubebox_v1 - upstream LeRobot (patient), normal network
 success: The green cube ends inside the box and the gripper is open, before the time limit.
@@ -13,6 +13,8 @@ models:
 - grootn17_cubebox_v1_full
 - act_cubebox_v1_full
 - diffusion_cubebox_v1_full
+- pi05_cubebox_v1_full
+- molmoact2_cubebox_v1_lora
 conditions:
   baseline: v2_robot/upstream_patient__none
 video: true
