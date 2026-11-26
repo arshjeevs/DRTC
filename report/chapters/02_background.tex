@@ -39,7 +39,7 @@ across starting poses but tie each chunk to the state it was predicted from.
   flow-matching \emph{action expert}; its authors also proposed asynchronous client-server inference.
 \item[GR00T N1.5 and N1.7] NVIDIA's models~\cite{nvidia2025gr00t} use a 3-billion-parameter vision-language model and a diffusion
   transformer action head, with 16-action chunks; N1.7 is trained here with relative arm actions.
-\item[\pizerofive] Physical Intelligence's model~\cite{pi2025pi05} adds a larger flow-matching expert to a vision-language model ($\approx$3.4B) and
+\item[\pizerofive] Physical Intelligence's model~\cite{pi2025pi05} adds a larger flow-matching expert to a vision-language model (4.1B parameters in all) and
   predicts relative joints, with 50-action chunks.
 \item[MolmoAct 2] MolmoAct~2~\cite{molmoact2} reasons about actions in space before acting and is pretrained on community
   SO-100/101 data; it is fine-tuned with LoRA here.
@@ -56,16 +56,16 @@ Section~\ref{sec:shortlist} summarises them.
     \toprule
     Policy & Kind & Vision and language & Action head & Chunk (actions) & Chunk (s) & Actions \\
     \midrule
-    ACT & task policy & ResNet image features, no language & CVAE transformer decoder & 100 & 3.33 & absolute \\
-    Diffusion Policy & task policy & ResNet image features, no language & denoising U-Net & 24 of 48 & 0.80 & absolute \\
-    \smolvla & VLA, $\approx$0.45B & SmolVLM2 & flow-matching expert & 50 & 1.67 & absolute \\
-    GR00T N1.5 & VLA, $\approx$3B & vision-language model & diffusion transformer & 16 & 0.53 & absolute \\
-    GR00T N1.7 & VLA, $\approx$3B & vision-language model & diffusion transformer & 16 & 0.53 & relative \\
-    \pizerofive & VLA, $\approx$3.4B & vision-language model & flow-matching expert & 50 & 1.67 & relative \\
-    MolmoAct 2 & VLA (LoRA) & Molmo vision-language model & flow matching (8 steps) & 30 & 1.00 & -- \\
+    ACT & task policy, 0.05B & ResNet image features, no language & CVAE transformer decoder & 100 & 3.33 & absolute \\
+    Diffusion Policy & task policy, 0.27B & ResNet image features, no language & denoising U-Net & 24 of 48 & 0.80 & absolute \\
+    \smolvla & VLA, 0.45B & SmolVLM2 & flow-matching expert & 50 & 1.67 & absolute \\
+    GR00T N1.5 & VLA, 2.7B & vision-language model & diffusion transformer & 16 & 0.53 & absolute \\
+    GR00T N1.7 & VLA, 3.1B & vision-language model & diffusion transformer & 16 & 0.53 & relative \\
+    \pizerofive & VLA, 4.1B & vision-language model & flow-matching expert & 50 & 1.67 & relative \\
+    MolmoAct 2 & VLA, 5.6B (LoRA) & Molmo vision-language model & flow matching (8 steps) & 30 & 1.00 & absolute \\
     \bottomrule
   \end{tabularx}
-  \caption{The seven policies side by side. Chunk lengths are the ones served here (at 30~Hz); \enquote{relative}
+  \caption{The seven policies side by side. Parameters are counted from the trained checkpoints; chunk lengths are the ones served here (at 30~Hz); \enquote{relative}
            actions are predicted as offsets from the current joint state.}\label{tab:policies-compare}
 \end{table}
 

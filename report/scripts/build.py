@@ -704,7 +704,11 @@ def main() -> int:
     import sys
 
     sys.path.insert(0, str(HERE / "scripts"))
+    import charts
     import v2_results
+
+    for st in STYLES.values():
+        charts.charts(st, sys.modules[__name__])  # report/data + results -> the report's data charts
 
     for stale in [*OUT.glob("tab_v2_*.tex"), *OUT.glob("tab_base_*.tex"), OUT / "tab_e4.tex"]:
         stale.unlink(missing_ok=True)  # written again below only if their results exist

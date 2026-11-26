@@ -29,13 +29,13 @@ and DOT and SFP (not in LeRobot; they would have needed their own plugins).
     \toprule
     Policy & Kind & Chunk & Actions & Language & RTC \\
     \midrule
-    ACT~\cite{zhao2023act} & transformer CVAE, ResNet backbone & 100 & absolute & no & no \\
-    Diffusion Policy~\cite{chi2023diffusion} & U-Net diffusion, ResNet-18 & 48 (24) & absolute & no & no \\
-    \smolvla~\cite{shukor2025smolvla} & small VLM + flow-matching action expert, $\approx$0.45B & 50 & absolute & yes & yes \\
-    GR00T N1.5~\cite{nvidia2025gr00t} & VLM + diffusion transformer, 3B & 16 & absolute & yes & yes \\
-    GR00T N1.7~\cite{nvidia2025gr00t} & VLM + diffusion transformer, 3B & 16 & relative arm & yes & no$^{a}$ \\
-    \pizerofive~\cite{pi2025pi05} & VLM + flow-matching expert, $\approx$3.4B & 50 & relative & yes & yes \\
-    MolmoAct 2~\cite{molmoact2} & VLM with action reasoning + flow-matching expert & 30 & absolute & yes & yes \\
+    ACT~\cite{zhao2023act} & transformer CVAE, ResNet backbone, 0.05B & 100 & absolute & no & no \\
+    Diffusion Policy~\cite{chi2023diffusion} & U-Net diffusion, ResNet-18, 0.27B & 48 (24) & absolute & no & no \\
+    \smolvla~\cite{shukor2025smolvla} & small VLM + flow-matching action expert, 0.45B & 50 & absolute & yes & yes \\
+    GR00T N1.5~\cite{nvidia2025gr00t} & VLM + diffusion transformer, 2.7B & 16 & absolute & yes & yes \\
+    GR00T N1.7~\cite{nvidia2025gr00t} & VLM + diffusion transformer, 3.1B & 16 & relative arm & yes & no$^{a}$ \\
+    \pizerofive~\cite{pi2025pi05} & VLM + flow-matching expert, 4.1B & 50 & relative & yes & yes \\
+    MolmoAct 2~\cite{molmoact2} & VLM with action reasoning + flow-matching expert, 5.6B & 30 & absolute & yes & yes \\
     \bottomrule
   \end{tabularx}
   \par\smallskip\raggedright\footnotesize $^{a}$ LeRobot turns the RTC prefix off for relative-action GR00T~N1.7
@@ -133,13 +133,9 @@ run is stopped by a step limit set in the recipe, which saves, pushes and ends t
 steps that sizes the learning-rate schedule is left at the recipe's value, so the stopped run is identical to the
 full one up to that step. Neither run logged a held-out loss, so the checkpoint served is the last one.
 
-\figslot{fig:losscurves}{Training loss of the seven policies on both tasks.}{C5.1 Chart}{Training loss against
-training step for each policy, one panel per task, exported from the Weights \& Biases runs (log scale); the step where
-\pizerofive{} and MolmoAct~2 were stopped is marked.}
+\chart{fig_losscurves}{Training loss of the seven policies on both tasks, from the Weights \& Biases runs (smoothed). Each policy has its own training objective, so the curves compare in shape, not in level; \pizerofive{} and MolmoAct~2 end where they were stopped.}{fig:losscurves}
 
-\figslot{fig:sizespeed}{Model size against inference time.}{C5.2 Chart}{Parameters (billions, log scale) against the
-server's inference time per chunk (ms) for the seven policies, from the server logs of the robot baselines; marker size:
-chunk length.}
+\chart{fig_sizespeed}{Model size against inference time.}{fig:sizespeed}
 
 \section{Offline evaluation}\label{sec:offline}
 

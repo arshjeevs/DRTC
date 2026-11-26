@@ -1,18 +1,28 @@
-% D2.2 Imitation learning: demonstrations -> dataset -> policy -> robot.
+% D2.2 Imitation learning: demonstrations -> dataset -> training -> policy, then the policy drives the robot in a loop.
 \input{figures/colors}
-\begin{tikzpicture}[font=\small, node distance=5mm and 9mm,
-  st/.style={draw=#1, thick, rounded corners=3pt, fill=white, align=center, text width=31mm, minimum height=15mm},
-  arr/.style={-{Latex[length=2.4mm]}, very thick, ink2}]
-\node[st=robotline] (demo) {{\bfseries Demonstration}\\\footnotesize a person moves the leader arm; the follower copies it};
-\node[st=robotline, right=of demo] (rec) {{\bfseries Recording}\\\footnotesize images, joint states and actions at 30~fps};
-\node[st=serverline, right=of rec] (train) {{\bfseries Training}\\\footnotesize the policy learns observation
-  $\rightarrow$ action chunk};
-\node[st=greenline, below=12mm of train] (pol) {{\bfseries Policy}\\\footnotesize new observation in, a chunk of actions
-  out};
-\node[st=robotline, left=of pol] (robot) {{\bfseries Robot}\\\footnotesize executes the actions; the cameras see the
-  result};
-\draw[arr] (demo) -- (rec); \draw[arr] (rec) -- node[above, font=\scriptsize]{dataset} (train);
-\draw[arr] (train) -- node[right, font=\scriptsize]{weights} (pol);
-\draw[arr] ([yshift=2mm]pol.west) -- node[above, font=\scriptsize]{actions} ([yshift=2mm]robot.east);
-\draw[arr] ([yshift=-2mm]robot.east) -- node[below, font=\scriptsize]{observation} ([yshift=-2mm]pol.west);
+\begin{tikzpicture}[font=\small, node distance=8mm and 12mm,
+  st/.style={draw=#1, thick, rounded corners=3pt, fill=white, align=center, text width=32mm, minimum height=23mm},
+  arr/.style={-{Latex[length=2.4mm]}, very thick, ink2}, lab/.style={font=\footnotesize, text=ink2},
+  phase/.style={font=\footnotesize\bfseries, text=ink2, anchor=east}]
+% learning (offline)
+\node[st=robotline] (demo) {{\bfseries Demonstration}\\[2pt]\footnotesize the operator moves the leader arm; the follower
+  copies it};
+\node[st=robotline, right=of demo] (rec) {{\bfseries Recording}\\[2pt]\footnotesize camera images, joint states and
+  actions at 30~fps};
+\node[st=serverline, right=of rec] (train) {{\bfseries Training}\\[2pt]\footnotesize the policy learns to map an
+  observation to a chunk of actions};
+\draw[arr] (demo) -- (rec);
+\draw[arr] (rec) -- node[lab, above]{dataset} (train);
+% deployment (closed loop)
+\node[st=robotline, below=14mm of demo] (robot) {{\bfseries Robot}\\[2pt]\footnotesize executes the actions; the
+  cameras see the result};
+\node[st=greenline] (pol) at (robot -| train) {{\bfseries Policy}\\[2pt]\footnotesize takes a new observation, returns
+  a chunk of actions};
+\draw[arr] (train) -- node[lab, right, pos=0.68, fill=white, inner sep=1pt]{trained weights} (pol);
+\draw[arr] ([yshift=4mm]pol.west) -- node[lab, above]{actions} ([yshift=4mm]robot.east);
+\draw[arr] ([yshift=-4mm]robot.east) -- node[lab, below]{observation} ([yshift=-4mm]pol.west);
+% phase labels
+\node[phase] at ([xshift=-4mm]demo.west) {learning};
+\node[phase] at ([xshift=-4mm]robot.west) {use};
+\draw[ink2!50, dashed] ([xshift=-16mm, yshift=-7mm]demo.south west) -- ([xshift=4mm, yshift=-7mm]train.south east);
 \end{tikzpicture}

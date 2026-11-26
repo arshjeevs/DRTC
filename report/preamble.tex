@@ -121,3 +121,5 @@
 % A drawn diagram (figures/<file>.tex), scaled down to the text width when wider.
 \newcommand{\diagram}[3]{\begin{figure}[htbp]\centering
   \begin{adjustbox}{max width=\textwidth}\input{figures/#1}\end{adjustbox}\caption{#2}\label{#3}\end{figure}}
+% A generated chart (generated/<name>.pdf; the pending box until its data exists).
+\newcommand{\chart}[3]{\begin{figure}[htbp]\centering\genfigure{#1}\caption{#2}\label{#3}\end{figure}}
