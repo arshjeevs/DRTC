@@ -322,6 +322,31 @@ def s_drtc(prs, n):
              "observation instead of waiting. And it never ends the run: the arm holds and resumes.")
 
 
+def s_drtc_anim(prs, n):
+    s = S.content(prs, n, "Method · DRTC, step by step", "Ask early, and replace a lost reply")
+    clip = OUT / "drtc_how.mp4"
+    vh = Inches(3.4)
+    vw = int(vh * 1920 / 740)
+    vx = M + (CW - vw) // 2
+    if clip.is_file():
+        movie(s, clip, vx, TOP - Inches(0.1), vw, vh, poster_at=9.0)
+    else:
+        pending_box(s, vx, TOP - Inches(0.1), vw, vh, "the explainer clip (python presentation/video.py --how)")
+    steps = [("Ask early", "with H − s_min actions left, not half a second before the queue runs dry."),
+             ("A reply is lost", "the queue keeps playing while the request is out."),
+             ("Cooldown", "once the reply is overdue, give it up and send a fresh observation."),
+             ("Refill", "the fresh chunk arrives before the queue is empty: the arm never stops.")]
+    tw = (CW - Inches(0.3) * 3) // 4
+    groups = [para(s, M + (tw + Inches(0.3)) * i, TOP + vh + Inches(0.1), tw, lead, rest, size=12,
+                   h=Inches(1.0), marker=S.accent) for i, (lead, rest) in enumerate(steps)]
+    builds(s, groups)
+    notes(s, "Click the clip to play it: a slowed-down simulation of one client. The queue drains one action per tick; "
+             "DRTC asks for the next chunk when 30 actions are left. The third request is lost: after the cooldown "
+             "the client gives up on it and sends a fresh observation, and the new chunk arrives before the queue "
+             "runs dry. LeRobot's client would wait until the queue is empty, with the arm stopped, before asking "
+             "again. Then click through the four steps.")
+
+
 def s_simulator(prs, n):
     s = S.content(prs, n, "Method · try it", "The DRTC Fault Simulator")
     clip = OUT / "drtc_simulator_clip.mp4"
@@ -885,7 +910,7 @@ def s_thanks(prs, n):
 
 SLIDES = [s_title, s_outline,
           s_section(1), s_problem, s_setting, s_shipped, s_claim,
-          s_section(2), s_drtc, s_simulator, s_fixes, s_smoothing,
+          s_section(2), s_drtc, s_drtc_anim, s_fixes, s_smoothing,  # s_simulator: an extra, out until the user finalises it
           s_section(3), s_platform, s_data, s_models, s_protocol, s_design,
           s_section(4), s_success, s_videos, s_motion, s_timeline, s_recovery, s_bench, s_offline,
           s_section(5), s_redesign, s_v2_smoothing, s_v2_results, s_edge, s_limits, s_conclusion, s_thanks]

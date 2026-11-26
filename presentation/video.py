@@ -558,7 +558,7 @@ def scene_how():
         for kk, kind, rid in events:
             if kk <= k and kind == "giveup":
                 cap = ("A reply was lost: after the cooldown the robot gives up on it and sends a fresh observation. "
-                       "Upstream would wait for it forever.")
+                       "Upstream waits until its queue runs dry, with the arm stopped.")
         fr.text((M, 860), cap, font("b", 30), INK, a, width=W - 2 * M)
         fr.footer("3")
         return fr.im
@@ -760,9 +760,9 @@ SCENES = [scene_title, scene_setup, scene_failure, scene_how, scene_simulator, s
           scene_three_smolvla, scene_motion, scene_success, scene_v2, scene_e1, scene_stack, scene_edge, scene_close]
 
 
-def render(preview: bool = False) -> Path:
+def render(preview: bool = False, scenes=None, path: Path | None = None) -> Path:
     OUT.mkdir(exist_ok=True)
-    built = [make() for make in SCENES]
+    built = [make() for make in (scenes or SCENES)]
     if preview:
         pdir = OUT / "video_preview"
         pdir.mkdir(exist_ok=True)
@@ -770,7 +770,7 @@ def render(preview: bool = False) -> Path:
             draw(min(dur - 0.1, dur * 0.7)).save(pdir / f"scene-{i:02d}.png")
         print(pdir)
         return pdir
-    path = OUT / "drtc_video.mp4"
+    path = path or OUT / "drtc_video.mp4"
     ff = subprocess.Popen(["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s",
                            f"{W}x{H}", "-r", str(FPS), "-i", "-", "-c:v", "libx264", "-preset", "medium", "-crf",
                            "20", "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(path)], stdin=subprocess.PIPE)
@@ -793,4 +793,11 @@ def render(preview: bool = False) -> Path:
 
 
 if __name__ == "__main__":
-    render(preview="--preview" in sys.argv)
+    if "--how" in sys.argv:  # the DRTC explainer alone, for the slides (cropped to the animation by the deck build)
+        render(scenes=[scene_how], path=OUT / "drtc_how_full.mp4")
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(OUT / "drtc_how_full.mp4"), "-vf",
+                        "crop=1920:740:0:250", "-c:v", "libx264", "-crf", "20", "-pix_fmt", "yuv420p",
+                        str(OUT / "drtc_how.mp4")], check=True)
+        print(OUT / "drtc_how.mp4")
+    else:
+        render(preview="--preview" in sys.argv)
