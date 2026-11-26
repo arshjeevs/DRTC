@@ -52,21 +52,23 @@ Section~\ref{sec:shortlist} summarises them.
 \begin{table}[htbp]
   \centering
   \small
-  \begin{tabularx}{\textwidth}{l l X l c c c}
+  \renewcommand{\arraystretch}{1.15}
+  \begin{tabularx}{\textwidth}{@{}l r >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}p{0.2\textwidth} r l@{}}
     \toprule
-    Policy & Kind & Vision and language & Action head & Chunk (actions) & Chunk (s) & Actions \\
+    Policy & Size & Vision and language & Action head & Chunk & Actions \\
     \midrule
-    ACT & task policy, 0.05B & ResNet image features, no language & CVAE transformer decoder & 100 & 3.33 & absolute \\
-    Diffusion Policy & task policy, 0.27B & ResNet image features, no language & denoising U-Net & 24 of 48 & 0.80 & absolute \\
-    \smolvla & VLA, 0.45B & SmolVLM2 & flow-matching expert & 50 & 1.67 & absolute \\
-    GR00T N1.5 & VLA, 2.7B & vision-language model & diffusion transformer & 16 & 0.53 & absolute \\
-    GR00T N1.7 & VLA, 3.1B & vision-language model & diffusion transformer & 16 & 0.53 & relative \\
-    \pizerofive & VLA, 4.1B & vision-language model & flow-matching expert & 50 & 1.67 & relative \\
-    MolmoAct 2 & VLA, 5.6B (LoRA) & Molmo vision-language model & flow matching (8 steps) & 30 & 1.00 & absolute \\
+    ACT & 0.05B & ResNet image features; no language & CVAE transformer & 100 (3.3~s) & absolute \\
+    Diffusion Policy & 0.27B & ResNet image features; no language & denoising U-Net & 24 (0.8~s) & absolute \\
+    \smolvla & 0.45B & SmolVLM2 vision-language model & flow-matching expert & 50 (1.7~s) & absolute \\
+    GR00T N1.5 & 2.7B & vision-language model & diffusion transformer & 16 (0.5~s) & absolute \\
+    GR00T N1.7 & 3.1B & vision-language model & diffusion transformer & 16 (0.5~s) & relative \\
+    \pizerofive & 4.1B & vision-language model & flow-matching expert & 50 (1.7~s) & relative \\
+    MolmoAct 2 & 5.6B & Molmo vision-language model (LoRA fine-tune) & flow matching & 30 (1.0~s) & absolute \\
     \bottomrule
   \end{tabularx}
-  \caption{The seven policies side by side. Parameters are counted from the trained checkpoints; chunk lengths are the ones served here (at 30~Hz); \enquote{relative}
-           actions are predicted as offsets from the current joint state.}\label{tab:policies-compare}
+  \caption{The seven policies side by side. Size: parameters counted from the trained checkpoints. Chunk: the actions
+           executed per chunk as served here, and their duration at 30~Hz (Diffusion Policy predicts 48 and executes
+           24). Relative actions are offsets from the current joint state.}\label{tab:policies-compare}
 \end{table}
 
 \diagram{chunking}{Action chunking: chunks are requested, received and executed while the next one is computed.}{fig:chunking}
