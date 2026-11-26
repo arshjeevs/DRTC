@@ -1,8 +1,7 @@
 \chapter{Literature Review}\label{ch:background}
 
 \section{Introduction}
-\textslot{what this chapter reviews and why: learning from demonstrations, VLA models, action chunking, remote
-inference, RTC, DRTC and smoothing, ending with the gap this project fills.}
+This chapter reviews the background for remote control of the SO-101 arm, starting with imitation learning (Figure~\ref{fig:illoop}) and vision-language-action models (Figure~\ref{fig:vla}). It introduces action chunking (Figure~\ref{fig:chunking}) and compares the seven policies used in this work, whose chunk lengths affect tolerance to delayed replies. It then covers asynchronous remote inference, Real-Time Chunking for smooth chunk boundaries (Figure~\ref{fig:rtc}), and Distributed Real-Time Chunking (\drtc{}) for fault-tolerant scheduling (Figure~\ref{fig:drtc}). Finally, it surveys command smoothing and highlights the limitations of existing systems that motivate a controlled comparison on a physical robot.
 
 \section{Learning manipulation from demonstrations}
 
@@ -15,8 +14,16 @@ stores such recordings as datasets of episodes and trains policies on them~\cite
 \diagram{illoop}{Imitation learning: from human demonstrations to a policy that drives the robot.}{fig:illoop}
 
 \section{Vision-language-action models}\label{sec:bg-vla}
-\textslot{what a VLA is, how it is built from a pretrained vision-language model plus an action expert, how it is
-trained and why it needs a GPU; walks through Figure~\ref{fig:vla}.}
+A vision-language-action (VLA) model is a policy built on a pretrained vision-language model (VLM): a network that has
+learned, from large amounts of image--text data from the web, to relate what it sees to words. Figure~\ref{fig:vla}
+follows one step of such a model. A vision encoder cuts each camera image into patches and turns them into tokens; the
+written instruction is tokenised; the joint state is projected to a token of its own; and the VLM's transformer reads
+the whole sequence together. A smaller \emph{action expert} then produces the actions: starting from random noise, it
+refines a whole chunk of future joint targets in a few steps (flow matching or diffusion), conditioned on the VLM's
+features and the joint state. For a robot task the pretrained model is fine-tuned on the task's demonstrations,
+usually with the vision encoder or the language model frozen and the action expert trained. The VLM is what makes
+these models large (from 0.45 to 5.6~billion parameters for the ones used here, Table~\ref{tab:policies-compare}) and is
+why they need a GPU, which a low-cost robot computer does not have.
 
 \diagram{vla}{How a vision-language-action model turns images, an instruction and the arm's state into a chunk of actions. The inputs are real: one frame from both cameras and the measured joint state of the arm at the same moment, from a cube-in-box trial on the robot (joint values in LeRobot's normalised range, $-100$ to $100$).}{fig:vla}
 
@@ -127,9 +134,12 @@ a motion must start from rest, the minimum-jerk profile~\cite{flash1985} of huma
 blend.
 
 \section{Limitations of existing systems}\label{sec:bg-limits}
-\textslot{what is missing: LeRobot's client gives up after one second and never replaces a lost reply; DRTC was
-evaluated only by its author; no controlled comparison on a physical robot against a fair, patient baseline, with task
-success as the outcome and the method taken apart.}
+Three gaps remain for a low-cost arm driven over a real network. LeRobot~0.7's remote-inference client, the one a
+user of the library runs by default, ends a run after one second without actions and does not replace a lost reply,
+so a short network fault stops the task. \drtc{} was designed for exactly this case, but it has been evaluated only by
+its author, on their own setup. And no study we know of compares a fault-tolerant scheduler with LeRobot's client on a
+physical robot, against a fair baseline that is allowed to wait, with task success as the outcome, the motion measured
+as well, and the method taken apart to show which of its parts matter. This project addresses these gaps.
 
 \section{Summary}
 

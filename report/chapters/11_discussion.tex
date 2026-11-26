@@ -1,19 +1,34 @@
 \chapter{Discussion}\label{ch:discussion}
 
 \section{Introduction}
-\textslot{what the results mean, what they do not show, and what was learned building the system.}
+This chapter examines what the results mean, what they do not show, and what was learned building the system. It discusses task-dependent baseline results and why short-chunk policies like GR00T~N1.7 run dry whatever the client does, alongside what adaptive playback can and cannot do. The E4 discussion on what faults cost, what \drtc{} wins back, and what the stack adds will be written when the E4 results are complete. It concludes with four implementation lessons and limitations including sample size, shared servers and simulated faults.
 
 \section{What the baselines show}
-\textslot{the newer and larger models are not uniformly better (GR00T~N1.7 far above N1.5; Diffusion best on cube in
-box); task-dependence; ten trials give wide intervals; MolmoAct~2's fine-tune is broken.}
+The baselines (Section~\ref{sec:baselines}) show, first, that size and recency do not order the policies. GR00T~N1.7
+and \smolvla{} were the strongest overall, at 90\% on sorting and 70\% and 60\% on cube in box, yet \smolvla{} is one of the smallest
+models (0.45B parameters); Diffusion Policy, which has no language input, was the best on cube in box (90\%); and
+\groot{} was weak on both tasks (20\% and 10\%) while its successor N1.7, trained on the same data, was far better.
+Second, the ranking depends on the task: \pizerofive{} did better on cube in box (60\%) than on sorting (40\%), where the
+policy must read the cube's colour and the layout, and \smolvla{} the reverse. Third, ten trials per policy and task
+give wide intervals (Tables~\ref{tab:basesort} and~\ref{tab:basecube}), so only large gaps, such as N1.7 against N1.5,
+are clear. MolmoAct~2 never succeeded; we treat its LoRA fine-tune as broken rather than as a measure of the model. No
+baseline trial was ended by a fault, so every failure was the policy's own, which makes the baselines the reference
+against which the faults of E4 are measured.
 
 \section{\drtc{} on the robot}
 \resultsslot{the discussion of E4 (what the faults cost, what \drtc{} wins back, what the stack adds), written when
 the E4 results are complete.}
 
 \section{Short-chunk policies and the round trip}\label{sec:shortchunk}
-\textslot{a policy whose chunk is not much longer than its round trip runs dry whatever the client does; GR00T~N1.7's
-16 actions (0.53~s) against about 0.6--1~s from the Pi; what adaptive playback can and cannot do.}
+A policy can only keep the arm moving if a new chunk arrives before the current one is used up, so the chunk must last
+longer than the round trip. Figure~\ref{fig:whendrtc} places the policies by their chunk duration and their median
+turnaround from the Pi. ACT, \smolvla{} and \pizerofive{} lie well above the diagonal: on a good link any client keeps
+their queue full, and a scheduler matters when a reply is late or lost. The two GR00T models lie below it: their
+16-action chunk lasts 0.53~s, while their replies took 0.86 and 0.97~s at the median, so the queue runs dry before
+every reply, whatever the client does. For such policies the remedy is not the scheduler but the playback: adaptive
+playback slows the arm when few actions are left, stretching each chunk at the cost of speed, and a shorter round trip
+(the cable, compressed images) moves the policy towards the diagonal. Diffusion Policy, at 0.8~s for 0.8~s, sits on
+the line.
 
 \diagram{whendrtc}{When \drtc{} can help: chunk length against round trip.}{fig:whendrtc}
 
@@ -55,4 +70,8 @@ the E4 results are complete.}
 \end{itemize}
 
 \section{Summary}
-\textslot{the chapter's summary: the baselines, \drtc{} on the robot, short chunks, lessons and limitations}
+This chapter discussed what the baselines show: neither size nor recency orders the policies, the ranking depends on
+the task, and only large gaps are clear with ten trials. It explained why the short-chunk GR00T policies run dry
+whatever the client does, since their chunk is shorter than their round trip from the Pi, and why adaptive playback
+or a shorter round trip, not the scheduler, is the remedy there. It collected the lessons of building the system and
+its limitations; the discussion of \drtc{} on the robot follows the E4 results.

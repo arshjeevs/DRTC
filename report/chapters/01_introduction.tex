@@ -2,8 +2,21 @@
 
 \section{General overview}\label{sec:overview}
 
-\textslot{one page on the project as a whole: a low-cost SO-101 arm, learned policies served from a GPU server, the
-network between them, and what this project built and measured; walks through Figure~\ref{fig:projectflow}.}
+This project is about running learned robot policies on a low-cost arm when the policy lives on a different computer.
+The arm is an SO-101, an open-source six-joint arm built from hobby servos. It is driven by a small robot computer
+(in the official trials a Raspberry~Pi~5) that reads two cameras and the arm's joint positions thirty times a second.
+The policies that decide what the arm should do are trained neural networks, from small task-specific models to
+vision-language-action (VLA) models with several billion parameters, and they run on a GPU server reached over the
+network. Every action the arm takes therefore depends on that network.
+
+Figure~\ref{fig:projectflow} shows the work as one flow. We built the hardware setup and a software platform on the
+open LeRobot library; recorded demonstrations of two tasks by teleoperation and turned them into versioned datasets;
+trained seven policies with their authors' own recipes on two shared GPU servers; served them to the robot through
+LeRobot's remote-inference runtime, to which we added the scheduling of Distributed Real-Time Chunking (\drtc), six
+smoothing methods and a network fault injector; and evaluated everything with a framework that fixes each experiment
+before it runs and rebuilds every result from the raw records of its trials. The robot baselines of all seven policies
+on both tasks, run from the Raspberry~Pi, are the first results; the robot experiment that tests \drtc{} under
+controlled network faults completes the report.
 
 \diagram{projectflow}{The project in one flow, from the hardware to the results.}{fig:projectflow}
 
@@ -92,4 +105,4 @@ discusses the results and their limitations, and Chapter~\ref{ch:conclusion} con
 recipes, the full metric definitions, every condition and plan, and how to reproduce the results.
 
 \section{Summary}
-\textslot{the chapter's summary: the problem, the objectives, the contributions and the organisation}
+This chapter introduced the remote-inference problem for a low-cost SO-101 robot arm executing action chunks at 30~actions per second from a GPU server under network faults. It motivated evaluating Distributed Real-Time Chunking (\drtc{}) against the shipped LeRobot~0.7 client and a patient client, and stated the research questions on task success, \drtc{}'s parts and motion smoothness. Seven objectives were set out across platform construction, datasets and seven policies, porting and dissecting \drtc{}, smoothing, repeatable measurement and using a Raspberry Pi as the robot computer. The chapter then summarised seven contributions: the LeRobot~0.7 platform, three datasets, \drtc{} with four fixes, six smoothing methods, seven fault types, the evaluation framework and the experiments. Finally, it outlined the remaining chapters and appendices.

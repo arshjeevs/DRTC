@@ -9,7 +9,13 @@ the parts connect.
 
 
 \section{Overall system architecture}\label{sec:architecture-overview}
-\textslot{the system as a whole and how its parts connect; walks through Figure~\ref{fig:sysarch}.}
+Figure~\ref{fig:sysarch} shows the parts and how they connect. On the robot side, the follower arm, the wrist camera
+and the phone that serves as the scene camera are plugged into the robot computer by USB; the leader arm is used only
+for recording. The robot computer runs the 30~Hz control loop and the client: LeRobot's, or our \drtc{} scheduler, with
+the smoothing and the fault injector. It reaches the laptop over WiFi or an Ethernet cable, and through the laptop the
+campus network and the two shared GPU servers, where the policies run in a policy server behind an SSH tunnel. The
+Hugging Face Hub holds the datasets, the trained models and the results store; Weights~\&~Biases and Trackio hold the
+training logs.
 
 \diagram{sysarch}{The system architecture: robot side, network and model servers.}{fig:sysarch}
 
@@ -150,4 +156,4 @@ is ever written or deleted. During a robot session the robot computer (the Pi or
 that forwards a port for every served model; on the H200 the connection reaches into the container.
 
 \section{Summary}
-\textslot{the chapter's summary: the hardware, the software layer, the registry and the machines}
+This chapter presents the hardware, software layer, registry, and machine workflow of the system. An SO-101 follower arm and two $800\times600$, 30~fps cameras run on a Raspberry Pi~5 or Linux laptop, connecting to shared A100 and H200 GPU servers over the network. A separate layer on unmodified LeRobot~0.7 provides the \texttt{lab} command, GR00T~N1.5 and replay-robot plugins, and the control layer with the \drtc{} scheduler, smoothing methods, and fault injector. A YAML registry fixes every rig, dataset, recipe, model, host, condition, and evaluation by name so conditions are reused across policies. Work moves across machines without manual copying via git, the Hugging Face Hub, and a private results store, while the robot computer reaches served models through an SSH tunnel.

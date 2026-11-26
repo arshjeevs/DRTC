@@ -5,7 +5,14 @@ The experiments of this report follow one design, \emph{setup~v2} (fixed on 22~N
 compare \drtc{} with LeRobot's client under every fault type, take \drtc{} apart and choose a smoothing stack, and a
 robot experiment that tests \drtc{} and the stack on the real arm. Every trained policy also has a baseline on the
 robot. This chapter describes the design, the claims it tests and the protocol.
-\textslot{one paragraph on the earlier pilot run (20~November) and why it led to setup~v2, without its results.}
+Setup~v2 replaced a pilot design (20~November 2026) that ran \smolvla{} and \groot{} on sorting under four conditions:
+LeRobot's client as shipped, the same under faults, \drtc{} under faults, and \drtc{} with two smoothing methods under
+faults. Three weaknesses of that design led to setup~v2. The shipped client ends a run after one second without
+actions, a single setting, so beating it would show that the default is fragile rather than that \drtc's scheduling
+is better. The \drtc{} condition differed from the faulted baseline in two things at once, the scheduling and the
+patience, so a difference could not be attributed to either. And the smoothing condition added two methods at once.
+Setup~v2 therefore compares \drtc{} with a patient client with the same limits, takes \drtc{} apart, and tests each
+smoothing method alone before combining them. The pilot's results are not used in this report.
 
 \section{Setup v2}\label{sec:setupv2}
 
@@ -26,7 +33,7 @@ GR00T~N1.7, ACT, Diffusion Policy, \pizerofive{} and MolmoAct~2), eight runs per
       trigger (A3), with the original $H/2$ cooldown cap (A4, which undoes our first fix), under every fault type; and
       $s_{\min}$ at half and one and a half times its value (A5), with no fault and under the mix.
 \item \textbf{E3a, smoothing methods:} \drtc{} under the mix with each method of Table~\ref{tab:smoothing} alone, and
-      with the Butterworth filter plus adaptive playback (the first run's condition~4); RTC only for \smolvla{} and
+      with the Butterworth filter plus adaptive playback (the pilot run's condition~4); RTC only for \smolvla{} and
       \groot.
 \item \textbf{E3b, the stack:} the stack chosen by the rule of Section~\ref{sec:stackrule}, without faults and under the
       mix, and the stack without each of its parts. When the stack uses RTC, the policies without it are run with
@@ -88,4 +95,4 @@ baseline of the first two policies is optional.
 \end{itemize}
 
 \section{Summary}
-\textslot{the chapter's summary: setup v2, E4, the baselines, the claims and the protocol}
+This chapter presents \emph{setup~v2} (22~November 2026), which replaced the pilot design to separate scheduling, patience and smoothing effects. Bench experiments E1--E3b run all seven policies on both tasks to compare \drtc{} against patient and shipped upstream clients, ablate \drtc's components, test individual smoothing methods and evaluate the chosen stack. Robot experiment E4 tests four policies across four interleaved conditions (patient upstream fault-free and under the mix, and \drtc{} alone and with the non-RTC stack under the mix), alongside fault-free baselines for all seven policies. Table~\ref{tab:claims} lists the primary claims and comparisons tested in E1 and E4. Finally, the protocol specifies machine assignment, Ethernet sessions for E4, layout rotation, RTC warm-up and trial growth.

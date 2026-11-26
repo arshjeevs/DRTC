@@ -51,7 +51,7 @@ arm and sends observations over the network (WiFi, or a cable for E4) to a polic
 \paragraph{Bench.}\label{sec:bench-design} The same pipeline without the arm: the replay robot plays a held-out episode
 as its camera images and joint states, and the policy server runs on the same GPU machine. The network to the robot is
 simulated on every reply as measured on the robot: 250~ms with up to 20~ms of jitter (the network share of the
-turnaround of the first robot run). Each run replays the next held-out episode. Nothing moves and the images do not
+turnaround of the pilot robot run). Each run replays the next held-out episode. Nothing moves and the images do not
 react to the actions, so the bench has no task success; it measures what every condition does to the timing and the
 motion, under each fault type, many times, without operator time. A run whose control loop falls below 27~Hz is not
 counted.
@@ -183,4 +183,4 @@ ensembling as the seam method.
 \diagram{stackrule}{The rule that chooses the smoothing stack.}{fig:stackrule}
 
 \section{Summary}
-\textslot{the chapter's summary: the three kinds of evaluation, plans, records, metrics, statistics and the stack rule}
+This chapter presents the evaluation framework, combining offline evaluation on held-out episodes, robot trials, and a replay bench without the arm under faults. Each study uses a frozen plan pinning models to Hub commits, running seeded rounds, and growing only by adding rounds or models. Trials save immutable tick, chunk, fault, and video records in a results store from which all reports, tables, and figures are rebuilt. Metrics M1--M12 capture success, latency, stalls, jerk, chunk switches, offline error, recovery, and plan deviation, tested within plans using Fisher's exact test, Mann--Whitney $U$ tests, and the Holm correction. Finally, a fixed script selects the smoothing stack on the bench against \drtc{} alone by gating on deviation, stalls, and recovery before choosing lower jerk.

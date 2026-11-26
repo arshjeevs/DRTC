@@ -32,18 +32,37 @@ the images, which make up most of each request. The Pi then became the robot com
 robot experiment E4.
 
 \section{The Pi as the robot computer for the baselines}
-\textslot{the baselines ran from the Pi with every model on the H200 (140 trials, 29.9~Hz control loop); over the WiFi
-hotspot the reply turnaround averaged about 0.8--1.2~s per policy and reached 4~s; the problems met (a loose power
-plug, network drops, a dead tunnel file after a restart) and how they were handled.}
+The robot baselines of Section~\ref{sec:baselines} ran from the Pi, with every model served from the H200: 70 counted
+trials per task, all seven policies, over the laptop's WiFi hotspot. The Pi kept the control loop at its rate in every
+counted trial (median 29.9~Hz, never below 29.1~Hz), so the CPU of the Pi is not a limit for the robot side. The link
+is: over WiFi the client measured a reply turnaround of 0.87~s at the median and 1.32~s at the 95th percentile across
+all policies, with a worst case of 4.2~s (Figure~\ref{fig:edgertt}), three to four times the 250~ms the bench assumes.
+
+Running from the Pi also brought practical problems, each handled inside the evaluation framework rather than by
+editing results. A loose power plug of the follower arm made the motors disappear in a test trial; network drops and
+three unexplained restarts of the Pi interrupted sessions, and the trials they spoiled were voided or not counted and
+were run again in later rounds (two voided and seven uncounted on sorting); a restart left a dead SSH connection file
+that blocked the next session, which the client now detects and replaces. Because the Pi's download from the results
+store over WiFi was slow, its sessions ran offline and were pushed at the end.
 
 \section{WiFi against cable}\label{sec:edge-cable}
-\textslot{why E4 runs over a cable: each request carries two uncompressed camera images (about 2.9~MB); over WiFi the
-slower policies' replies took about 2~s and \drtc's cooldown abandoned them; over the cable the turnaround fell to about
-0.6--1.0~s.}
+Each request carries the two camera images uncompressed, about 2.9~MB, so over WiFi the upload is a large part of
+every round trip (Figure~\ref{fig:rttparts}). This matters more for \drtc{} than for the patient client. In a practice
+round of E4 over WiFi, the first reply of \pizerofive{} took 2.2~s; \drtc's cooldown, set from the replies seen so far,
+gave up the next requests as lost before their slow replies arrived, accepted one reply in total, and the run ended at
+LeRobot's 10~s deadline for new actions. Diffusion Policy failed the same way, and one \smolvla{} trial with the stack
+froze the control loop for 3~s and was stopped because its observation had become too old. E4 therefore runs with the
+Pi connected to the laptop by an Ethernet cable, which shortens the upload; in the first E4 trial over the cable the
+turnaround was 0.6--1.0~s. The difference between WiFi and cable is itself a result: a cooldown tuned on a fast link can
+abandon every reply on a slow one (Section~\ref{sec:limits}).
 
 \chart{fig_edgertt}{Reply turnaround per policy from the Pi, over WiFi and over the cable.}{fig:edgertt}
 
 \diagram{rttparts}{Where the round-trip time goes.}{fig:rttparts}
 
 \section{Summary}
-\textslot{the chapter's summary: the Pi as the robot computer, WiFi against cable}
+This chapter showed that a Raspberry~Pi~5 can be the robot computer: it ran the official robot baselines of all seven
+policies with the control loop at 29.9~Hz and no CPU limit. The link, not the Pi, is the constraint: over the WiFi
+hotspot each request carried 2.9~MB of uncompressed images and the reply turnaround was 0.87~s at the median, three to
+four times the bench's assumption, which made \drtc's cooldown abandon the replies of the slower policies. The robot
+experiment E4 therefore runs over an Ethernet cable, and image compression is the next step for the edge.

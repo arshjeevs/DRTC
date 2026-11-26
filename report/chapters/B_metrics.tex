@@ -1,7 +1,7 @@
 \chapter{Metric Definitions}\label{app:metrics}
 
 The metrics were fixed before the first robot experiment and revised twice, each time with every result recomputed from
-the raw files: version~2 (before the first run) counts a trial ended by a fault as a failure instead of repeating it;
+the raw files: version~2 (before the pilot run) counts a trial ended by a fault as a failure instead of repeating it;
 version~3 (before setup~v2) reads the fault label from the run's own record, counts jerk only while the arm moves, and
 adds the recovery time (M11) and the deviation from the policy's plan (M12). A \emph{tick} is one 30~Hz control step of
 the robot computer; the \emph{first action} is the first tick that executes an action from a chunk; \emph{arm joints}

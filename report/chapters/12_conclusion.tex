@@ -4,5 +4,15 @@
 \textslot{written after E4: what was built, what the baselines and E4 show, and the answer to the problem statement.}
 
 \section{Future work}
-\textslot{a cooldown that adapts to a slowing link; compressed images from the robot computer; E4 with the RTC stack
-and with more trials; more tasks.}
+\begin{itemize}
+\item \textbf{A cooldown for slow links.} \drtc's cooldown follows the replies seen so far, so it gives up replies that
+      are only slower than recent ones. A cooldown that tracks a slowing link, or waits at least as long as the slowest
+      recent reply plus a margin, would remove this failure.
+\item \textbf{Compressed observations.} The robot computer sends uncompressed images (about 2.9~MB per request).
+      Compressing them would shorten the round trip on WiFi and move the short-chunk policies towards the region where
+      the queue can stay full.
+\item \textbf{E4 with the RTC stack and more trials.} The robot experiment uses the stack without RTC; running it with
+      RTC for the policies that support it, and growing every plan to twenty trials, would narrow the intervals.
+\item \textbf{More tasks and policies.} Two tasks and seven policies are a start; harder tasks, longer horizons and a
+      working MolmoAct~2 fine-tune would test whether the results hold more widely.
+\end{itemize}

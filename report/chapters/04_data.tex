@@ -1,7 +1,7 @@
 \chapter{Data Collection}\label{ch:data}
 
 \section{Introduction}
-\textslot{what was recorded, how, and how it became training data; walks through Figure~\ref{fig:datapipe}.}
+This chapter describes how demonstration data were recorded and processed into reproducible training and held-out datasets, following the pipeline in Figure~\ref{fig:datapipe}. Section~\ref{sec:tasks} introduces the cube-in-box and sorting tasks across three datasets (Figure~\ref{fig:tasks}). Section~\ref{sec:recording} details the 30~fps teleoperation capture, balanced layout rotation, and seeded held-out splits. Section~\ref{sec:trimming} explains how episodes are edited and trimmed of idle starts and ends so policies do not learn to stand still. Finally, Section~\ref{sec:versions} covers Hub revision pinning and separation by joint units (Figure~\ref{fig:datastats}).
 
 \diagram{datapipe}{The data pipeline, from teleoperation to a versioned dataset on the Hub.}{fig:datapipe}
 
@@ -88,4 +88,4 @@ units are never mixed, and errors are only compared within one dataset.
 \chart{fig_datasets}{The datasets: episodes and episode lengths, before and after trimming.}{fig:datastats}
 
 \section{Summary}
-\textslot{the chapter's summary: the tasks, the recording, trimming and the versioned datasets}
+This chapter presented the data pipeline for two tasks, cube in box and sorting, recorded across three datasets. Teleoperation captures both cameras and follower joint positions at 30~fps with balanced layout rotations and seeded held-out splits ($80+8$ episodes for sorting and $100+10$ for cube in box v1). Each dataset is kept in an editable raw copy and a rebuilt trimmed copy for training. Trimming cuts idle starts and ends based on the joint noise floor without re-encoding video, preventing policies from learning to stand still. Finally, each dataset is pinned to one Hub revision with its episode and frame counts and joint units (degrees for sorting, normalised range $-100$ to $100$ for cube in box) so different units are never mixed.

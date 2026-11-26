@@ -1,7 +1,7 @@
 \chapter{Policies and Training}\label{ch:policies}
 
 \section{Introduction}
-\textslot{which policies were trained, why, and how; the offline evaluation at the end.}
+To cover small task-specific models through large VLAs, this chapter first shortlists seven policies from published SO-101 studies and retires five others. It then adopts each policy's published training recipe unchanged so that differences arise from the models rather than tuning. Next, it outlines the training infrastructure and pipeline, from dataset preparation to Hub checkpointing (Figure~\ref{fig:trainpipe}). It documents the completed runs across tasks with training loss curves (Figure~\ref{fig:losscurves}) and model size versus inference time (Figure~\ref{fig:sizespeed}). Finally, it evaluates held-out action error and inference cost offline on a shared GPU (Figure~\ref{fig:offline}).
 
 \section{Choosing the policies}\label{sec:shortlist}
 
@@ -168,4 +168,4 @@ criteria do not always agree. On cube in box v1 the order of speed is the same, 
 \end{figure}
 
 \section{Summary}
-\textslot{the chapter's summary: the seven policies, the recipes, the training infrastructure and the offline evaluation}
+This chapter chose seven policies from SO-101 studies (ACT, Diffusion Policy, \smolvla{}, GR00T~N1.5, GR00T~N1.7, \pizerofive{}, and MolmoAct~2) and retired five. Each followed its authors' published recipe unchanged so differences come from the models rather than tuning. A single-command infrastructure managed dataset preparation, Weights~\&~Biases and Trackio logging, GPU sharing, and Hub checkpointing. All seven were trained on cube in box v1 and sorting, with \pizerofive{} and MolmoAct~2 stopped at 15k and 30k steps. Offline on a shared GPU, \smolvla{} had the lowest sorting arm error, followed by Diffusion Policy, \groot{}, and ACT; ACT was fastest and \groot{} used the most memory. Two policies' last checkpoints had lower held-out error than their lowest-loss checkpoints, while GR00T~N1.7, \pizerofive{}, and MolmoAct~2 await offline evaluation.

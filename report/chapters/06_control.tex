@@ -1,7 +1,7 @@
 \chapter{Remote Inference and DRTC}\label{ch:control}
 
 \section{Introduction}
-\textslot{how the robot computer and the model server work together, how LeRobot's client and \drtc{} handle late and lost replies, the smoothing methods and the fault injection.}
+This chapter explains how the robot computer and the model server interact under network faults. It begins with the 30~Hz client-server loop built on LeRobot~0.7 (Figure~\ref{fig:architecture}, Figure~\ref{fig:sequence}) and examines how LeRobot's upstream client handles late and lost replies in its as-shipped and patient settings (Figure~\ref{fig:flowupstream}). It then presents \drtc{}, which uses a latency-based cooldown to replace lost replies, along with four fixes found on the real setup (Figure~\ref{fig:flowdrtc}). Finally, it covers six smoothing methods that address jerky motion (Figure~\ref{fig:smoothpipe}) and the transport-level fault injector with seven seeded fault types (Figure~\ref{fig:faulttypes}).
 
 \section{The client-server loop}\label{sec:loop}
 
@@ -231,4 +231,4 @@ number in the same way.
 \diagram{faulttypes}{The seven fault types on a timeline.}{fig:faulttypes}
 
 \section{Summary}
-\textslot{the chapter's summary: the loop, the two clients, \drtc{} and our fixes, the smoothing methods and the faults}
+This chapter presented the 30~Hz client-server loop built on LeRobot~0.7's remote-inference engine and unchanged policy server. It described LeRobot's upstream client in its as-shipped (1~s starvation grace, 5~s request deadline) and patient (whole-trial limits) settings, both issuing at most one fresh request when the queue empties. Under the same whole-trial limits, \drtc{} schedules requests using a $q_t \le H - s_{\min}$ trigger, a Jacobson--Karels latency estimator, and a cooldown re-request to replace lost replies, incorporating four fixes found on the real setup. It also covered six smoothing methods addressing seams, stalls, jitter, and fault restarts, and why soft stop was dropped. Finally, it detailed the transport-level fault injector and seven fault types with a trial-seeded 0 to 4~s shift and seeded random loss.

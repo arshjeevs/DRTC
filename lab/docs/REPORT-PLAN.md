@@ -1,4 +1,4 @@
-# Report plan (draft for approval, 2026-11-26)
+# Report plan (approved 2026-11-26; stages 1-4 done, stage 5 waits for E4)
 
 The final project report: `report/` (LaTeX, NIT Calicut format, builds to `report/report.pdf`).
 Nothing below is built until the user approves this plan.
