@@ -18,8 +18,7 @@ stores such recordings as datasets of episodes and trains policies on them~\cite
 \textslot{what a VLA is, how it is built from a pretrained vision-language model plus an action expert, how it is
 trained and why it needs a GPU; walks through Figure~\ref{fig:vla}.}
 
-\diagram{vla}{How a vision-language-action model turns images, an instruction and the arm's state into a chunk of
-actions.}{fig:vla}
+\diagram{vla}{How a vision-language-action model turns images, an instruction and the arm's state into a chunk of actions. The inputs are real: one frame from both cameras and the measured joint state of the arm at the same moment, from a cube-in-box trial on the robot (joint values in LeRobot's normalised range, $-100$ to $100$).}{fig:vla}
 
 \section{Action chunking}
 

@@ -1,4 +1,5 @@
 % D2.1 How a vision-language-action model works (generic, as in SmolVLA, pi0.5 and GR00T); drawn top to bottom.
+% Inputs: real frames (3.5 s) and the measured joint state of cube-in-box baseline trial smolvla t01 (2026-11-26).
 \input{figures/colors}
 \begin{tikzpicture}[font=\small, node distance=5mm and 4mm,
   inp/.style={draw=robotline, thick, rounded corners=2pt, fill=robotfill, align=center, text width=30mm,
@@ -8,10 +9,14 @@
   note/.style={font=\footnotesize\itshape, text=ink2, align=left, anchor=west},
   arr/.style={-{Latex[length=2.4mm]}, thick, ink2}]
 % inputs
-\node[inp] (wrist) {{\bfseries Wrist camera}\\ \footnotesize image};
-\node[inp, right=of wrist] (scene) {{\bfseries Scene camera}\\ \footnotesize image};
-\node[inp, right=of scene] (text) {{\bfseries Instruction}\\ \footnotesize \enquote{Pick up the green cube and put it inside the box.}};
-\node[inp, right=of text] (state) {{\bfseries Joint state}\\ \footnotesize 6 joint angles};
+\node[inp, inner sep=2pt, minimum height=33mm] (wrist) {{\bfseries Wrist camera}\\[2pt] \includegraphics[width=29mm]{assets/vla_wrist.jpg}};
+\node[inp, inner sep=2pt, minimum height=33mm, right=of wrist] (scene) {{\bfseries Scene camera}\\[2pt] \includegraphics[width=29mm]{assets/vla_scene.jpg}};
+\node[inp, right=of scene, minimum height=33mm] (text) {{\bfseries Instruction}\\[4pt] \footnotesize \enquote{Pick up the green cube and put it inside the box.}};
+\node[inp, right=of text, minimum height=33mm] (state) {{\bfseries Joint state $\mathbf{s}_t$}\\[3pt] \scriptsize
+  \begin{tabular}{@{}r@{\hspace{2pt}}c@{}}
+  \begin{tabular}{@{}r@{}}shoulder pan\\ shoulder lift\\ elbow flex\\ wrist flex\\ wrist roll\\ gripper\end{tabular} &
+  $\left[\begin{array}{@{}r@{}} -2.1\\ 31.8\\ -1.0\\ 41.0\\ -53.9\\ 33.6\end{array}\right]$
+  \end{tabular}};
 % encoders
 \node[blk=purpleline, text width=64mm, minimum height=14mm, below=7mm of wrist.south west, anchor=north west] (venc)
   {{\bfseries Vision encoder}\\ \footnotesize a vision transformer cuts each image into patches and turns each patch into a token};
@@ -24,7 +29,7 @@
 \foreach \i in {0,...,15} \node[tok=robotline] at ([xshift=4mm+\i*4mm]ts) {};
 \foreach \i in {16,...,22} \node[tok=greenline] at ([xshift=4mm+\i*4mm]ts) {};
 \node[tok=serverline] at ([xshift=4mm+23*4mm]ts) {};
-\node[note] at ([xshift=4mm+24*4mm]ts) {one token sequence};
+\node[note, anchor=north west] at ([xshift=56mm, yshift=-2.5mm]ts) {one token sequence: image, text and state tokens};
 \draw[arr] (venc.south) -- ([yshift=2.5mm]venc.south|-ts); \draw[arr] (tokz.south) -- ([yshift=2.5mm]tokz.south|-ts);
 \draw[arr] (proj.south) -- ([xshift=4mm+23*4mm, yshift=2.5mm]ts);
 % backbone
