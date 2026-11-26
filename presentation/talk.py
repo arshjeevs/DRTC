@@ -149,57 +149,96 @@ def t_outline(prs, n):
 
 def t_vla_what(prs, n):
     s = S.content(prs, n, "1 · Robot control with a VLA", "What goes in, what comes out")
-    lab = dict(size=12, color=S.muted, font=S.body)
-    iw = Inches(1.75)
-    ins = [picture(s, ASSETS / "vla_wrist.jpg", M, TOP - Inches(0.15), w=iw),
-           picture(s, ASSETS / "vla_scene.jpg", M + iw + Inches(0.12), TOP - Inches(0.15), w=iw)]
-    ih = ins[0].height
-    ins += [text(s, M, TOP - Inches(0.1) + ih, iw, Inches(0.3), "wrist camera", **lab),
-            text(s, M + iw + Inches(0.12), TOP - Inches(0.1) + ih, iw, Inches(0.3), "scene camera", **lab)]
-    y2 = TOP + ih + Inches(0.3)
-    ins.append(box(s, M, y2, Inches(3.62), Inches(0.62), fill=S.panel, line=S.panel_line, radius=S.card_radius,
-                   runs=[[("“Pick up the green cube and put it in the box”", {"italic": True})]], size=14,
-                   font=S.body, align=PP_ALIGN.LEFT, margin=Inches(0.15)))
-    js = first_state()
-    names = ["pan", "lift", "elbow", "wrist", "roll", "grip"]
-    vals = "   ".join(f"{nm} {js[j]:.0f}°" if nm != "grip" else f"{nm} {js[j]:.0f}" for nm, j in zip(names, JOINTS))
-    ins.append(box(s, M, y2 + Inches(0.75), Inches(3.62), Inches(0.75), fill=S.panel, line=S.panel_line,
-                   radius=S.card_radius, runs=[[("six joint angles now", {"bold": True, "size": 12})],
-                                                [(vals, {"size": 12, "color": S.muted})]],
-                   size=13, font=S.body, align=PP_ALIGN.LEFT, margin=Inches(0.15)))
-    # the model
-    mx, my, mw, mh = M + Inches(4.45), TOP + Inches(0.2), Inches(3.0), Inches(3.4)
-    a1 = [line(s, M + Inches(3.75), my + mh * f, mx - Inches(0.05), my + mh / 2, color=S.ink, weight=Pt(1.25),
-               arrow=True) for f in (0.12, 0.62, 0.88)]
-    model = [box(s, mx, my, mw, mh, fill=S.dark, radius=S.card_radius),
-             text(s, mx + Inches(0.25), my + Inches(0.2), mw - Inches(0.5), Inches(0.4), "VLA policy", size=20,
-                  bold=True, font=S.heading, color=S.dark_text),
-             box(s, mx + Inches(0.25), my + Inches(0.8), mw - Inches(0.5), Inches(1.05), fill="#232A34",
-                 radius=S.card_radius, runs=[[("Vision-language model", {"bold": True})],
-                                             [("images + words → tokens", {"color": S.dark_muted, "size": 12})]],
-                 size=14, font=S.body, color=S.dark_text),
-             box(s, mx + Inches(0.25), my + Inches(2.05), mw - Inches(0.5), Inches(1.05), fill="#232A34",
-                 radius=S.card_radius, runs=[[("Action expert", {"bold": True})],
-                                             [("tokens + joints → future moves", {"color": S.dark_muted,
-                                                                                         "size": 12})]],
-                 size=14, font=S.body, color=S.dark_text)]
-    tech = text(s, mx, my + mh + Inches(0.12), mw, Inches(0.6),
-                "SmolVLA: 0.45 B parameters; the action expert generates the chunk by flow matching", size=11,
-                color=S.accent, font=S.body, line=1.15)
-    # the output
-    ox, ow = mx + mw + Inches(0.75), W - M - (mx + mw + Inches(0.75))
-    a2 = line(s, mx + mw + Inches(0.05), my + mh / 2, ox - Inches(0.08), my + mh / 2, color=S.ink, weight=Pt(1.25),
-              arrow=True)
-    frame = box(s, ox, my, ow, Inches(2.4), fill=S.panel, line=S.panel_line, radius=S.card_radius)
-    curves = first_chunk_curves(s, ox + Inches(0.15), my + Inches(0.15), ow - Inches(0.3), Inches(2.1))
-    olab = text(s, ox, my + Inches(2.5), ow, Inches(1.1),
-                [[("A chunk", {"bold": True, "color": S.ink})],
-                 [("50 future positions for each of the 6 joints: the next 1.7 s", {"color": S.muted, "size": 13})]],
-                size=16, font=S.body, line=1.15)
-    builds(s, [ins, a1 + model + [tech], [a2, frame, olab] + [(c, "wipe_right") for c in curves]])
-    notes(s, "Real values from one trial. Two images, the instruction and the six joint angles go in. The VLA turns "
-             "images and words into tokens; its action expert turns those and the joint angles into a chunk: the next "
-             "50 positions of every joint. Each coloured line is one joint.")
+    ex = json.loads((MEDIA / "data" / "vla_example.json").read_text())
+    st = MEDIA / "stills"
+    y0, h = TOP - Inches(0.05), Inches(4.3)
+    iw, aw, mw = Inches(3.85), Inches(0.55), Inches(2.75)
+    ix, mx = M, M + iw + aw
+    ox = mx + mw + aw
+    ow = W - M - ox
+    pad = Inches(0.18)
+    eb = dict(size=11, bold=True, color=S.muted, font=S.body, spacing=1.2)
+    heads = [text(s, ix, y0 - Inches(0.32), iw, Inches(0.3), "INPUTS  ·  ONE MOMENT", **eb),
+             text(s, mx, y0 - Inches(0.32), mw, Inches(0.3), "THE POLICY", **eb),
+             text(s, ox, y0 - Inches(0.32), ow, Inches(0.3), "OUTPUT  ·  AN ACTION CHUNK", **eb)]
+    # inputs
+    inp = [heads[0], box(s, ix, y0, iw, h, fill=S.panel, line=S.panel_line, radius=0.04)]
+    pw = (iw - 2 * pad - Inches(0.12)) / 2
+    for k, (f, cap) in enumerate((("vla_ep0_wrist.jpg", "wrist camera"), ("vla_ep0_scene.jpg", "scene camera"))):
+        x = int(ix + pad + (pw + Inches(0.12)) * k)
+        inp.append(picture(s, st / f, x, int(y0 + pad), w=int(pw)))
+        inp.append(text(s, x, int(y0 + pad + pw * 0.75 + Inches(0.03)), int(pw), Inches(0.25), cap, size=11,
+                        color=S.muted, font=S.body))
+    yi = y0 + Inches(1.78)
+    inp.append(text(s, ix + pad, yi, iw - 2 * pad, Inches(0.25), "INSTRUCTION", size=10, bold=True, color=S.muted,
+                    font=S.body, spacing=1.2))
+    inp.append(text(s, ix + pad, yi + Inches(0.22), iw - 2 * pad, Inches(0.5),
+                    "“Pick up the green cube and put it in the box”", size=14, italic=True, color=S.ink,
+                    font=S.body, line=1.1))
+    yj = y0 + Inches(2.62)
+    inp.append(text(s, ix + pad, yj, iw - 2 * pad, Inches(0.25), "JOINT POSITIONS NOW", size=10, bold=True,
+                    color=S.muted, font=S.body, spacing=1.2))
+    labels = ["shoulder pan", "shoulder lift", "elbow", "wrist flex", "wrist roll", "gripper"]
+    cw_ = (iw - 2 * pad) / 3
+    for k, (lab, v) in enumerate(zip(labels, ex["state"])):
+        x = int(ix + pad + cw_ * (k % 3))
+        y = int(yj + Inches(0.28) + Inches(0.62) * (k // 3))
+        inp.append(text(s, x, y, int(cw_), Inches(0.6), [[(lab, {"size": 10, "color": S.muted})],
+                                                          [(f"{v:+.1f}", {"size": 17, "bold": True,
+                                                                          "color": S.ink})]],
+                        size=12, font=S.body, line=1.05))
+    # the policy
+    ymid = y0 + h / 2
+    a1 = line(s, ix + iw + Inches(0.08), ymid, mx - Inches(0.08), ymid, color=S.ink, weight=Pt(1.75), arrow=True)
+    pol = [heads[1], box(s, mx, y0, mw, h, fill=S.dark, radius=0.04),
+           text(s, mx + pad, y0 + Inches(0.2), mw - 2 * pad, Inches(0.4), "VLA policy", size=20, bold=True,
+                font=S.heading, color=S.dark_text),
+           text(s, mx + pad, y0 + Inches(0.6), mw - 2 * pad, Inches(0.3), "e.g. SmolVLA, 0.45 B parameters",
+                size=11, color=S.dark_muted, font=S.body)]
+    ib = Inches(1.25)
+    for k, (t1, t2) in enumerate((("Vision-language model", "images + instruction → tokens"),
+                                  ("Action expert", "tokens + joint positions → 50 future actions"))):
+        yy = y0 + Inches(1.05) + (ib + Inches(0.35)) * k
+        pol.append(box(s, mx + pad, yy, mw - 2 * pad, ib, fill="#232A34", radius=0.08,
+                       runs=[[(t1, {"bold": True})], [(t2, {"color": S.dark_muted, "size": 12})]], size=14,
+                       font=S.body, color=S.dark_text))
+    pol.append(line(s, mx + mw / 2, y0 + Inches(1.05) + ib + Inches(0.04), mx + mw / 2,
+                    y0 + Inches(1.05) + ib + Inches(0.31), color=S.dark_muted, weight=Pt(1.5), arrow=True))
+    # the output: one row per joint
+    a2 = line(s, mx + mw + Inches(0.08), ymid, ox - Inches(0.08), ymid, color=S.ink, weight=Pt(1.75), arrow=True)
+    out = [heads[2], box(s, ox, y0, ow, h, fill=S.panel, line=S.panel_line, radius=0.04)]
+    chunk = np.array(ex["chunk"])
+    lw_ = Inches(0.95)
+    gx, gw = ox + pad + lw_, ow - 2 * pad - lw_
+    rh = (h - 2 * pad - Inches(0.45)) / 6
+    curves = []
+    for k, (lab, col) in enumerate(zip(labels, JOINT_COLOURS)):
+        ry = y0 + pad + rh * k
+        out.append(text(s, ox + pad, ry, lw_, rh, lab, size=11, color=S.ink, font=S.body, anchor=MSO_ANCHOR.MIDDLE))
+        out.append(line(s, gx, ry + rh - Inches(0.04), gx + gw, ry + rh - Inches(0.04), color=S.grid,
+                        weight=Pt(0.5)))
+        v = chunk[:, k]
+        lo, hi = float(v.min()), float(v.max())
+        if hi - lo < 3:
+            lo, hi = lo - 3, hi + 3
+        f = mapper(gx, ry + Inches(0.08), gw, rh - Inches(0.18), 0, len(v) - 1, lo, hi)
+        curves.append(curve(s, [f(i, a) for i, a in enumerate(v)], col, weight=Pt(2.25)))
+    ay = y0 + h - pad - Inches(0.38)
+    out += [text(s, gx, ay, Inches(0.8), Inches(0.25), "now", size=10, color=S.muted, font=S.body),
+            text(s, gx, ay, gw, Inches(0.25), "50 actions", size=10, color=S.muted, font=S.body,
+                 align=PP_ALIGN.CENTER),
+            text(s, gx + gw - Inches(0.8), ay, Inches(0.8), Inches(0.25), "+1.7 s", size=10, color=S.muted,
+                 font=S.body, align=PP_ALIGN.RIGHT)]
+    cap = text(s, M, y0 + h + Inches(0.1), CW, Inches(0.3),
+               "One moment of a recorded demonstration (cube in box): the two camera frames, the arm's joint "
+               "positions, and the next 50 actions the person made: what the policy learns to predict.", size=11,
+               color=S.muted, font=S.body)
+    builds(s, [inp, [a1] + pol, [a2] + out + [(c, "wipe_right") for c in curves], [cap]])
+    notes(s, "Real data from one moment of a demonstration. In: the wrist and scene camera frames, the instruction, "
+             "and the six joint positions (LeRobot's normalised units). The vision-language model turns images and "
+             "words into tokens; the action expert turns those and the joint positions into a chunk: the next 50 "
+             "actions for every joint, 1.7 s of motion. Shown here: what the person actually did next, which is "
+             "exactly what the policy is trained to predict.")
 
 
 def t_vla_video(prs, n):
@@ -651,50 +690,71 @@ def t_machines(prs, n):
              "Hub; code and the registry live in git, so any machine can reproduce any step.")
 
 
+RERUN = {"bg": "#17191C", "grid": "#2B2F35", "text": "#C9CDD3", "muted": "#7E848D",
+         "lines": ["#E05FB5", "#E0A33A", "#C9D24A", "#F07F50", "#4C8FE6", "#5DC9C2"]}
+
+
 def t_trimming(prs, n):
-    s = S.content(prs, n, "4 · What we built", "Trimming: cut the idle start and end")
+    s = S.content(prs, n, "4 · What we built", "Trimming: automatic, not by hand")
     d = json.loads((MEDIA / "data" / "trim_episode0.json").read_text())
     a = np.array(d["action"])
-    fps, st, en = d["fps"], d["start"], d["end"]
+    fps, st_, en = d["fps"], d["start"], d["end"]
     t = np.arange(len(a)) / fps
-    why = text(s, M, TOP - Inches(0.3), CW, Inches(0.5),
+    names = [nm.replace(".pos", "") for nm in d["names"]]
+    why = text(s, M, TOP - Inches(0.35), CW, Inches(0.35),
                [[("Why: ", {"bold": True, "color": S.ink}),
-                 ("trained on still starts, a model learns that not moving is a valid first move (“never starts”).",
-                  {"color": S.muted})]], size=15, font=S.body)
-    px, py, pw, ph = M + Inches(0.1), TOP + Inches(0.35), CW - Inches(0.1), Inches(1.9)
-    curves = []
-    for j, col in enumerate(JOINT_COLOURS):
-        v = a[:, j]
-        lo, hi = v.min(), v.max()
-        span = (hi - lo) or 1
-        f = mapper(px, py, pw, ph, 0, t[-1], lo - 0.1 * span, hi + 0.1 * span)
-        curves.append(curve(s, [f(tt, vv) for tt, vv in zip(t, v)], col, weight=Pt(1.75)))
-    axis = [line(s, px, py + ph, px + pw, py + ph, color=S.muted, weight=Pt(0.75)),
-            text(s, px, py + ph + Inches(0.03), Inches(8), Inches(0.25),
-                 f"one demonstration, all six joints  ·  {len(a) / fps:.1f} s at {fps} frames a second",
-                 size=11, color=S.muted, font=S.body)]
-    fx = lambda tt: int(px + pw * tt / t[-1])  # noqa: E731
+                 ("trained on still starts, a model learns that not moving is a valid first move (“never "
+                  "starts”).", {"color": S.muted})]], size=15, font=S.body)
+    # a Rerun-style panel
+    bx, by, bw_, bh = M, TOP + Inches(0.1), CW, Inches(2.6)
+    panel = [box(s, bx, by, bw_, bh, fill=RERUN["bg"], radius=0.03),
+             text(s, bx + Inches(0.15), by + Inches(0.07), Inches(3), Inches(0.25), "action  ·  episode 0 "
+                  "(raw recording)", size=11, bold=True, color=RERUN["text"], font=S.body)]
+    px, py, pw, ph = bx + Inches(0.55), by + Inches(0.4), bw_ - Inches(2.2), bh - Inches(0.75)
+    f = mapper(px, py, pw, ph, 0, t[-1], -110, 110)
+    for v in (-100, 0, 100):
+        _, yy = f(0, v)
+        panel.append(line(s, px, yy, px + pw, yy, color=RERUN["grid"], weight=Pt(0.75)))
+        panel.append(text(s, bx + Inches(0.05), int(yy - Inches(0.11)), Inches(0.45), Inches(0.22), str(v), size=9,
+                          color=RERUN["muted"], font=S.body, align=PP_ALIGN.RIGHT))
+    for sec in range(0, int(t[-1]) + 1):
+        xx, _ = f(sec, 0)
+        panel.append(line(s, xx, py, xx, py + ph, color=RERUN["grid"], weight=Pt(0.5)))
+        panel.append(text(s, int(xx - Inches(0.3)), py + ph + Inches(0.04), Inches(0.6), Inches(0.22), f"{sec} s",
+                          size=9, color=RERUN["muted"], font=S.body, align=PP_ALIGN.CENTER))
+    curves = [curve(s, [f(tt, vv) for tt, vv in zip(t, a[:, j])], RERUN["lines"][j], weight=Pt(1.5))
+              for j in range(a.shape[1])]
+    lx = px + pw + Inches(0.2)
+    leg = [box(s, lx, py, Inches(1.35), Inches(1.45), fill="#23262B", radius=0.08)]
+    for j, nm in enumerate(names):
+        yy = py + Inches(0.08) + Inches(0.22) * j
+        leg.append(dot(s, lx + Inches(0.14), yy + Inches(0.1), Inches(0.045), RERUN["lines"][j]))
+        leg.append(text(s, lx + Inches(0.25), yy, Inches(1.1), Inches(0.21), nm, size=9, color=RERUN["text"],
+                        font=S.body))
+    fx = lambda tt: int(f(tt, 0)[0])  # noqa: E731
     cut = []
-    for x0, x1, label in ((0, st / fps, f"idle {st / fps:.1f} s"), (en / fps, t[-1], f"idle {(len(a) - en) / fps:.1f} s")):
-        cut.append(box(s, fx(x0), py - Inches(0.05), fx(x1) - fx(x0), ph + Inches(0.05), fill=S.ink, alpha=0.12))
-        cut.append(text(s, fx(x0), py - Inches(0.32), max(fx(x1) - fx(x0), Inches(1.0)), Inches(0.25), label,
-                        size=11, bold=True, color=S.alert, font=S.body))
-        for xx in (x1,) if x0 == 0 else (x0,):
-            cut.append(line(s, fx(xx), py - Inches(0.05), fx(xx), py + ph, color=S.alert, weight=Pt(1.5), dash=True))
+    for x0, x1, secs in ((0, st_ / fps, st_ / fps), (en / fps, t[-1], (len(a) - en) / fps)):
+        cut.append(box(s, fx(x0), py, fx(x1) - fx(x0), ph, fill=S.alert, alpha=0.22))
+        xc = x1 if x0 == 0 else x0
+        cut.append(line(s, fx(xc), py, fx(xc), py + ph, color=S.alert, weight=Pt(1.75), dash=True))
+        cut.append(text(s, fx(x0), py + ph - Inches(0.32), fx(x1) - fx(x0), Inches(0.25), f"cut {secs:.1f} s",
+                        size=10, bold=True, color="#FFFFFF", font=S.body, align=PP_ALIGN.CENTER))
     cw, gap = Inches(3.6), Inches(0.37)
-    cy = TOP + Inches(2.75)
-    cards = [("Raw copy", "the recording as made; the only copy ever edited"),
-             ("Trimmed copy", "rebuilt from the raw one after every edit; the one models train on"),
-             ("Editing tools", "view, delete bad episodes, set a manual trim, undo, push")]
-    cs = [node(s, M + (cw + gap) * i, cy, cw, Inches(1.0), a_, b_, edge=S.accent) for i, (a_, b_) in enumerate(cards)]
-    num = text(s, M, cy + Inches(1.15), CW, Inches(0.35),
-               [[("Automatic: ", {"bold": True, "color": S.ink}),
-                 ("the cut is where the arm is still, measured against the recording's own joint noise. Over the three "
-                  "datasets 69,864 → 58,104 frames (−17 %).", {"color": S.muted})]], size=13, font=S.body)
-    builds(s, [[why] + axis + [(c, "wipe_right") for c in curves], cut, cs + [num]])
-    notes(s, "A real raw demonstration. The grey parts are the operator getting ready and letting go: the arm is "
-             "still. The trim finds them automatically from the joints' own noise level. We keep the raw recording "
-             "untouched and rebuild the trimmed copy from it after every edit.")
+    cy = TOP + Inches(2.9)
+    cards = [("Automatic trim", "finds the still start and end from the joints' own noise; no manual editing",
+              S.accent),
+             ("Raw copy kept", "the recording as made; the trim never alters it", S.panel_line),
+             ("Trimmed copy", "rebuilt automatically from the raw one; the copy models train on", S.panel_line)]
+    cs = [node(s, M + (cw + gap) * i, cy, cw, Inches(1.1), a_, b_, edge=e_) for i, (a_, b_, e_) in enumerate(cards)]
+    num = text(s, M, cy + Inches(1.2), CW, Inches(0.35),
+               [[("All three datasets trimmed automatically: ", {"bold": True, "color": S.ink}),
+                 ("69,864 → 58,104 frames (−17 %). Manual tools exist only for the rare bad episode.",
+                  {"color": S.muted})]], size=13, font=S.body)
+    builds(s, [[why] + panel + leg + [(c, "wipe_right") for c in curves], cut, cs + [num]])
+    notes(s, "This is a raw demonstration as Rerun shows it: the six joints over 9.6 s. At the start and the end the "
+             "arm is still while the operator gets ready and lets go. Our trim finds those parts automatically, from "
+             "how much the joints jitter when nobody moves them, and cuts them; nobody edits episodes by hand. The raw "
+             "recording is kept, and the trimmed copy is rebuilt from it.")
 
 
 def t_offline(prs, n):
