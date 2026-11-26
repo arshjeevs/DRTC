@@ -293,7 +293,7 @@ def t_vla_video(prs, n):
 
 
 def t_chunks(prs, n):
-    s = S.content(prs, n, "1 · Robot control with a VLA", "Chunk after chunk: how the arm keeps moving")
+    s = S.content(prs, n, "1 · Robot control with a VLA", "Chunk after chunk: the arm moves while the server computes")
     st = MEDIA / "stills"
     t0, t1 = 1.2, 7.45
     fw = Inches(2.17)
@@ -334,7 +334,7 @@ def t_chunks(prs, n):
 
 
 def t_why_server(prs, n):
-    s = S.content(prs, n, "1 · Robot control with a VLA", "The model is too big for the robot's computer")
+    s = S.content(prs, n, "1 · Robot control with a VLA", "Too big for the robot: the model runs on a GPU server")
     a = stat(s, M, TOP, Inches(3.5), "0.05-5.6 B", "parameters in the policies we trained")
     b = stat(s, M, TOP + Inches(1.5), Inches(3.5), "Raspberry Pi 5", "the robot's computer: no GPU")
     c = stat(s, M, TOP + Inches(3.0), Inches(3.5), "A100 · H200", "the GPU servers that run the models")
@@ -370,7 +370,7 @@ def t_why_server(prs, n):
     builds(s, [a, b, c, hdr + sum(rows, []) + [cap]])
     notes(s, "So the model runs on a GPU server, and the robot sends it images over the network. Even there, the "
              "big models take a few hundred milliseconds per chunk (median over our robot trials). This is remote "
-             "inference, and it is where our problem starts.")
+             "inference: next, how the arm keeps moving while it waits.")
 
 
 def t_loop(prs, n):
@@ -1781,13 +1781,13 @@ def t_thanks(prs, n):
 
 SLIDES = [t_title, t_hook, t_outline,
           lambda p, n: S.section_slide(p, n, 1, "Robot control with a VLA", "Cameras and joints in, motion out"),
-          t_vla_what, t_chunks, t_why_server,
+          t_vla_what, t_why_server, t_chunks,
           lambda p, n: S.section_slide(p, n, 2, "The problem", "Control over an unreliable network"),
           t_loop, t_faults, t_fault, t_question, t_project,
           lambda p, n: S.section_slide(p, n, 3, "Our solution", "DRTC and motion smoothing"),
           t_drtc_idea, t_drtc_media, t_jerk, t_stack,
           lambda p, n: S.section_slide(p, n, 4, "What we built", "Hardware, our lab platform, data, training"),
-          t_hardware, t_lab, t_machines, t_record, t_first_attempt, t_data, t_trimming, t_models,
+          t_hardware, t_machines, t_lab, t_record, t_first_attempt, t_data, t_trimming, t_models,
           lambda p, n: S.section_slide(p, n, 5, "How we evaluate", "Offline, the bench, live robot trials"),
           t_eval_kinds, t_offline, t_bench, t_robot_eval, t_records,
           lambda p, n: S.section_slide(p, n, 6, "Results", "Four questions, answered"),
