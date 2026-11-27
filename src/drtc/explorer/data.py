@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import csv
 import json
+import statistics
 from pathlib import Path
 
 import yaml
@@ -127,6 +128,80 @@ def describe_condition(exp: dict) -> dict:
             "shift": shift if isinstance(shift, list) else None}
 
 
+# --- the key findings (the Results window's first view): the report's main claims, from the same raw trials ----------
+
+E4 = "cubebox_v1_drtc_v2"
+# executed actions per chunk at 30 Hz (the report's Table 2.1 and Figure 11.1)
+CHUNK_ACTIONS = {"act": 100, "smolvla": 50, "pi05": 50, "diffusion": 24, "groot": 16, "grootn17": 16}
+BASELINES = ("sort_one_baseline", "cubebox_v1_baseline")
+
+
+def _median(xs):
+    xs = [x for x in xs if x is not None]
+    return float(statistics.median(xs)) if xs else None
+
+
+def reply_times(names=BASELINES) -> dict[str, float]:
+    """Median reply turnaround (s) per policy over the robot baselines, from the client's 'turnaround N ms' lines in
+    every trial's rollout.log (as the report's Figure 11.1)."""
+    import re
+
+    ms: dict[str, list[float]] = {}
+    for name in names:
+        for f in (store.ROOT / name / "sessions").glob("*/trials/*/*/t*/rollout.log"):
+            pol = f.parents[1].name.split("_", 1)[0]
+            ms.setdefault(pol, []).extend(float(v) for v in re.findall(r"turnaround ([0-9.]+) ms",
+                                                                        f.read_text(errors="ignore")))
+    return {p: statistics.median(v) / 1000 for p, v in ms.items() if v}
+
+
+def highlights(evals: list[dict]) -> dict | None:
+    e = next((x for x in evals if x.get("name") == E4 and not x.get("missing")), None)
+    if e is None:
+        return None
+    by = {c: [t for t in e["trials"] if t["valid"] and t["condition"] == c] for c in (c["id"] for c in e["conditions"])}
+    P, F, DR, ST = "upstream_patient__none", "upstream_patient__mix", "drtc__mix", "drtc_stack_nortc__mix"
+    if not all(by.get(c) for c in (P, F, DR, ST)):
+        return None
+
+    def rec(ts, f):
+        h = [t for t in ts if t["metrics"].get(f"M11_recovered_{f}") is not None]
+        return {"k": sum(1 for t in h if t["metrics"][f"M11_recovered_{f}"] == 1), "n": len(h)}
+
+    def med(ts, col):
+        return _median(t["metrics"].get(col) for t in ts)
+
+    policies = []
+    for m in e["models"]:
+        g = {c: [t for t in by[c] if t["model"] == m["id"]] for c in (P, F, DR, ST)}
+        test = next((t for t in e["tests"] if t["condition"] == DR and t["reference"] == F and t["model"] == m["id"]), {})
+        policies.append({"model": m["id"], "name": m["name"],
+                         "k": {c: sum(1 for t in g[c] if t["outcome"] == "success") for c in g},
+                         "n": {c: len(g[c]) for c in g}, "p_holm": test.get("p_holm"),
+                         "significant": test.get("significant", False),
+                         "jerk": {c: med(g[c], "M7_jerk_k") for c in (DR, ST)},
+                         "deviation": med(g[ST], "M12_plan_deviation_deg"),
+                         "stall_nofault": med(g[P], "M2_stall_pct")})
+    replies = reply_times()
+    chunk = [{"policy": p, "name": POLICIES[p], "chunk_s": n / 30, "reply_s": replies[p]}
+             for p, n in CHUNK_ACTIONS.items() if p in replies]
+    chunk.sort(key=lambda r: r["chunk_s"] - r["reply_s"], reverse=True)
+    pooled = {p["condition"]: p for p in e["pooled"]}
+    ptest = next((t for t in e["pooled_tests"] if t["condition"] == DR and t["reference"] == F), {})
+    jd, js = med(by[DR], "M7_jerk_k"), med(by[ST], "M7_jerk_k")
+    return {
+        "eval": E4, "conditions": [P, F, DR, ST], "ladder": [pooled[c] for c in (P, F, DR, ST)],
+        "pooled_p": ptest.get("p"),
+        "ended_by_client": {c: sum(1 for t in by[c] if t["outcome"] == "fault") for c in (F, DR, ST)},
+        "recovery": [{"fault": f, **{c: rec(by[c], f) for c in (F, DR, ST)}} for f in ("spike", "drops", "outage")],
+        "jerk": {"drtc": jd, "stack": js, "ratio": jd / js if jd and js else None},
+        "policies": policies, "chunk": chunk,
+        "baselines": [{"name": x["name"], "title": x["title"],
+                       "range": [min(g["rate"] for g in x["groups"] if g["n"]), max(g["rate"] for g in x["groups"] if g["n"])],
+                       "policies": len(x["models"])} for x in evals if x.get("name") in BASELINES and not x.get("missing")],
+    }
+
+
 def build(reg, names=None) -> dict:
     """The whole bundle: every eval with its plan, groups, comparisons and trials."""
     out = {"evals": [], "metrics": [{"col": c, "name": n, "unit": u, "dec": d, "lower": lo, "help": h}
@@ -137,6 +212,7 @@ def build(reg, names=None) -> dict:
             out["evals"].append(build_eval(reg, name))
         except FileNotFoundError as e:
             out["evals"].append({"name": name, "missing": str(e), **EVALS.get(name, {})})
+    out["highlights"] = highlights(out["evals"])
     return out
 
 

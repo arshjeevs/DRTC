@@ -28,7 +28,19 @@ Ctrl-C stops it. It reads the results once at start; after a new `lab eval pull`
 Three evaluations: **DRTC on the robot** (E4, `cubebox_v1_drtc_v2`), **Baseline: cube in box** (`cubebox_v1_baseline`)
 and **Baseline: sorting** (`sort_one_baseline`).
 
-**Results** (`/`): pick an evaluation at the top.
+**Results** (`/`) opens on **Key findings**: the main results, the ones that make the work new, from the E4 trials
+(numbers as the report's abstract and claims):
+
+- The headline: success 68% → 13% under the fault mix → 65% with DRTC → 75% with the smoothing stack, 3.2× smoother
+  (pooled over the four policies), and what is new in the work.
+- Finding 1: the waiting client itself ended 32 of 40 runs under faults (DRTC 3, the stack 2).
+- Finding 2: after the link went down the arm moved again in 31 of 33 runs with DRTC, 2 of 34 with the waiting client.
+- Finding 3: every policy wins success back; GR00T N1.7 0 → 8 of 10, significant after Holm over all 12 tests.
+- Finding 4: jerk 52 → 16 with the stack, 3.0-5.6× per policy, success 26/40 → 30/40.
+- Finding 5: the limit: GR00T's chunk (0.53 s) is shorter than its round trip (0.86-0.97 s), so it stands still 65% of
+  the time even without faults (the report's Figure 11.1).
+
+Each finding has "▶" links to watch the trials behind it. The cards at the top switch to one evaluation in full:
 
 - The setup: task, success rule, plan, Pi → server, dates, counted trials; for E4 the four conditions and the fault
   mix drawn on a time axis (with the random 0-4 s shift).

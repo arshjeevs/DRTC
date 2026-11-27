@@ -12,7 +12,8 @@ loadData().then((b) => {
   B = b;
   const h = hash.get();
   if (h.metric && B.metric[h.metric]) METRIC = h.metric;
-  select(h.eval && B.evals.some((e) => e.name === h.eval) ? h.eval : B.evals[0].name);
+  const known = h.eval && (B.evals.some((e) => e.name === h.eval) || (h.eval === "key" && B.highlights));
+  select(known ? h.eval : B.highlights ? "key" : B.evals[0].name);
 }).catch((err) => {
   document.getElementById("app").replaceChildren(el("div", { class: "empty", text: `Could not read the results: ${err.message}` }));
 });
@@ -21,8 +22,10 @@ let resizeT = null;
 addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(() => E && render(), 150); });
 addEventListener("popstate", () => { const h = hash.get(); if (B && h.eval && h.eval !== E.name) select(h.eval, true); });
 
+const KEY = { name: "key", key: true };  // the key findings view
+
 function select(name, fromHistory) {
-  E = B.evals.find((e) => e.name === name);
+  E = name === "key" ? KEY : B.evals.find((e) => e.name === name);
   if (!fromHistory) hash.set({ eval: name, metric: METRIC });
   render();
 }
@@ -31,6 +34,7 @@ function render() {
   const app = document.getElementById("app");
   const scroll = scrollY;
   app.replaceChildren(evalSwitcher());
+  if (E.key) { app.append(...keyFindings(B)); scrollTo(0, scroll); return; }
   if (E.missing) { app.append(el("div", { class: "panel empty", text: E.missing })); return; }
   const multi = E.conditions.length > 1;
   app.append(setupPanel(), multi ? conditionsPanel() : null, headline(), successPanel(),
@@ -45,7 +49,10 @@ const modelName = (m) => E.model[m]?.name || m;
 
 // --- the three evals ---------------------------------------------------------------------------------------------
 function evalSwitcher() {
-  return el("div", { class: "evals", role: "tablist", "aria-label": "Evaluations" }, B.evals.map((e) => {
+  const key = B.highlights ? el("button", { class: "evalcard keycard", role: "tab", type: "button", "aria-selected": E.key ? "true" : "false",
+    onclick: () => select("key") }, el("span", { class: "tag", text: "Start here" }), el("span", { class: "t", text: "Key findings" }),
+  el("span", { class: "h", text: B.highlights.ladder.map((p) => fmt.pct(p.rate)).join(" → ") })) : null;
+  return el("div", { class: "evals", role: "tablist", "aria-label": "Evaluations" }, key, B.evals.map((e) => {
     let head = "";
     if (!e.missing) {
       head = e.pooled.length > 1
