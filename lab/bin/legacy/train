@@ -1,0 +1,4 @@
+#!/bin/bash
+# Old name kept for compatibility: lab train <model> (lab train -h)
+source "$(dirname "$0")/../_env"
+exec "$LAB" train "$@"

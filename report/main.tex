@@ -1,0 +1,51 @@
+% The project report. Build: `make` in this folder (results -> generated/ -> report.pdf). See README.md.
+\documentclass[12pt,a4paper,oneside]{report}
+\input{preamble}
+\input{config}
+
+\hypersetup{pdftitle={\ReportTitle},pdfsubject={Project report}}
+
+\begin{document}
+
+% --- front matter -----------------------------------------------------------------------------------------------------
+\pagenumbering{roman}
+\input{frontmatter/titlepage}
+\ifcertificate\input{frontmatter/certificate}\fi
+\ifdeclaration\input{frontmatter/declaration}\fi
+\ifacknowledgements\input{frontmatter/acknowledgements}\fi
+\input{frontmatter/abstract}
+% The contents and the lists: single-spaced, no paragraph gap (the body text keeps 1.15 and its gap)
+{\setlength{\parskip}{0pt}\singlespacing
+\tableofcontents
+\listoffigures
+\listoftables
+}
+\input{frontmatter/abbreviations}
+
+% --- chapters ---------------------------------------------------------------------------------------------------------
+\cleardoublepage
+\pagenumbering{arabic}
+\include{chapters/01_introduction}
+\include{chapters/02_background}
+\include{chapters/03_platform}
+\include{chapters/04_data}
+\include{chapters/05_policies}
+\include{chapters/06_control}
+\include{chapters/07_evaluation}
+\include{chapters/08_design}
+\include{chapters/09_results}
+\include{chapters/10_edge}
+\include{chapters/11_discussion}
+\include{chapters/12_conclusion}
+
+% --- references and appendices ----------------------------------------------------------------------------------------
+\bibliographystyle{unsrtnat}
+\bibliography{references}
+
+\appendix
+\include{chapters/A_recipes}
+\include{chapters/B_metrics}
+\include{chapters/C_conditions}
+\include{chapters/D_reproducibility}
+
+\end{document}

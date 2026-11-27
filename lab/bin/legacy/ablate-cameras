@@ -1,0 +1,5 @@
+#!/bin/bash
+# Not part of the new setup yet.
+echo "lab/bin/ablate-cameras: not ported yet (only needed for a camera-ablation study)."
+echo "The old tool is in the minor-final checkout (~/Projects/drtc, branch drtc)."
+exit 1

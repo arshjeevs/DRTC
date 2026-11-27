@@ -1,0 +1,466 @@
+<title>DRTC Fault Simulator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Layout: a control bar, then three client lanes stacked on one shared 14 s time axis, then the key and the notes.
+   Palette and type follow the project deck (presentation/style.py): paper, ink, blue accent, orange alert. */
+:root {
+  --bg: #F6F5F1; --panel: #FCFBF8; --ink: #15191F; --muted: #5E636D; --grid: #DEDBD2;
+  --accent: #1C5CAB; --accent-soft: #D6E2F2; --alert: #EB6834; --alert-soft: #FBE1D6; --good: #2E7D4F;
+  --fault: rgba(235, 104, 52, 0.12);
+  --display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --text: "Inter", "Segoe UI", system-ui, sans-serif;
+  --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #15191F; --panel: #1C2128; --ink: #F1F0EC; --muted: #A9AEB8; --grid: #2E343D;
+  --accent: #6DA7EC; --accent-soft: #233650; --alert: #F08A5D; --alert-soft: #43291F; --good: #5DBB85;
+  --fault: rgba(240, 138, 93, 0.14); color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #15191F; --panel: #1C2128; --ink: #F1F0EC; --muted: #A9AEB8; --grid: #2E343D;
+  --accent: #6DA7EC; --accent-soft: #233650; --alert: #F08A5D; --alert-soft: #43291F; --good: #5DBB85;
+  --fault: rgba(240, 138, 93, 0.14); color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--text); margin: 0; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 28px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 22px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(26px, 3.4vw, 36px); font-weight: 700; letter-spacing: -0.01em; }
+.eyebrow { font: 600 12px/1 var(--text); letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+header { display: grid; gap: 8px; }
+header p { margin: 0; color: var(--muted); max-width: 68ch; }
+
+/* controls */
+.controls { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: end; padding: 16px 18px;
+  background: var(--panel); border: 1px solid var(--grid); border-radius: 10px; }
+.field { display: grid; gap: 6px; min-width: 0; }
+.field > label, .field > .lbl { font: 600 11px/1 var(--text); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+select, button { font: 500 14px/1 var(--text); color: var(--ink); }
+select { background: var(--bg); border: 1px solid var(--grid); border-radius: 6px; padding: 8px 10px; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg button, .btn { background: var(--bg); border: 1px solid var(--grid); border-radius: 6px; padding: 8px 11px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); min-width: 84px; }
+:root[data-theme="dark"] .btn.primary { color: #0E1116; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn.primary { color: #0E1116; } }
+.btn.inject { border-color: var(--alert); color: var(--alert); }
+.btn:hover, .seg button:hover { border-color: var(--muted); }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.range { display: flex; gap: 10px; align-items: center; }
+.range output { font: 500 13px var(--mono); font-variant-numeric: tabular-nums; min-width: 6ch; }
+input[type="range"] { accent-color: var(--accent); width: 140px; }
+.checks { display: flex; flex-wrap: wrap; gap: 10px 14px; }
+.checks label { display: flex; gap: 6px; align-items: center; font-size: 14px; cursor: pointer; }
+input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; }
+
+/* transport + clock */
+.transport { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+.clock { font: 600 22px/1 var(--mono); font-variant-numeric: tabular-nums; }
+.clock small { font-size: 13px; color: var(--muted); font-weight: 500; }
+.scrub { flex: 1 1 260px; min-width: 0; }
+.scrub input { width: 100%; }
+.hint { color: var(--muted); font-size: 13px; }
+
+/* lanes */
+.lanes { display: grid; gap: 14px; }
+.lane { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 0; background: var(--panel);
+  border: 1px solid var(--grid); border-radius: 10px; overflow: hidden; }
+.lane-main { padding: 14px 16px 10px; min-width: 0; display: grid; gap: 8px; align-content: start; }
+.lane-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; align-items: baseline; }
+.lane-head h3 { font-size: 18px; font-weight: 700; }
+.lane-head .sub { color: var(--muted); font-size: 13px; }
+canvas { width: 100%; height: 190px; display: block; }
+.lane-side { border-left: 1px solid var(--grid); padding: 14px 16px; display: grid; gap: 10px; align-content: start; }
+.state { display: inline-flex; align-items: center; gap: 8px; font: 600 14px/1 var(--text); padding: 8px 12px;
+  border-radius: 999px; width: fit-content; }
+.state::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+.state.moving { background: var(--accent-soft); color: var(--accent); }
+.state.stalled { background: var(--alert-soft); color: var(--alert); }
+.state.ended { background: var(--ink); color: var(--bg); }
+.state.ended::before { border-radius: 2px; }
+.state.idle { background: var(--grid); color: var(--muted); }
+.why { font-size: 13px; color: var(--muted); min-height: 2.6em; }
+dl { margin: 0; display: grid; grid-template-columns: 1fr auto; gap: 5px 10px; font-size: 13px; }
+dt { color: var(--muted); }
+dd { margin: 0; font: 600 13px var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+.progress { height: 6px; background: var(--grid); border-radius: 3px; overflow: hidden; }
+.progress > i { display: block; height: 100%; background: var(--accent); width: 0; }
+
+/* key and notes */
+.key { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 13px; color: var(--muted); }
+.key span { display: inline-flex; gap: 7px; align-items: center; }
+.sw { width: 18px; height: 10px; border-radius: 2px; display: inline-block; }
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px 28px; }
+.notes section { display: grid; gap: 8px; align-content: start; }
+.notes h2 { font-size: 17px; }
+.notes p, .notes li { margin: 0; color: var(--muted); font-size: 14px; max-width: 65ch; }
+.notes ol, .notes ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.tbl { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 13px; width: 100%; }
+th, td { padding: 5px 8px; border-bottom: 1px solid var(--grid); text-align: right; font-variant-numeric: tabular-nums; }
+th:first-child, td:first-child { text-align: left; }
+th { font-weight: 600; color: var(--muted); }
+@media (max-width: 760px) {
+  .lane { grid-template-columns: minmax(0, 1fr); }
+  .lane-side { border-left: 0; border-top: 1px solid var(--grid); grid-template-columns: 1fr 1fr; }
+  .lane-side .why, .lane-side .progress-wrap { grid-column: 1 / -1; }
+  canvas { height: 130px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Remote inference under network faults</div>
+    <h1>DRTC Fault Simulator</h1>
+    <p>A robot arm plays a <b>chunk</b> of actions (a batch of planned moves, played at 30 Hz) while a GPU server
+      computes the next chunk. This is a simplified model of three robot clients when the network fails: LeRobot as
+      shipped, LeRobot made patient, and Distributed Real-Time Chunking (DRTC). Press Replay, then use the orange
+      buttons to break the network while it plays.</p>
+  </header>
+
+  <div class="controls">
+    <div class="field">
+      <label for="policy">Policy</label>
+      <select id="policy"></select>
+    </div>
+    <div class="field">
+      <span class="lbl">Scheduled faults</span>
+      <div class="seg" id="scenario" role="group" aria-label="Scheduled faults"></div>
+    </div>
+    <div class="field">
+      <label for="latency">Network delay per reply</label>
+      <div class="range"><input type="range" id="latency" min="50" max="600" step="10" value="250"><output id="latencyOut">250 ms</output></div>
+    </div>
+    <div class="field">
+      <span class="lbl">DRTC parts</span>
+      <div class="checks">
+        <label><input type="checkbox" id="pTrigger" checked> Early trigger</label>
+        <label><input type="checkbox" id="pEstimator" checked> Latency estimator</label>
+        <label><input type="checkbox" id="pCooldown" checked> Cooldown re-request</label>
+      </div>
+    </div>
+  </div>
+
+  <div class="transport">
+    <button class="btn primary" id="play">Play</button>
+    <div class="seg" id="speed" role="group" aria-label="Speed"></div>
+    <div class="clock" id="clock">0.00 <small>/ 14 s</small></div>
+    <div class="scrub"><input type="range" id="scrub" min="0" max="14" step="0.01" value="0" aria-label="Trial time"></div>
+    <button class="btn inject" id="injSpike">Spike now (+1 s)</button>
+    <button class="btn inject" id="injDrops">Drop replies 1 s</button>
+    <button class="btn inject" id="injOutage">Outage 1.5 s</button>
+    <button class="btn" id="reset">Clear faults</button>
+  </div>
+
+  <div class="lanes" id="lanes"></div>
+
+  <div class="key" aria-label="Key">
+    <span><i class="sw" style="background:var(--accent)"></i>actions in the queue</span>
+    <span><i class="sw" style="border-top:2px dashed var(--muted);height:0"></i>trigger: queue level that sends the next request</span>
+    <span><i class="sw" style="background:var(--accent);opacity:.8"></i>request in flight</span>
+    <span><i class="sw" style="background:var(--ink)"></i>request answered</span>
+    <span><i class="sw" style="background:var(--alert)"></i>request or reply lost</span>
+    <span><i class="sw" style="background:var(--muted);opacity:.55"></i>replaced (↻) or cancelled</span>
+    <span><i class="sw" style="background:var(--accent);opacity:.9;height:6px"></i>arm moving</span>
+    <span><i class="sw" style="background:var(--alert);opacity:.35"></i>arm stalled</span>
+    <span><i class="sw" style="background:var(--ink)"></i>run ended</span>
+    <span><i class="sw" style="background:var(--fault);border:1px solid var(--alert)"></i>network fault</span>
+  </div>
+
+  <div class="notes">
+    <section>
+      <h2>What the three clients do</h2>
+      <ul>
+        <li><b>LeRobot as shipped</b> asks for the next chunk when about half a second of actions is left and waits for
+          the reply. If the queue stays empty for 1 s, or a reply is 5 s late, it ends the run.</li>
+        <li><b>LeRobot, patient</b> is the same client with those two limits raised to the whole 14 s trial. When the
+          queue runs dry it cancels the request in flight and sends one fresh request. If that one is lost too, nothing
+          else is sent, and LeRobot's third limit (no action for 10 s after a restart) ends the run.</li>
+        <li><b>DRTC</b> has three parts. The <b>early trigger</b> asks for the next chunk when H − s<sub>min</sub>
+          actions are left (H: the chunk length; s<sub>min</sub>: 20 actions, 8 for the short-chunk policies). The
+          <b>latency estimator</b> tracks the round trip and its variation, as TCP does. The <b>cooldown
+          re-request</b> gives up a request once it is overdue by that estimate and sends a fresh observation. Untick
+          a part to see what it adds.</li>
+      </ul>
+    </section>
+    <section>
+      <h2>Try this</h2>
+      <ol>
+        <li>Keep SmolVLA, choose <b>Outage</b> and press Replay. LeRobot as shipped ends the run; DRTC moves again
+          within about a second of the outage ending.</li>
+        <li>Choose <b>GR00T N1.5</b> with no faults. Its 16-action chunk lasts 0.53 s, about as long as its 0.55 s round
+          trip (network plus inference), so at the default delay every client stalls without any fault.</li>
+        <li>Go back to SmolVLA with <b>Outage</b> and untick <b>Cooldown re-request</b>. The outage swallows DRTC's
+          request, and without the cooldown it waits for its queue to run dry before asking again: the stall grows from
+          about 8% to about 35% of the trial.</li>
+      </ol>
+    </section>
+    <section>
+      <h2>How close is this to the real thing?</h2>
+      <p>The scheduling rules are taken from the project's client code and LeRobot 0.7. The rest is simplified: one
+        server that computes one request at a time, a fixed network delay, and the bench's fault shapes. There is no
+        arm, camera or task success in this model. Under spike + drops + outage, its stall times come out close to those
+        measured on the replay bench, for DRTC and for the patient client. The patient client's bench results arrived
+        after this model was built, so that column is a prediction.</p>
+      <div class="tbl"><table id="validation">
+        <thead><tr><th>Policy</th><th>Chunk</th><th>DRTC sim.</th><th>bench</th><th>Patient sim.</th><th>bench</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+      <p>Share of a 14 s trial in which the arm stood still, median of 8 trials. Bench: the real client and policy
+        servers on an H200 GPU, with recorded episodes replayed as the robot's cameras and joints.</p>
+    </section>
+  </div>
+</div>
+
+<script>
+/*MODEL*/
+</script>
+<script>
+(function () {
+  "use strict";
+  const S = window.DRTCSim, DUR = 14;
+  // Bench medians under the fault mix, sorting (E1: results/bench/bench_v2_drtc_sort_one/metrics.csv): stall %.
+  const BENCH = { act: [3.3, 50.4], smolvla: [14.6, 60.5], pi05: [35.0, 68.7], molmoact2: [54.9, 67.4],
+                  diffusion: [48.8, 77.9], groot: [64.2, 84.1], grootn17: [68.1, 83.9] };   // [DRTC, patient]
+  const LANES = [
+    { client: "shipped", title: "LeRobot as shipped", sub: "gives up after 1 s without actions" },
+    { client: "patient", title: "LeRobot, patient", sub: "stall limits raised to the whole trial" },
+    { client: "drtc", title: "DRTC", sub: "early trigger, latency estimator, cooldown re-request" },
+  ];
+  const SCENARIOS = [["none", "None"], ["spike", "Spike"], ["drops", "Drops"], ["outage", "Outage"], ["mix", "Spike + drops + outage"], ["loss", "10% reply loss"]];
+  const SPEEDS = [[0.25, "¼×"], [0.5, "½×"], [1, "1×"]];
+  const $ = id => document.getElementById(id);
+
+  const state = { policy: "smolvla", scenario: "mix", latency: 250, parts: { trigger: true, estimator: true, cooldown: true },
+    injected: [], t: 14, playing: false, speed: 0.5, lanes: [] };
+
+  // --- controls ---
+  for (const [k, p] of Object.entries(S.POLICIES)) {
+    const o = document.createElement("option"); o.value = k; o.textContent = `${p.name} · ${p.H} actions`; $("policy").append(o);
+  }
+  $("policy").value = state.policy;
+  function seg(el, items, current, onPick) {
+    el.innerHTML = "";
+    for (const [v, label] of items) {
+      const b = document.createElement("button"); b.type = "button"; b.textContent = label; b.dataset.v = v;
+      b.setAttribute("aria-pressed", String(v === current));
+      b.addEventListener("click", () => { for (const x of el.children) x.setAttribute("aria-pressed", String(x === b)); onPick(v); });
+      el.append(b);
+    }
+  }
+  seg($("scenario"), SCENARIOS, state.scenario, v => { state.scenario = v; state.injected = []; restart(); });
+  seg($("speed"), SPEEDS.map(([v, l]) => [String(v), l]), String(state.speed), v => { state.speed = parseFloat(v); });
+  $("policy").addEventListener("change", e => { state.policy = e.target.value; recompute(); });
+  $("latency").addEventListener("input", e => { state.latency = +e.target.value; $("latencyOut").textContent = `${state.latency} ms`; recompute(); });
+  for (const [id, key] of [["pTrigger", "trigger"], ["pEstimator", "estimator"], ["pCooldown", "cooldown"]])
+    $(id).addEventListener("change", e => { state.parts[key] = e.target.checked; recompute(); });
+  $("play").addEventListener("click", () => {
+    if (state.t >= DUR - 1e-6) state.t = 0;
+    state.playing = !state.playing; syncPlay(); if (state.playing) loop.last = performance.now();
+  });
+  $("scrub").addEventListener("input", e => { state.t = +e.target.value; state.playing = false; syncPlay(); draw(); });
+  $("reset").addEventListener("click", () => { state.injected = []; recompute(); });
+  function inject(f) {
+    const t = Math.max(0.1, Math.min(DUR - 0.5, state.t + 0.05));
+    state.injected.push(Object.assign({ start: t }, f)); recompute();
+    if (!state.playing) { state.playing = true; syncPlay(); loop.last = performance.now(); }
+  }
+  $("injSpike").addEventListener("click", () => inject({ kind: "spike", delay: 1.0 }));
+  $("injDrops").addEventListener("click", () => inject({ kind: "drops", dur: 1.0 }));
+  $("injOutage").addEventListener("click", () => inject({ kind: "outage", dur: 1.5 }));
+  function syncPlay() { $("play").textContent = state.playing ? "Pause" : (state.t >= DUR - 1e-6 ? "Replay" : "Play"); }
+
+  // --- lanes ---
+  for (const L of LANES) {
+    const el = document.createElement("article"); el.className = "lane";
+    el.innerHTML = `<div class="lane-main"><div class="lane-head"><h3>${L.title}</h3><span class="sub"></span></div>
+      <canvas aria-label="${L.title}: queue, requests and arm state over time"></canvas></div>
+      <div class="lane-side"><span class="state idle">Waiting</span><div class="why"></div>
+      <dl><dt>Arm stalled</dt><dd class="v-stall">0%</dd><dt>Requests sent</dt><dd class="v-sent">0</dd>
+      <dt>Lost on the way</dt><dd class="v-lost">0</dd><dt>Replaced, cancelled</dt><dd class="v-repl">0</dd>
+      <dt>Recovery, last fault</dt><dd class="v-rec">–</dd></dl>
+      <div class="progress-wrap"><dl><dt>Time moving</dt><dd class="v-prog">0%</dd></dl><div class="progress"><i></i></div></div></div>`;
+    $("lanes").append(el);
+    L.el = el; L.canvas = el.querySelector("canvas");
+  }
+
+  function faultList() {
+    const base = (S.FAULTS[state.scenario] || []).map(f => Object.assign({}, f));
+    return base.concat(state.injected.map(f => Object.assign({}, f)));
+  }
+  function recompute() {
+    const faults = faultList(), d = state.parts;
+    for (const L of LANES) {
+      const overrides = L.client === "drtc" ? {
+        trigger: d.trigger ? "drtc" : "upstream", estimator: d.estimator ? "jk" : "upstream", cooldown: d.cooldown } : {};
+      L.sim = S.runTrial({ policy: state.policy, client: L.client, faults, net: state.latency / 1000, seed: 3, duration: DUR, overrides });
+      if (L.client === "drtc") {
+        const off = [!d.trigger && "early trigger", !d.estimator && "latency estimator", !d.cooldown && "cooldown re-request"].filter(Boolean);
+        L.el.querySelector(".sub").textContent = off.length ? `off: ${off.join(", ")}` : L.sub;
+      } else L.el.querySelector(".sub").textContent = L.sub;
+    }
+    draw();
+  }
+  function restart() { state.t = 0; recompute(); }
+
+  // --- drawing ---
+  let C = {};
+  function readColors() {
+    const cs = getComputedStyle(document.documentElement);
+    for (const k of ["bg", "panel", "ink", "muted", "grid", "accent", "accent-soft", "alert", "fault"]) C[k] = cs.getPropertyValue(`--${k}`).trim();
+  }
+  readColors();
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { readColors(); draw(); });
+  new MutationObserver(() => { readColors(); draw(); }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  function drawLane(L) {
+    const cv = L.canvas, dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+    const sim = L.sim, H = sim.H0, now = state.t;
+    const left = 58, right = 8, axisH = 16, armH = 12, reqH = 20, gap = 6;
+    const qTop = 4, qBot = h - axisH - armH - reqH - 2 * gap;
+    const reqY = qBot + gap, armY = reqY + reqH + gap;
+    const X = t => left + (t / DUR) * (w - left - right);
+    const Y = q => qBot - (q / H) * (qBot - qTop);
+    g.font = `500 10px ${getComputedStyle(document.body).fontFamily}`;
+    // faults
+    for (const f of sim.faults) {
+      const a = f.start, b = f.start + (f.dur !== undefined ? f.dur : (f.kind === "spike" ? f.delay : 0));
+      if (a === undefined || a > DUR) continue;
+      g.fillStyle = C.fault; g.fillRect(X(a), qTop, Math.max(2, X(b) - X(a)), armY + armH - qTop);
+      g.fillStyle = C.alert; g.fillRect(X(a), qTop, 1.5, armY + armH - qTop);
+      g.fillText(f.kind === "drops" ? "drops" : f.kind, X(a) + 4, qTop + 10);
+    }
+    if (sim.faults.some(f => f.kind === "loss")) { g.fillStyle = C.alert; g.fillText("10% reply loss", left + 4, qTop + 10); }
+    // grid + axis
+    g.strokeStyle = C.grid; g.lineWidth = 1; g.fillStyle = C.muted;
+    for (let s = 0; s <= DUR; s += 2) {
+      g.beginPath(); g.moveTo(X(s) + 0.5, qTop); g.lineTo(X(s) + 0.5, armY + armH); g.stroke();
+      g.textAlign = "center"; g.fillText(`${s} s`, X(s), h - 3);
+    }
+    g.textAlign = "right"; g.fillText(`${H} queued`, left - 5, qTop + 8); g.fillText("0", left - 5, qBot);
+    g.textAlign = "left";
+    g.beginPath(); g.moveTo(left, qBot + 0.5); g.lineTo(w - right, qBot + 0.5); g.stroke();
+    // queue up to now
+    const ticks = sim.ticks.filter(k => k.t <= now);
+    if (ticks.length) {
+      g.beginPath(); g.moveTo(X(ticks[0].t), qBot);
+      for (const k of ticks) { g.lineTo(X(k.t), Y(k.queue)); }
+      g.lineTo(X(ticks[ticks.length - 1].t), qBot); g.closePath();
+      g.fillStyle = C["accent-soft"]; g.fill();
+      g.beginPath(); ticks.forEach((k, i) => i ? g.lineTo(X(k.t), Y(k.queue)) : g.moveTo(X(k.t), Y(k.queue)));
+      g.strokeStyle = C.accent; g.lineWidth = 1.6; g.stroke();
+      // trigger level
+      g.setLineDash([4, 3]); g.strokeStyle = C.muted; g.lineWidth = 1; g.beginPath();
+      ticks.forEach((k, i) => { const y = Y(Math.min(H, k.thr)); i ? g.lineTo(X(k.t), y) : g.moveTo(X(k.t), y); }); g.stroke(); g.setLineDash([]);
+    }
+    // requests
+    for (const r of Object.values(sim.requests)) {
+      if (r.sent > now) continue;
+      const end = Math.min(now, r.endAt !== undefined ? r.endAt : now);
+      const x0 = X(r.sent), x1 = Math.max(x0 + 2, X(end));
+      let col = C.muted, alpha = 0.55;
+      if (r.fate === "accepted" && r.endAt <= now) { col = C.ink; alpha = 1; }
+      else if (r.fate === "lost" || r.lostReply) { col = C.alert; alpha = 1; }
+      else if (r.fate === "pending" || r.endAt === undefined || r.endAt > now) { col = C.accent; alpha = 0.8; }
+      g.globalAlpha = alpha; g.fillStyle = col; g.fillRect(x0, reqY + 4, x1 - x0, reqH - 8); g.globalAlpha = 1;
+      if ((r.fate === "replaced" || r.fate === "busy") && r.endAt <= now) { g.fillStyle = C.ink; g.fillText("↻", x1 + 1, reqY + reqH - 5); }
+    }
+    g.fillStyle = C.muted; g.textAlign = "right"; g.fillText("requests", left - 5, reqY + reqH - 6); g.fillText("arm", left - 5, armY + armH - 2); g.textAlign = "left";
+    // arm state
+    for (const k of ticks) {
+      g.fillStyle = k.moved ? C.accent : C.alert; g.globalAlpha = k.moved ? 0.9 : 0.35;
+      g.fillRect(X(k.t), armY, Math.max(1, X(k.t + S.DT) - X(k.t)) + 0.5, armH);
+    }
+    g.globalAlpha = 1;
+    if (sim.ended && sim.ended.t <= now) {
+      const xe = X(sim.ended.t);
+      g.fillStyle = C.ink; g.fillRect(xe, armY, w - right - xe, armH);
+      g.fillStyle = C.ink; g.fillRect(xe - 1, qTop, 2, armY + armH - qTop);
+      g.fillStyle = C.bg; g.fillText("run ended", xe + 5, armY + armH - 2);
+    }
+    // playhead
+    if (now > 0 && now < DUR) { g.fillStyle = C.ink; g.globalAlpha = 0.6; g.fillRect(X(now), qTop, 1, armY + armH - qTop); g.globalAlpha = 1; }
+  }
+
+  function side(L) {
+    const sim = L.sim, now = state.t, el = L.el;
+    const ticks = sim.ticks.filter(k => k.t <= now);
+    let first = ticks.findIndex(k => k.moved), moved = 0, counted = 0;
+    if (first >= 0) for (const k of ticks.slice(first)) { counted++; if (k.moved) moved++; }
+    const reqs = Object.values(sim.requests).filter(r => r.sent <= now);
+    const lost = reqs.filter(r => (r.fate === "lost" || r.lostReply) && (r.endAt === undefined || r.endAt <= now || true)).length;
+    const repl = reqs.filter(r => ["replaced", "busy", "cancelled"].includes(r.fate) && r.endAt <= now).length;
+    const ended = sim.ended && sim.ended.t <= now;
+    const last = ticks[ticks.length - 1];
+    const pill = el.querySelector(".state"), why = el.querySelector(".why");
+    if (ended) { pill.className = "state ended"; pill.textContent = "Run ended"; why.textContent = `At ${sim.ended.t.toFixed(1)} s: ${sim.ended.reason}.`; }
+    else if (!last || now === 0) { pill.className = "state idle"; pill.textContent = "Waiting"; why.textContent = "Press Play to start the trial."; }
+    else if (last.moved) { pill.className = "state moving"; pill.textContent = "Moving"; why.textContent = `${last.queue} actions queued${last.pending ? ", next chunk requested" : ""}.`; }
+    else { pill.className = "state stalled"; pill.textContent = "Stalled"; why.textContent = last.pending ? "Queue empty, waiting for a reply." : "Queue empty, no request in flight."; }
+    el.querySelector(".v-stall").textContent = counted ? `${Math.round(100 * (1 - moved / counted))}%` : "–";
+    el.querySelector(".v-sent").textContent = reqs.length;
+    el.querySelector(".v-lost").textContent = lost;
+    el.querySelector(".v-repl").textContent = repl;
+    const recs = sim.recoveries().filter(r => r.end <= now && r.stalled);
+    const lastRec = recs[recs.length - 1];
+    el.querySelector(".v-rec").textContent = !lastRec ? "–" : (lastRec.recovery === null || (ended && sim.ended.t < lastRec.end + (lastRec.recovery || 0)) ? (ended ? "run ended" : "not yet") : `${lastRec.recovery.toFixed(1)} s`);
+    const prog = Math.min(100, 100 * (ticks.filter(k => k.moved).length) / (DUR * 30));
+    el.querySelector(".v-prog").textContent = `${Math.round(prog)}%`;
+    el.querySelector(".progress > i").style.width = `${prog}%`;
+  }
+
+  function draw() {
+    $("clock").innerHTML = `${state.t.toFixed(2)} <small>/ ${DUR} s</small>`;
+    $("scrub").value = state.t;
+    for (const L of LANES) { drawLane(L); side(L); }
+  }
+
+  const loop = { last: 0 };
+  function frame(ts) {
+    if (state.playing) {
+      const dt = Math.min(0.1, (ts - loop.last) / 1000) * state.speed; loop.last = ts;
+      state.t = Math.min(DUR, state.t + dt);
+      if (state.t >= DUR) { state.playing = false; syncPlay(); }
+      draw();
+    } else loop.last = ts;
+    requestAnimationFrame(frame);
+  }
+  window.addEventListener("resize", draw);
+
+  // validation table: the simulator recomputed here, the bench as measured
+  const tb = document.querySelector("#validation tbody");
+  for (const [k, p] of Object.entries(S.POLICIES)) {
+    const med = client => {
+      const st = [];
+      for (let n = 1; n <= 8; n++) st.push(S.runTrial({ policy: k, client, faults: S.FAULTS.mix, shift: 4 * ((n * 0.6180339887) % 1), seed: n }).stats().stallPct);
+      st.sort((a, b) => a - b);
+      return (st[3] + st[4]) / 2;
+    };
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${p.name}</td><td>${p.H}</td><td>${med("drtc").toFixed(0)}%</td><td>${BENCH[k][0].toFixed(0)}%</td>` +
+      `<td>${med("patient").toFixed(0)}%</td><td>${BENCH[k][1].toFixed(0)}%</td>`;
+    tb.append(tr);
+  }
+
+  // Start state from the address (for links from the slides and for recording): ?policy=groot&faults=outage&t=0
+  try {
+    const q = new URLSearchParams(location.search);
+    if (q.get("policy") in S.POLICIES) { state.policy = q.get("policy"); $("policy").value = state.policy; }
+    if (q.get("faults") in S.FAULTS) {
+      state.scenario = q.get("faults");
+      for (const x of $("scenario").children) x.setAttribute("aria-pressed", String(x.dataset.v === state.scenario));
+    }
+    if (q.has("t")) state.t = Math.max(0, Math.min(DUR, parseFloat(q.get("t")) || 0));
+  } catch (e) { /* no address parameters */ }
+  // Hook for the recording script (presentation/simulator/record.js)
+  window.DRTCSimPage = { setTime(t) { state.playing = false; state.t = t; syncPlay(); draw(); } };
+
+  recompute(); syncPlay(); requestAnimationFrame(frame);
+})();
+</script>

@@ -1,0 +1,13 @@
+# The live demo console (lab demo): LeRobot, patient (starvation grace and request deadline = the whole run). As the setup v2 bench conditions (lab/experiments/v2/), with the bench's
+# 250 ms reply latency and no scheduled faults: the console's buttons inject them.
+description: 'Demo console: LeRobot, patient (starvation grace and request deadline = the whole run)'
+model: smolvla_sort_one_v1_full
+action_filter_mode: none
+scheduler: upstream
+estimator: upstream
+cooldown: false
+request_deadline: trial
+latency:
+  base_ms: 250
+  jitter_ms: 20
+  seed: 0

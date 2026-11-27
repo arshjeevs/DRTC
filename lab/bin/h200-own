@@ -1,5 +1,6 @@
 #!/bin/bash
-# H200 server only, inside the drtc_lab container: give files created as root (the container's user)
-# back to the server account, so checkpoints and logs can be deleted without docker.
-[ -n "$NVIDIA_PYTORCH_VERSION" ] && [ -d /workspace/drtc_lab ] || { echo "Run inside the drtc_lab container on the H200."; exit 1; }
-chown -R "$(stat -c %u:%g /workspace)" /workspace/drtc_lab && echo "ownership fixed: /workspace/drtc_lab"
+# H200 server only, inside the drtc_lab container: give files created as root back to the server account, for this
+# checkout only (e.g. /workspace/drtc_major).
+here="$(cd "$(dirname "$0")/../.." && pwd)"
+[ -n "$NVIDIA_PYTORCH_VERSION" ] && [ -d /workspace ] || { echo "Run inside the drtc_lab container on the H200."; exit 1; }
+chown -R "$(stat -c %u:%g /workspace)" "$here" && echo "ownership fixed: $here"

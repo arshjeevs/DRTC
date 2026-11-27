@@ -1,4 +1,6 @@
 #!/bin/bash
-# Pre-session checks: lab/bin/preflight [run|record]   (run = DRTC client on the Pi, record = demos)
+# Old name kept for compatibility: lab check --rig (devices, calibration; also --data)
+# lab/bin/session passes its mode (run|record): the checks are the same for both, so it is dropped.
 source "$(dirname "$0")/_env"
-exec "$PY" -m lab.tools.preflight "$@"
+case "${1:-}" in run|record) shift ;; esac
+exec "$LAB" check --rig "$@"

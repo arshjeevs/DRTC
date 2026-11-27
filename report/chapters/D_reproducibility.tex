@@ -1,0 +1,41 @@
+\chapter{Reproducing the Results}\label{app:repro}
+
+All results are produced by the project's \texttt{lab} command from versioned files: a frozen plan pins every policy
+to its exact model version, and every trial's raw files are kept in the results store. The project's step-by-step guide
+(\texttt{lab/WORKFLOW.md}) gives every command with its expected output; the essentials are below.
+
+\paragraph{Training a policy} (on a GPU server):
+\begin{lstlisting}[language=bash]
+lab prepare so101_sort_one_v1               # once per dataset revision
+lab train smolvla_sort_one_v1_full          # pushes the model to the Hub at the end
+lab eval offline --models smolvla_sort_one_v1_full   # M9, M10
+\end{lstlisting}
+
+\paragraph{A bench plan} (servers and replay robot on one GPU server):
+\begin{lstlisting}[language=bash]
+lab eval freeze bench_v2_drtc_sort_one      # on the laptop, once; commit and push
+lab eval serve bench_v2_drtc_sort_one       # on the server: every model, at its frozen commit
+lab eval run bench_v2_drtc_sort_one --server local
+\end{lstlisting}
+
+\paragraph{Choosing the stack} (after the smoothing benches):
+\begin{lstlisting}[language=bash]
+python -m drtc.evals.stack                  # applies the fixed rule
+python lab/experiments/v2/_make.py --stack <methods> --evals   # writes E3b and E4
+\end{lstlisting}
+
+\paragraph{A robot plan} (model server, then the laptop with the arm and cameras):
+\begin{lstlisting}[language=bash]
+lab eval serve sort_one_drtc_v2             # on the GPU server
+lab eval servers sort_one_drtc_v2 --server a100   # on the laptop: every model "ready"
+lab eval run sort_one_drtc_v2 --server a100       # rounds; s = success, f = failure
+\end{lstlisting}
+
+\paragraph{Reports} (any machine):
+\begin{lstlisting}[language=bash]
+lab eval report sort_one_drtc_v2 --pull     # rebuilds report.md, trials.csv, metrics.csv from every session
+cd report && make                           # this report: numbers, tables and figures from the results
+\end{lstlisting}
+
+The figures, tables and numbers of this report are generated from the result files by
+the build script (\texttt{build.py} in \texttt{report/scripts}); a number without a result prints \pending.

@@ -1,0 +1,12 @@
+\begin{tabular}{l ccc ccc}
+\toprule
+ & \multicolumn{3}{c}{SmolVLA} & \multicolumn{3}{c}{GR00T N1.5} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+Condition & Success & 95\% CI & Fault-ended & Success & 95\% CI & Fault-ended \\
+\midrule
+1~~Baseline & 9/10 (90\%) & 60--98\% & 0/10 & 7/10 (70\%) & 40--89\% & 0/10 \\
+2~~Baseline + faults & 0/10 (0\%) & 0--28\% & 10/10 & 0/10 (0\%) & 0--28\% & 10/10 \\
+3~~DRTC + faults & 6/10 (60\%) & 31--83\% & 0/10 & 8/10 (80\%) & 49--94\% & 0/10 \\
+4~~DRTC + smoothing + faults & 8/10 (80\%) & 49--94\% & 0/10 & 10/10 (100\%) & 72--100\% & 0/10 \\
+\bottomrule
+\end{tabular}

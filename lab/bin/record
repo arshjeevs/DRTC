@@ -1,4 +1,0 @@
-#!/bin/bash
-# Record demos with the leader arm: lab/bin/record <hf_user>/<dataset> --task "..." [--episodes 50]
-source "$(dirname "$0")/_env"
-exec "$PY" -m lab.tools.record "$@"

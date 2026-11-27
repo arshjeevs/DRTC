@@ -1,0 +1,19 @@
+# Training recipes. `source`: who made this work and where it comes from.
+
+molmoact2_lora:
+  source: 'MolmoAct 2 authors: LoRA (rank 64) on the VLM for < 200 demos, connector and action expert fully trained,
+    LR 5e-5 for all groups, warmup 200, cosine (LeRobot MolmoAct2 docs); 50k steps x batch 16 (paper arXiv 2605.02881
+    §4.3.1, real-robot fine-tunes); continuous flow matching, 8 flow timesteps, chunk 30 at 30 Hz, absolute joints,
+    quantile norm; image augmentation on and compile on (the docs'' command for LeRobot weights)'
+  policy: molmoact2
+  finetune: lora   # policy-native LoRA (policy.train_mode_vlm), not an adapter
+  base: lerobot/MolmoAct2-SO100_101-LeRobot@a4ab68081b84bb0659d96f454edbce6abbe8a1cd
+  # Cut short for time (2026-11-23): stops at 30k of the 50k steps; the LR schedule is still that of 50k (LeRobot
+  # sizes it from `steps`), so the model is the 30k checkpoint of the original 50k run, not a 30k recipe.
+  train: {steps: 50000, stop_at: 30000, batch_size: 16, save_freq: 1000}
+  flags: {policy.dtype: bfloat16, policy.gradient_checkpointing: true, policy.compile_model: true,
+    policy.train_mode_vlm: lora, policy.lora_rank: 64, policy.action_mode: continuous,
+    policy.num_flow_timesteps: 8, policy.chunk_size: 30, policy.n_action_steps: 30,
+    policy.scheduler_warmup_steps: 200, dataset.image_transforms.enable: true}
+  serve: {rtc_enabled: false, num_flow_matching_steps: null, actions_per_chunk: 30}
+  cameras: {scene: observation.images.cam0, wrist: observation.images.cam1}

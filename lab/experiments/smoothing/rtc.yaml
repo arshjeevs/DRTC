@@ -1,4 +1,0 @@
-# Method B: real-time chunking for GR00T (server; GrootPolicy._velocity_guidance)
-description: RTC prefix inpainting in GR00T's flow-matching head, so each chunk continues the committed actions
-model: groot_cubebox_v1_lora
-rtc_enabled: true

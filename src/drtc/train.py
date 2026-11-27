@@ -1,0 +1,567 @@
+"""Train a registry model with LeRobot 0.7's lerobot-train: `lab train <model>`.
+
+The registry (lab/) gives dataset (pinned revision), recipe and overrides; this builds the lerobot-train flags and
+adds only what 0.7 lacks:
+- our seeded held-out split (the same held-out episodes as in the minor), mapped onto 0.7's own eval split: the
+  episode list is passed training-first, held-out-last, and eval_split selects exactly the held-out tail;
+- epochs -> steps over the training frames;
+- refusing a stale local dataset copy (a different version cached under the same name);
+- checkpoints: the latest two and the best by held-out eval loss are kept, the others deleted, the training state
+  only in the latest (prune_checkpoints); the push puts the best one's model files at the repo root;
+- one video decoder everywhere (torchcodec, drtc.data.video): checked before training, no silent PyAV fallback;
+- recipes that need more than the recorded dataset (relative-action stats, a frame cache) train on a prepared
+  variant (drtc.data.prepare; drtc.compat.frame_cache reads the cached frames);
+- a clean stop: Ctrl-C, SIGTERM or `lab stop <model>` saves a checkpoint at the next step, pushes it with its
+  training state (resumable anywhere: `lab train <model> --resume`) and exits;
+- logging to Trackio (local database per machine) and to wandb (drtc.compat.wandb_mirror; lab/lab.yaml);
+- pushing the final (or a chosen) checkpoint: model files at the repo root, the checkpoint for resuming under
+  checkpoints/<step>/ (tagged).
+
+Everything else (progress bar with time left, held-out eval loss, logging, mixed precision, multi-GPU) is 0.7's.
+"""
+
+from __future__ import annotations
+
+import argparse
+import dataclasses
+import json
+import logging
+import math
+import random
+import re
+import shlex
+import signal
+import sys
+from pathlib import Path
+from typing import Any
+
+from drtc.data import video
+from drtc.registry import Registry, RegistryError, Resolved
+
+OUTPUTS = Path("outputs/train")
+# Stop requests live outside the run folder: LeRobot 0.7 creates outputs/train/<model> only at the first checkpoint.
+STOPS = OUTPUTS / ".stop"
+
+
+def stop_file(model: str) -> Path:
+    return STOPS / model
+
+
+class StopTraining(Exception):
+    pass
+
+
+# --- episodes ------------------------------------------------------------------------------------------------------
+
+
+def split_episodes(split: dict, count: int | None = None) -> tuple[list[int], list[int]]:
+    """Seeded random split -> (training episodes, held-out episodes); identical to the old lab/tools/train.py.
+
+    `count` takes the first `count` of the training episodes' fixed shuffle, so subsets are nested (10 within 25
+    within 50) and every model sees the same held-out episodes.
+    """
+    total, held, seed = split["total"], split["held_out"], split.get("seed", 0)
+    order = random.Random(seed).sample(range(total), total)
+    held_out, pool = order[:held], order[held:]
+    if count is not None:
+        if count > len(pool):
+            raise RegistryError(f"episodes: {count} > the {len(pool)} training episodes of the split")
+        pool = pool[:count]
+    return pool, held_out
+
+
+def parse_episodes(spec) -> list[int]:
+    if isinstance(spec, list):
+        return [int(e) for e in spec]
+    out: list[int] = []
+    for part in str(spec).replace(" ", "").split(","):
+        first, _, last = part.partition("-")
+        out += range(int(first), int(last or first) + 1)
+    return out
+
+
+def select_episodes(train: dict) -> tuple[list[int] | None, list[int]]:
+    if train.get("split"):
+        count = train.get("episodes")
+        if count is not None and not isinstance(count, int):
+            raise RegistryError("with a split, train.episodes must be a number (a subset of the training episodes)")
+        return split_episodes(train["split"], count)
+    if train.get("episodes") is not None:
+        return parse_episodes(train["episodes"]), []
+    return None, []
+
+
+# --- dataset pin ---------------------------------------------------------------------------------------------------
+
+
+def check_local_dataset(r: Resolved) -> None:
+    """A local copy under the dataset's name must be the registered version; LeRobot would use it as it is."""
+    from lerobot.utils.constants import HF_LEROBOT_HOME
+
+    info = HF_LEROBOT_HOME / r.dataset.repo / "meta" / "info.json"
+    if not info.is_file():
+        return
+    meta = json.loads(info.read_text())
+    got = (meta["total_episodes"], meta["total_frames"])
+    want = (r.dataset.episodes, r.dataset.frames)
+    if any(w is not None and w != g for w, g in zip(want, got)):
+        raise RegistryError(
+            f"local copy {info.parent.parent} has {got[0]} episodes / {got[1]} frames, but {r.dataset.id} is pinned "
+            f"to {want[0]} / {want[1]} (revision {r.dataset.revision}). It is another version under the same name; "
+            f"move it aside or set HF_LEROBOT_HOME to another folder.")
+
+
+def training_frames(r: Resolved, episodes: list[int] | None) -> int:
+    from lerobot.datasets import LeRobotDatasetMetadata
+
+    meta = LeRobotDatasetMetadata(r.dataset.repo, revision=r.dataset.revision)
+    lengths = dict(zip(meta.episodes["episode_index"], meta.episodes["length"]))
+    return sum(lengths[e] for e in episodes) if episodes is not None else meta.total_frames
+
+
+# --- flags ---------------------------------------------------------------------------------------------------------
+
+
+def flag_value(v: Any) -> str:
+    if v is None:
+        return "null"  # draccus reads "null" as None; "None" would arrive as the string "None"
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, (dict, list)):
+        return json.dumps(v)
+    return str(v)
+
+
+def resolve_base(base: str) -> str:
+    """repo or repo@revision -> what --policy.path loads (a pinned revision is downloaded and passed as a folder).
+
+    A base whose config.json has fields the LeRobot 0.7 policy class no longer has (e.g. MolmoAct 2's Hub
+    conversion, written for an earlier MolmoAct2Config) is passed as a local copy: the files linked, the config
+    upgraded by drtc.compat.configs (fields only dropped, each drop printed). The Hub snapshot is not modified.
+    """
+    repo, _, rev = base.partition("@")
+    if not rev:
+        return repo
+    from huggingface_hub import snapshot_download
+
+    return str(upgraded_base(Path(snapshot_download(repo, revision=rev)), f"{repo.replace('/', '--')}@{rev}"))
+
+
+def upgraded_base(snapshot: Path, name: str) -> Path:
+    from lerobot.configs import PreTrainedConfig
+    from lerobot.utils.import_utils import register_third_party_plugins
+
+    from drtc.compat.configs import upgrade_config
+    from drtc.compat.serve import CACHE
+
+    raw = json.loads((snapshot / "config.json").read_text())
+    register_third_party_plugins()
+    if raw.get("type") not in PreTrainedConfig.get_known_choices():
+        return snapshot
+    upgraded = upgrade_config(raw, PreTrainedConfig.get_choice_class(raw["type"]))
+    if upgraded == raw:
+        return snapshot
+    out = CACHE.parent / "compat_bases" / name
+    out.mkdir(parents=True, exist_ok=True)
+    for f in snapshot.rglob("*"):
+        rel = f.relative_to(snapshot)
+        dst = out / rel
+        if f.is_dir() or rel == Path("config.json"):
+            continue
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        if not dst.exists():
+            dst.symlink_to(f.resolve())
+    (out / "config.json").write_text(json.dumps(upgraded, indent=2))
+    print(f"base {name}: config upgraded for LeRobot 0.7, loading the local copy {out}", flush=True)
+    return out
+
+
+def unknown_policy_flags(policy: str, flags: dict) -> list[str]:
+    """policy.* flags the policy's config class does not have (would be rejected or, worse, mean nothing)."""
+    from lerobot.configs import PreTrainedConfig
+    from lerobot.utils.import_utils import register_third_party_plugins
+
+    register_third_party_plugins()
+    if policy not in PreTrainedConfig.get_known_choices():
+        raise RegistryError(f"policy {policy!r} is not available in this setup (LeRobot 0.7 + our plugins); "
+                            f"it needs a plugin port first")
+    cls = PreTrainedConfig.get_choice_class(policy)
+    known = {f.name for f in dataclasses.fields(cls)}
+    special = {"path", "type"}  # draccus arguments (load from / choose the policy), not config fields
+    return [k for k in flags if k.startswith("policy.") and k.split(".")[1] not in known | special]
+
+
+def build(reg: Registry, model_id: str, steps: int | None = None, download: bool = True) -> tuple[dict, dict]:
+    """-> (lerobot-train flags, info for the summary)."""
+    r = reg.resolve(model_id)
+    if not r.trainable:
+        raise RegistryError(f"{model_id!r} has no recipe/dataset: it cannot be trained here")
+    if r.status == "not_trainable":
+        raise RegistryError(f"{model_id!r} is marked not_trainable ({reg.models[model_id].notes or 'see the registry'})")
+    if r.finetune == "lora" and r.lora is not None:
+        # Adapter-style LoRA (a `lora:` block, our old format). Policy-native LoRA (e.g. MolmoAct 2's
+        # policy.train_mode_vlm: lora) is a recipe flag and trains as is.
+        raise RegistryError(f"{model_id!r}: adapter LoRA recipes are not mapped to LeRobot 0.7's --peft.* yet")
+    t = dict(r.train)
+    if "epochs" in t and "steps" in t:
+        raise RegistryError(f"{model_id!r}: set train.epochs or train.steps, not both")
+    episodes, held_out = select_episodes(t)
+    out = OUTPUTS / model_id
+    flags: dict[str, Any] = {
+        "dataset.repo_id": r.dataset.repo,
+        "dataset.revision": r.dataset.revision,
+        "policy.repo_id": r.hub,
+        "policy.push_to_hub": False,  # pushed by us (final or chosen checkpoint), see push()
+        "policy.device": "cuda",
+        "output_dir": str(out),
+        "job_name": model_id,
+        "batch_size": t.get("batch_size", 8),
+        "save_freq": t.get("save_freq", 5_000),
+        "trackio.enable": True,
+        "dataset.video_backend": video.DECODER,  # one decoder everywhere (drtc.data.video), checked in main()
+        "trackio.project": reg.settings.trackio_project,
+    }
+    if reg.settings.trackio_space:
+        flags["trackio.space_id"] = reg.settings.trackio_space
+        flags["trackio.private"] = reg.settings.trackio_private
+    if r.base:
+        flags["policy.path"] = resolve_base(r.base) if download else r.base
+    else:
+        flags["policy.type"] = r.policy
+    if episodes is not None:
+        # Training episodes first, held-out last: 0.7 holds out the last ceil(n * eval_split) episodes.
+        flags["dataset.episodes"] = episodes + held_out
+    if held_out:
+        n = len(episodes) + len(held_out)
+        flags["dataset.eval_split"] = (len(held_out) - 0.5) / n  # ceil(n * x) == len(held_out), robust to rounding
+    flags.update({k: v for k, v in r.flags.items()})
+    speed = dict(r.recipe.speed) if r.recipe else {}
+    clash = sorted(set(speed) & set(r.flags))
+    if clash:
+        raise RegistryError(f"{model_id!r}: speed settings {clash} are also recipe flags; a speed setting must not "
+                            f"change the recipe")
+    flags.update(speed)
+    # What the recipe needs beyond the recorded dataset (relative-action stats, a frame cache): one prepared
+    # variant folder.
+    from drtc.data import prepare
+
+    needs = prepare.needs(flags, r.policy, r.recipe.data if r.recipe else None)
+    variants = [n.tag for n in needs]
+    if needs:
+        root = prepare.ensure(r.dataset.repo, r.dataset.revision, needs) if download else \
+            prepare.variant_root(r.dataset.repo, r.dataset.revision, needs)
+        flags["dataset.root"] = str(root)
+    frames = None
+    if steps is not None:
+        flags["steps"] = steps
+    elif "epochs" in t:
+        frames = training_frames(r, episodes)
+        flags["steps"] = max(1, math.ceil(t["epochs"] * frames / flags["batch_size"]))
+    else:
+        flags["steps"] = t.get("steps", 20_000)
+    if held_out:
+        flags["eval_steps"] = max(50, flags["steps"] // 20)  # ~20 held-out evaluations per run, as before
+    # A recipe's stop_at cuts the run short (save + push at that step) without changing the schedule, which LeRobot
+    # sizes from `steps`. A shorter run (--steps, a test) ends before it anyway.
+    stop_at = t.get("stop_at")
+    if stop_at is not None and stop_at >= flags["steps"]:
+        stop_at = None
+    info = {"model": model_id, "recipe": r.recipe.id, "dataset": f"{r.dataset.id}@{r.dataset.revision[:10]}",
+            "episodes": len(episodes) if episodes is not None else "all", "held_out": held_out,
+            "frames": frames, "epochs": t.get("epochs"), "unknown_flags": unknown_policy_flags(r.policy, flags),
+            "variants": variants, "speed": speed, "stop_at": stop_at,
+            "resolved": r}
+    return flags, info
+
+
+def command(flags: dict) -> list[str]:
+    return ["lerobot-train", *(f"--{k}={flag_value(v)}" for k, v in flags.items())]
+
+
+# --- clean stop and pushing ----------------------------------------------------------------------------------------
+
+
+def push(checkpoint_dir: Path, repo_id: str, model_from: Path | None = None) -> None:
+    """Checkpoint (with training state, for resuming) under checkpoints/<step>/, and model files at the repo root:
+    from `model_from` (the best checkpoint, also pushed under checkpoints/<step>/) or else from this one."""
+    from huggingface_hub import HfApi
+    from lerobot.common.train_utils import push_checkpoint_to_hub
+
+    checkpoint_dir = checkpoint_dir.resolve()
+    push_checkpoint_to_hub(checkpoint_dir, repo_id)
+    model_from = (model_from or checkpoint_dir).resolve()
+    if model_from != checkpoint_dir:
+        push_checkpoint_to_hub(model_from, repo_id)
+    HfApi().upload_folder(folder_path=str(model_from / "pretrained_model"), repo_id=repo_id, repo_type="model",
+                          commit_message=f"model from checkpoint {model_from.name}"
+                          + (" (best held-out eval loss)" if model_from != checkpoint_dir else ""))
+    print(f"pushed checkpoint {checkpoint_dir.name} to https://huggingface.co/{repo_id}"
+          + (f"; model files from the best checkpoint {model_from.name}" if model_from != checkpoint_dir else ""),
+          flush=True)
+
+
+def other_trainings() -> int:
+    """Other `lab train` processes running on this machine (main processes, not their DataLoader workers)."""
+    import os
+
+    me, n = os.getpid(), 0
+    for d in Path("/proc").iterdir():
+        if not d.name.isdigit() or int(d.name) == me:
+            continue
+        try:
+            argv = (d / "cmdline").read_bytes().split(b"\0")
+        except OSError:
+            continue
+        if len(argv) > 2 and argv[1].endswith(b"/lab") and argv[2] == b"train":
+            n += 1
+    return n
+
+
+def cpu_budget(reg: Registry, policy: str, sharing: bool) -> dict[str, int]:
+    """This host's CPU share for the policy (hosts.yaml cpu_budget), when other trainings share the machine."""
+    host = reg.current_host()
+    if not sharing or host is None:
+        return {}
+    return dict(host.cpu_budget.get(policy, {}))
+
+
+def apply_cpu_budget(budget: dict[str, int]) -> None:
+    import os
+
+    import torch
+
+    threads = budget.get("threads")
+    if threads:
+        for var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "TORCHINDUCTOR_COMPILE_THREADS"):
+            os.environ[var] = str(threads)
+        torch.set_num_threads(threads)
+
+
+KEEP_LAST = 2  # checkpoints kept besides the best one
+
+
+class EvalLosses(logging.Handler):
+    """Collects lerobot-train's held-out losses ("step N: eval_loss=X") as {step: loss}. With a `path` they are also
+    kept on disk (outputs/train/<model>/eval_losses.json), so a resumed run still knows the earlier ones when it
+    picks the best checkpoint."""
+
+    PATTERN = re.compile(r"step (\d+): eval_loss=([0-9.eE+-]+|nan|inf)")
+
+    def __init__(self, path: Path | None = None):
+        super().__init__(logging.INFO)
+        self.path = path
+        self.losses: dict[int, float] = {}
+        if path is not None and path.is_file():
+            self.losses = {int(k): float(v) for k, v in json.loads(path.read_text()).items()}
+
+    def emit(self, record):
+        m = self.PATTERN.search(record.getMessage())
+        if m:
+            self.losses[int(m.group(1))] = float(m.group(2))
+            if self.path is not None:
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                self.path.write_text(json.dumps({str(k): v for k, v in sorted(self.losses.items())}, indent=1))
+
+
+def best_checkpoint(ckpts_dir: Path, losses: dict[int, float]) -> Path | None:
+    """The saved checkpoint with the lowest held-out eval loss (None before any evaluated checkpoint)."""
+    scored = [(losses[int(c.name)], c) for c in ckpts_dir.iterdir()
+              if c.is_dir() and not c.is_symlink() and c.name.isdigit() and int(c.name) in losses]
+    scored = [(l, c) for l, c in scored if l == l]  # drop nan
+    return min(scored)[1] if scored else None
+
+
+def prune_checkpoints(latest: Path, losses: dict[int, float], keep_last: int = KEEP_LAST) -> list[Path]:
+    """Bounded disk use: keep the latest `keep_last` checkpoints and the best one by held-out eval loss (the one to
+    serve); delete the others. The training state (optimizer, scheduler, RNG: the bulk of a large model's
+    checkpoint) stays only in the latest, which resumes. LeRobot 0.7 keeps everything (tens of GB per π0.5
+    checkpoint; the A100 and H200 home disks are shared and nearly full)."""
+    import shutil
+
+    from lerobot.utils.constants import TRAINING_STATE_DIR
+
+    latest = latest.resolve()
+    ckpts = sorted((c for c in latest.parent.iterdir() if c.is_dir() and not c.is_symlink() and c.name.isdigit()),
+                   key=lambda c: int(c.name))
+    keep = {c.resolve() for c in ckpts[-keep_last:]} | {latest}
+    best = best_checkpoint(latest.parent, losses)
+    if best is not None:
+        keep.add(best.resolve())
+    removed = []
+    for ckpt in ckpts:
+        if ckpt.resolve() not in keep:
+            shutil.rmtree(ckpt)
+            removed.append(ckpt)
+        elif ckpt.resolve() != latest and (ckpt / TRAINING_STATE_DIR).is_dir():
+            shutil.rmtree(ckpt / TRAINING_STATE_DIR)
+            removed.append(ckpt / TRAINING_STATE_DIR)
+    return removed
+
+
+def install_clean_stop(lerobot_train, model: str, losses_file: Path | None = None, stop_at: int | None = None) -> dict:
+    """At the next step after a stop request, or at step `stop_at` (the recipe's): save a checkpoint, then stop (the
+    caller pushes it)."""
+    state = {"requested": False, "saved": None, "eval": EvalLosses(losses_file), "stop_at": stop_at}
+    logging.getLogger().addHandler(state["eval"])
+    stop = stop_file(model)
+    stop.parent.mkdir(parents=True, exist_ok=True)
+    stop.unlink(missing_ok=True)  # an old request must not stop this run
+
+    def request(*_):
+        if state["requested"]:
+            print("\nsecond stop request: exiting without saving", flush=True)
+            raise KeyboardInterrupt
+        state["requested"] = True
+        print("\nstop requested: saving a checkpoint at the next step (Ctrl-C again to quit without saving)",
+              flush=True)
+
+    signal.signal(signal.SIGINT, request)
+    signal.signal(signal.SIGTERM, request)
+    should_save = lerobot_train.should_save_checkpoint
+    update_last = lerobot_train.update_last_checkpoint
+
+    def should_save_checkpoint(step, save_freq, total_steps):
+        if stop_at is not None and step >= stop_at and not state["requested"]:
+            state["requested"] = True
+            print(f"\nstep {step}: the recipe's stop_at ({stop_at}) is reached: saving a checkpoint and stopping",
+                  flush=True)
+        if stop.exists() and not state["requested"]:
+            stop.unlink(missing_ok=True)
+            request()
+        return state["requested"] or should_save(step, save_freq, total_steps)
+
+    def update_last_checkpoint(checkpoint_dir):
+        update_last(checkpoint_dir)
+        for gone in prune_checkpoints(Path(checkpoint_dir), state["eval"].losses):
+            print(f"checkpoints: removed {gone.relative_to(Path(checkpoint_dir).resolve().parent)}", flush=True)
+        if state["requested"]:
+            state["saved"] = Path(checkpoint_dir)
+            raise StopTraining
+
+    lerobot_train.should_save_checkpoint = should_save_checkpoint
+    lerobot_train.update_last_checkpoint = update_last_checkpoint
+    return state
+
+
+# --- CLI -----------------------------------------------------------------------------------------------------------
+
+
+def print_summary(flags: dict, info: dict) -> None:
+    print(" \\\n    ".join(shlex.quote(p) for p in command(flags)), flush=True)
+    r: Resolved = info["resolved"]
+    print(f"\nmodel {info['model']}: recipe {info['recipe']}, dataset {info['dataset']}, policy {r.policy} "
+          f"({r.finetune}), push to {r.hub}")
+    if info.get("speed"):
+        print(f"speed settings (not part of the recipe): {', '.join(f'{k}={v}' for k, v in info['speed'].items())}")
+    if info["variants"]:
+        print(f"dataset prepared for this recipe: {', '.join(info['variants'])} (--dataset.root)")
+    if info["held_out"]:
+        print(f"episodes: {info['episodes']} for training, held out: {info['held_out']}")
+    if info["frames"]:
+        print(f"epochs {info['epochs']} x {info['frames']} frames / batch {flags['batch_size']} = {flags['steps']} steps")
+    if info.get("stop_at"):
+        print(f"stops at step {info['stop_at']} of {flags['steps']} (recipe stop_at; the LR schedule is that of "
+              f"{flags['steps']} steps)")
+    if info["unknown_flags"]:
+        print(f"WARNING: {r.policy} has no config field for: {', '.join(info['unknown_flags'])}")
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(prog="lab train", description=__doc__.split("\n\n")[0])
+    ap.add_argument("model")
+    ap.add_argument("--dry-run", action="store_true", help="print the lerobot-train command and exit")
+    ap.add_argument("--steps", type=int, help="override the run length (e.g. a short test run)")
+    ap.add_argument("--no-push", action="store_true", help="keep the model local")
+    ap.add_argument("--no-wandb", action="store_true", help="log to Trackio only (wandb is the standard)")
+    ap.add_argument("--resume", action="store_true", help="continue outputs/train/<model> (or the Hub checkpoint)")
+    ap.add_argument("--push", nargs="?", const="last", metavar="CHECKPOINT", help="only push a saved checkpoint")
+    args, extra = ap.parse_known_args(argv)
+    reg = Registry()
+    out = OUTPUTS / args.model
+    try:
+        r = reg.resolve(args.model)
+    except RegistryError as e:
+        print(f"lab train: {e}", file=sys.stderr)
+        return 1
+
+    if args.push:
+        losses = EvalLosses(out / "eval_losses.json").losses
+        best = best_checkpoint(out / "checkpoints", losses) if args.push == "last" else None
+        push(out / "checkpoints" / args.push, r.hub, model_from=best)
+        return 0
+
+    from lerobot.scripts import lerobot_train
+
+    if args.resume:
+        local = out / "checkpoints" / "last" / "pretrained_model" / "train_config.json"
+        cfg_path = str(local) if local.is_file() else r.hub
+        flags = {"config_path": cfg_path, "resume": True}
+        stop_at = r.train.get("stop_at")  # the recipe's, also for a resumed run
+    else:
+        try:
+            check_local_dataset(r)
+            flags, info = build(reg, args.model, steps=args.steps, download=not args.dry_run)
+        except RegistryError as e:
+            print(f"lab train: {e}", file=sys.stderr)
+            return 1
+        print_summary(flags, info)
+        stop_at = info["stop_at"]
+        if info["unknown_flags"] and not args.dry_run:
+            print("lab train: fix the recipe's flags first (or remove them)", file=sys.stderr)
+            return 1
+        if args.dry_run:
+            return 0
+        trackio_on = flags.get("trackio.enable", True) and "--trackio.enable=false" not in extra
+        if reg.settings.wandb_project and trackio_on and not args.no_wandb:
+            from drtc.compat.wandb_mirror import problem
+
+            why = problem()
+            if why:
+                print(f"lab train: every run logs to wandb and Trackio; {why}. Or pass --no-wandb.", file=sys.stderr)
+                return 1
+        if not any(e.startswith("--dataset.video_backend") for e in extra):
+            try:
+                video.check_decoder()
+            except RegistryError as e:
+                print(f"lab train: {e}", file=sys.stderr)
+                return 1
+        if out.exists():
+            print(f"lab train: {out} exists; continue it with --resume", file=sys.stderr)
+            return 1
+    budget = cpu_budget(reg, r.policy, sharing=other_trainings() > 0)
+    if budget:
+        # a resumed run keeps its saved num_workers (train_config.json); its threads are set again here
+        if "workers" in budget and not args.resume and not any(e.startswith("--num_workers") for e in extra):
+            flags["num_workers"] = budget["workers"]
+        if not any(k in __import__("os").environ for k in ("OMP_NUM_THREADS",)):
+            apply_cpu_budget(budget)
+        print(f"cpu budget (other trainings run here): {budget}", flush=True)
+    cmd = command(flags) + extra
+    from drtc.compat import frame_cache, molmoact2, resume_processors, wandb_mirror
+
+    molmoact2.install()  # LoRA fine-tuning from a full-weight MolmoAct 2 checkpoint
+    frame_cache.install()  # cached frames for variants that have them (recipe data.frames)
+    resume_processors.install()  # --resume for policies without a normalizer step (GR00T N1.5)
+    if reg.settings.wandb_project and flags.get("trackio.enable", True) and \
+            "--trackio.enable=false" not in extra and not args.no_wandb:
+        wandb_mirror.install(reg.settings.wandb_project, reg.settings.wandb_entity)  # wandb next to Trackio
+    state = install_clean_stop(lerobot_train, args.model, out / "eval_losses.json", stop_at=stop_at)
+    sys.argv = cmd
+    try:
+        lerobot_train.main()
+    except StopTraining:
+        print(f"\nstopped at checkpoint {state['saved'].name}", flush=True)
+    last = out / "checkpoints" / "last"
+    best = best_checkpoint(out / "checkpoints", state["eval"].losses) if last.exists() else None
+    if best is not None:
+        loss = state["eval"].losses[int(best.name)]
+        print(f"best checkpoint by held-out eval loss: {best.name} ({loss:.4f})", flush=True)
+    if not args.no_push and last.exists():
+        push(last.resolve(), r.hub, model_from=best)
+    if state["requested"]:
+        print(f"continue (here or on another machine): lab train {args.model} --resume", flush=True)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,94 @@
+\chapter{Discussion}\label{ch:discussion}
+
+\section{Introduction}
+This chapter examines what the results mean, what they do not show, and what was learned building the system. It discusses task-dependent baseline results and why short-chunk policies like GR00T~N1.7 run dry whatever the client does, alongside what adaptive playback can and cannot do. It then discusses what the faults cost on the robot, what \drtc{} wins back and what the stack adds. It concludes with four implementation lessons and limitations including sample size, shared servers and simulated faults.
+
+\section{What the baselines show}
+The baselines (Section~\ref{sec:baselines}) show, first, that size and recency do not order the policies. GR00T~N1.7
+and \smolvla{} were the strongest overall, at 90\% on sorting and 70\% and 60\% on cube in box, yet \smolvla{} is one of the smallest
+models (0.45B parameters); Diffusion Policy, which has no language input, was the best on cube in box (90\%); and
+\groot{} was weak on both tasks (20\% and 10\%) while its successor N1.7, trained on the same data, was far better.
+Second, the ranking depends on the task: \pizerofive{} did better on cube in box (60\%) than on sorting (40\%), where the
+policy must read the cube's colour and the layout, and \smolvla{} the reverse. Third, ten trials per policy and task
+give wide intervals (Tables~\ref{tab:basesort} and~\ref{tab:basecube}), so only large gaps, such as N1.7 against N1.5,
+are clear. MolmoAct~2 never succeeded; we treat its LoRA fine-tune as broken rather than as a measure of the model. No
+baseline trial was ended by a fault, so every failure was the policy's own, which makes the baselines the reference
+against which the faults of E4 are measured.
+
+\section{\drtc{} on the robot}
+The robot experiment answers the problem statement for one task and four policies. \textbf{What the faults cost:} a
+fault mix of about 3.5~s in a 30~s trial lowered the patient client's success from 68 to 13\%, not because the policies
+failed but because the client did: after a lost reply it sends one fresh request, and when that is lost too it waits
+until LeRobot's start-up deadline ends the run (32 of 40 faulted runs). \textbf{What \drtc{} wins back:} all of it,
+within the intervals (65\%), because its cooldown replaces a lost reply with a request carrying a fresh observation;
+the arm moved again after the outage in 31 of 40 trials, about a second after the link returned. The bench predicted
+this (E1: \drtc{} recovered from every fault, the patient client from about a fifth
+to a half), and E2 located it in the
+cooldown. \textbf{What the stack adds:} smoother motion, about three times lower jerk, at no cost in success, and fewer
+stalls for the short-chunk policies through adaptive playback; the price is a deviation of about 1--2\degree{} from the
+policy's own actions and, for \pizerofive, a slower recovery after the latency spike.
+
+Two qualifications matter. With ten trials per policy, only one per-policy comparison survives the pre-registered Holm
+correction (GR00T~N1.7, \drtc{} against faults); the pooled effects are large but exploratory. And the benefit depends
+on the policy. \pizerofive{}, whose 50-action chunk outlasts short faults, lost least under faults (8 to 4) and gained
+least from \drtc{} (4 to 6), as Figure~\ref{fig:whendrtc} predicts; the short-chunk GR00T~N1.7 and Diffusion Policy
+lost almost everything and gained the most. \drtc{} matters most where a policy cannot ride out a fault on its own
+queue.
+
+\section{Short-chunk policies and the round trip}\label{sec:shortchunk}
+A policy can only keep the arm moving if a new chunk arrives before the current one is used up, so the chunk must last
+longer than the round trip. Figure~\ref{fig:whendrtc} places the policies by their chunk duration and their median
+turnaround from the Pi. ACT, \smolvla{} and \pizerofive{} lie well above the diagonal: on a good link any client keeps
+their queue full, and a scheduler matters when a reply is late or lost. The two GR00T models lie below it: their
+16-action chunk lasts 0.53~s, while their replies took 0.86 and 0.97~s at the median, so the queue runs dry before
+every reply, whatever the client does. For such policies the remedy is not the scheduler but the playback: adaptive
+playback slows the arm when few actions are left, stretching each chunk at the cost of speed, and a shorter round trip
+(the cable, compressed images) moves the policy towards the diagonal. Diffusion Policy, at 0.8~s for 0.8~s, sits on
+the line.
+
+\diagram{whendrtc}{When \drtc{} can help: chunk length against round trip.}{fig:whendrtc}
+
+
+\section{Lessons from the implementation}
+
+\begin{itemize}
+\item \textbf{The slow link finds the bugs.} Three of the four fixes of Table~\ref{tab:fixes} concern the cooldown, and
+      all three appeared only with a slow link and a short chunk. The replay bench with the latency measured on the
+      robot reproduced them in minutes and became the main development tool.
+\item \textbf{A method can hurt in combination.} The soft stop looked harmless alone but, by keeping the queue alive, let
+      a reply from an old observation be accepted, and the next chunk jumped; it was dropped
+      (Section~\ref{sec:smoothing}). Each smoothing method is therefore tested alone before the stack is chosen.
+\item \textbf{Measure what the system does, not what the operator presses.} In an early run several of the
+      trials that the client ended were stored as ordinary failures, because the operator pressed the failure key
+      while the stopped arm returned home. The label is now read from the run's own record.
+\item \textbf{Fix the analysis before the data.} The comparisons that are tested and the rule that chooses the stack
+      were written down before the bench ran, so the result cannot shape the question.
+\end{itemize}
+
+\section{Limitations}\label{sec:limits}
+
+\begin{itemize}
+\item \textbf{Sample size.} Ten trials per cell give wide intervals (a 50\% success rate over ten trials has a 95\%
+      interval of about 24--76\%), so only large differences in success are significant. The robot plans can grow to
+      twenty trials.
+\item \textbf{Scope on the robot.} The robot \drtc{} experiment covers one task (cube in box) and four policies; the bench covers two
+      tasks and seven policies, without task success.
+\item \textbf{Operator judgement.} Success is judged by the operator, who knows the condition; the success rule is
+      written down before the first trial to limit this.
+\item \textbf{Shared servers.} Other users' jobs run on the A100 and H200, so inference times include contention.
+\item \textbf{A slower link.} \drtc's cooldown is set from the replies seen so far, so a reply that is only slower
+      than the recent ones can be given up as lost; over the Pi's WiFi this abandoned every reply of the slower
+      policies (Section~\ref{sec:edge-cable}). A cooldown that adapts faster to a slower link is future work.
+\item \textbf{Simulated faults.} The faults follow fixed shapes, shifted per trial, rather than a recorded real network,
+      and the bench simulates the latency.
+\item \textbf{Uncompressed images.} About 260~ms of each round trip is the network share, mostly the 2.9~MB of raw
+      images per request; compression would shorten it and change the timing.
+\end{itemize}
+
+\section{Summary}
+This chapter discussed what the baselines show: neither size nor recency orders the policies, the ranking depends on
+the task, and only large gaps are clear with ten trials. It explained why the short-chunk GR00T policies run dry
+whatever the client does, since their chunk is shorter than their round trip from the Pi, and why adaptive playback
+or a shorter round trip, not the scheduler, is the remedy there. On the robot, the faults cost the patient client most of its
+successes, \drtc{} recovered them through its cooldown, and the stack made the motion smoother without lowering
+success. It collected the lessons of building the system and its limitations.

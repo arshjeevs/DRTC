@@ -1,0 +1,15 @@
+% D7.1 The evaluation workflow, from a plan to the report.
+\input{figures/colors}
+\begin{tikzpicture}[font=\footnotesize, node distance=4mm and 5mm,
+  st/.style={draw=#1, thick, rounded corners=3pt, fill=white, align=center, text width=22mm, minimum height=21mm},
+  arr/.style={-{Latex[length=2.2mm]}, very thick, ink2}]
+\node[st=purpleline] (plan) {{\bfseries Plan}\\[2pt] models, conditions, trials, success rule (YAML)};
+\node[st=purpleline, right=of plan] (frz) {{\bfseries Check, freeze}\\[2pt] each model pinned to its Hub commit};
+\node[st=serverline, right=of frz] (srv) {{\bfseries Serve}\\[2pt] the models on a GPU server};
+\node[st=robotline, right=of srv] (run) {{\bfseries Run}\\[2pt] seeded rounds from the robot computer; s / f / void};
+\node[st=greenline, right=of run] (push) {{\bfseries Push}\\[2pt] the session's raw records to the results store};
+\node[st=greenline, right=of push] (rep) {{\bfseries Report}\\[2pt] metrics, tables and charts rebuilt from the records};
+\foreach \a/\b in {plan/frz, frz/srv, srv/run, run/push, push/rep} \draw[arr] (\a) -- (\b);
+\draw[arr] (run.south) -- ++(0,-5mm) -| node[pos=0.25, below, font=\scriptsize]{a voided or uncounted trial is run again in a later round} (run.south west);
+\draw[arr, dashed] (frz.north) -- ++(0,4mm) -| node[pos=0.25, above, font=\scriptsize]{a frozen plan only grows (more trials, more models)} (plan.north);
+\end{tikzpicture}

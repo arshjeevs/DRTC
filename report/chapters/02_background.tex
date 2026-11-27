@@ -1,0 +1,149 @@
+\chapter{Literature Review}\label{ch:background}
+
+\section{Introduction}
+This chapter reviews the background for remote control of the SO-101 arm, starting with imitation learning (Figure~\ref{fig:illoop}) and vision-language-action models (Figure~\ref{fig:vla}). It introduces action chunking (Figure~\ref{fig:chunking}) and compares the seven policies used in this work, whose chunk lengths affect tolerance to delayed replies. It then covers asynchronous remote inference, Real-Time Chunking for smooth chunk boundaries (Figure~\ref{fig:rtc}), and Distributed Real-Time Chunking (\drtc{}) for fault-tolerant scheduling (Figure~\ref{fig:drtc}). Finally, it surveys command smoothing and highlights the limitations of existing systems that motivate a controlled comparison on a physical robot.
+
+\section{Learning manipulation from demonstrations}
+
+In imitation learning a policy $\pi$ maps an observation $o_t$ (camera images and the robot's joint positions) to an
+action $a_t$ (target joint positions) and is trained on demonstrations recorded by a human. With low-cost arms such as
+the SO-101~\cite{so101}, demonstrations are recorded by teleoperation: the operator moves a \emph{leader} arm by hand
+and an identical \emph{follower} arm copies it, while cameras and joint encoders are recorded at a fixed rate. LeRobot
+stores such recordings as datasets of episodes and trains policies on them~\cite{lerobot}.
+
+\diagram{illoop}{Imitation learning: from human demonstrations to a policy that drives the robot.}{fig:illoop}
+
+\section{Vision-language-action models}\label{sec:bg-vla}
+A vision-language-action (VLA) model is a policy built on a pretrained vision-language model (VLM): a network that has
+learned, from large amounts of image--text data from the web, to relate what it sees to words. Figure~\ref{fig:vla}
+follows one step of such a model. A vision encoder cuts each camera image into patches and turns them into tokens; the
+written instruction is tokenised; the joint state is projected to a token of its own; and the VLM's transformer reads
+the whole sequence together. A smaller \emph{action expert} then produces the actions: starting from random noise, it
+refines a whole chunk of future joint targets in a few steps (flow matching or diffusion), conditioned on the VLM's
+features and the joint state. For a robot task the pretrained model is fine-tuned on the task's demonstrations,
+usually with the vision encoder or the language model frozen and the action expert trained. The VLM is what makes
+these models large (from 0.45 to 5.6~billion parameters for the ones used here, Table~\ref{tab:policies-compare}) and is
+why they need a GPU, which a low-cost robot computer does not have.
+
+\diagram{vla}{How a vision-language-action model turns images, an instruction and the arm's state into a chunk of actions. The inputs are real: one frame from both cameras and the measured joint state of the arm at the same moment, from a cube-in-box trial on the robot (joint values in LeRobot's normalised range, $-100$ to $100$).}{fig:vla}
+
+\section{Action chunking}
+
+Predicting one action per step makes policies sensitive to compounding errors and to the timing of inference.
+\emph{Action chunking} predicts a sequence of $H$ future actions $A_t=(a_t,\dots,a_{t+H-1})$ from one observation.
+Actions can be \emph{absolute} joint targets or \emph{relative} to the current state; relative actions generalise
+across starting poses but tie each chunk to the state it was predicted from.
+
+\section{The policies used in this work}\label{sec:bg-policies}
+
+\begin{description}[style=nextline, leftmargin=0pt]
+\item[ACT] Zhao et al.~\cite{zhao2023act} introduced chunking with a transformer conditional variational autoencoder over ResNet
+  image features. It is small and fast, has no language input, and predicts long chunks (100 actions here).
+\item[Diffusion Policy] Chi et al.~\cite{chi2023diffusion} generate the chunk by iterative denoising with a U-Net conditioned on
+  image features; it predicts 48 actions and executes 24.
+\item[\smolvla] Shukor et al.~\cite{shukor2025smolvla} pair a small vision-language model ($\approx$0.45B parameters) with a
+  flow-matching \emph{action expert}; its authors also proposed asynchronous client-server inference.
+\item[GR00T N1.5 and N1.7] NVIDIA's models~\cite{nvidia2025gr00t} use a 3-billion-parameter vision-language model and a diffusion
+  transformer action head, with 16-action chunks; N1.7 is trained here with relative arm actions.
+\item[\pizerofive] Physical Intelligence's model~\cite{pi2025pi05} adds a larger flow-matching expert to a vision-language model (4.1B parameters in all) and
+  predicts relative joints, with 50-action chunks.
+\item[MolmoAct 2] MolmoAct~2~\cite{molmoact2} reasons about actions in space before acting and is pretrained on community
+  SO-100/101 data; it is fine-tuned with LoRA here.
+\end{description}
+The chunk length differs widely, from 16 to 100 actions, and it matters for remote inference: a chunk that is barely
+longer than one round trip leaves no reserve when a reply is late (Section~\ref{sec:shortchunk}). Published results on
+the SO-101 differ considerably between these policies~\cite{armnetbench,so101failure,valloss2026};
+Section~\ref{sec:shortlist} summarises them.
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \renewcommand{\arraystretch}{1.15}
+  \begin{tabularx}{\textwidth}{@{}l r >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}p{0.2\textwidth} r l@{}}
+    \toprule
+    Policy & Size & Vision and language & Action head & Chunk & Actions \\
+    \midrule
+    ACT & 0.05B & ResNet image features; no language & CVAE transformer & 100 (3.3~s) & absolute \\
+    Diffusion Policy & 0.27B & ResNet image features; no language & denoising U-Net & 24 (0.8~s) & absolute \\
+    \smolvla & 0.45B & SmolVLM2 vision-language model & flow-matching expert & 50 (1.7~s) & absolute \\
+    GR00T N1.5 & 2.7B & vision-language model & diffusion transformer & 16 (0.5~s) & absolute \\
+    GR00T N1.7 & 3.1B & vision-language model & diffusion transformer & 16 (0.5~s) & relative \\
+    \pizerofive & 4.1B & vision-language model & flow-matching expert & 50 (1.7~s) & relative \\
+    MolmoAct 2 & 5.6B & Molmo vision-language model (LoRA fine-tune) & flow matching & 30 (1.0~s) & absolute \\
+    \bottomrule
+  \end{tabularx}
+  \caption{The seven policies side by side. Size: parameters counted from the trained checkpoints. Chunk: the actions
+           executed per chunk as served here, and their duration at 30~Hz (Diffusion Policy predicts 48 and executes
+           24). Relative actions are offsets from the current joint state.}\label{tab:policies-compare}
+\end{table}
+
+\diagram{chunking}{Action chunking: chunks are requested, received and executed while the next one is computed.}{fig:chunking}
+
+\section{Asynchronous and remote inference}\label{sec:bg-remote}
+
+If the robot waits for each chunk before moving, it pauses for every inference. \emph{Asynchronous} inference requests
+the next chunk while the current one is still being executed, so execution and inference overlap; \smolvla{}'s authors
+proposed this in a client-server form~\cite{shukor2025smolvla}. LeRobot~0.7 ships a remote-inference stack built on this
+idea: a policy server on the GPU machine and a client on the robot computer, connected through the Zenoh protocol.
+The client keeps a queue of actions and at most one request in flight, requests the next chunk when the queued actions
+fall to about one round trip, and gives up a run after a short time without actions (Section~\ref{sec:baseline}).
+
+\section{Real-time chunking}
+
+Consecutive chunks are predicted from different observations, so the actions at the boundary between them can
+disagree and the arm jumps when execution switches chunks. Real-Time Chunking (RTC)~\cite{black2025rtc} treats the
+next chunk as an in-painting problem: while generating it with a flow-matching policy, the actions that will still be
+executed from the current chunk are fixed as a prefix, so the new chunk continues them smoothly. RTC needs a
+flow-matching policy and an estimate of how many actions will be executed before the new chunk arrives.
+
+\diagram{rtc}{Real-time chunking: the start of the new chunk is in-painted to continue the actions still to be
+executed.}{fig:rtc}
+
+\section{Distributed Real-Time Chunking}\label{sec:bg-drtc}
+
+\drtc~\cite{vial2026drtc} combines asynchronous inference with RTC and makes the client resilient to an unreliable
+network:
+\begin{itemize}
+\item \textbf{Trigger.} A new chunk is requested when the queue holds at most $H-s_{\min}$ actions, where $H$ is the
+      chunk length and $s_{\min}$ a fixed number of steps.
+\item \textbf{Latency estimation.} The round-trip time is estimated with the Jacobson--Karels
+      estimator~\cite{jacobson1988congestion,rfc6298} that TCP uses for its retransmission timer: a smoothed mean
+      plus a multiple of a smoothed mean deviation.
+\item \textbf{Cooldown.} A request that is not answered within a cooldown derived from the latency estimate is given
+      up, and a fresh observation is sent instead; the freshest observation always wins.
+\item \textbf{Message semantics.} Messages between threads and the merging of chunks into the action schedule are
+      modelled as last-write-wins registers from the literature on conflict-free replicated data
+      types~\cite{shapiro2011crdt}, so reordered and duplicated messages are absorbed.
+\end{itemize}
+Its author evaluated it with injected faults on an SO-101 arm. The present work ports its scheduling into LeRobot~0.7's
+runtime, compares it with LeRobot's client on task success and takes it apart. In this report \drtc{} therefore means DRTC's
+scheduling (the trigger, the latency estimate, the cooldown and the message semantics); RTC is treated separately, as
+one of the smoothing methods (Section~\ref{sec:smoothing}), and is not part of the robot experiment.
+
+\diagram{drtcsched}{\drtc's scheduling: when it requests, how it estimates the latency, and when it gives up a reply.}{fig:drtc}
+
+\section{Smoothing robot commands}
+
+Robot commands that change abruptly excite the arm's mechanics and look unnatural. A standard remedy is a causal
+low-pass filter on the commanded positions; the Butterworth filter~\cite{butterworth1930} has a maximally flat pass band,
+but a causal filter delays the signal. When the future of the signal is known, filtering it forward and backward
+removes the delay~\cite{gustafsson1996}; in chunked control the queued actions are such a known future. Two remedies are
+specific to chunking: averaging the overlapping predictions of successive chunks (temporal ensembling,
+ACT~\cite{zhao2023act}), and varying the playback rate so that a late chunk causes a slowdown rather than a stop. Where
+a motion must start from rest, the minimum-jerk profile~\cite{flash1985} of human reaching movements gives a smooth
+blend.
+
+\section{Limitations of existing systems}\label{sec:bg-limits}
+Three gaps remain for a low-cost arm driven over a real network. LeRobot~0.7's remote-inference client, the one a
+user of the library runs by default, ends a run after one second without actions and does not replace a lost reply,
+so a short network fault stops the task. \drtc{} was designed for exactly this case, but it has been evaluated only by
+its author, on their own setup. And no study we know of compares a fault-tolerant scheduler with LeRobot's client on a
+physical robot, against a fair baseline that is allowed to wait, with task success as the outcome, the motion measured
+as well, and the method taken apart to show which of its parts matter. This project addresses these gaps.
+
+\section{Summary}
+
+Remote inference makes large policies usable on low-cost robots, but the shipped client handles network faults poorly.
+\drtc{} proposes a scheduling method that tolerates such faults, and several smoothing techniques exist for chunked control.
+What is missing is an independent, controlled comparison on a physical robot, against a fair baseline, with task success
+as the outcome, the motion measured as well, and the method taken apart. This report provides one.

@@ -1,0 +1,17 @@
+# Sorting A (Phase 4, 2026-11-19): one cube (red or blue, fixed position), the two squares swap sides.
+# Trained with each model's original recipe (lab/PLAN.md, Phase 2).
+
+act_sort_one_v1_full: {recipe: act_original, dataset: so101_sort_one_v1, status: planned,
+  notes: 'ACT on so101_sort_one_v1; original recipe'}
+smolvla_sort_one_v1_full: {recipe: smolvla_authors, dataset: so101_sort_one_v1, status: planned,
+  notes: 'SmolVLA on so101_sort_one_v1; original recipe (action expert only)'}
+groot_sort_one_v1_full: {recipe: groot_n15_nvidia, dataset: so101_sort_one_v1, status: planned,
+  notes: 'GR00T N1.5 on so101_sort_one_v1; original recipe'}
+diffusion_sort_one_v1_full: {recipe: diffusion_original, dataset: so101_sort_one_v1, status: planned,
+  notes: 'Diffusion on so101_sort_one_v1; original recipe'}# The rest of the 7 (locked scope 2026-11-20: all 7 trained on cubebox v1 and sort_one, baseline only).
+grootn17_sort_one_v1_full: {recipe: groot_n17_nvidia, dataset: so101_sort_one_v1, status: planned,
+  notes: 'GR00T N1.7 on so101_sort_one_v1; original recipe (relative actions)'}
+pi05_sort_one_v1_full: {recipe: pi05_openpi, dataset: so101_sort_one_v1, status: planned,
+  notes: 'π0.5 on so101_sort_one_v1; original recipe (relative actions; ~27 h on the H200)'}
+molmoact2_sort_one_v1_lora: {recipe: molmoact2_lora, dataset: so101_sort_one_v1, status: planned,
+  notes: 'MolmoAct 2 on so101_sort_one_v1; original recipe (LoRA)'}

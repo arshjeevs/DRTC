@@ -1,0 +1,4 @@
+description: Smoothing A - adaptive playback (min rate 0.5, margin 4, slew 0.05), with the Butterworth filter
+model: act_sort_one_v1_full
+playback_mode: adaptive
+latency: {base_ms: 400, jitter_ms: 200, seed: 0}   # the measured WiFi link to the A100 (_wifi.md)

@@ -1,0 +1,299 @@
+"""`lab eval report <eval>`: trials.csv, metrics.csv and report.md, always rebuilt from all sessions present
+(lab/docs/EVALUATION.md rule 3; metrics: lab/METRICS.md v1)."""
+
+from __future__ import annotations
+
+import csv
+import json
+from datetime import datetime
+from pathlib import Path
+
+from drtc.evals import metrics as M
+from drtc.evals import spec as S
+from drtc.evals import store
+from drtc.registry import Registry
+
+TRIAL_COLS = ["session", "machine", "server", "server_gpu", "condition", "model", "trial", "round", "valid", "success",
+              "label", "time_to_success_s", "void", "outcome", "started_at", "revision", "git_commit", "path"]
+
+
+def _fmt(x, d):
+    return "-" if x is None else f"{x:.{d}f}"
+
+
+def _pct(x):
+    return "-" if x is None else f"{100 * x:.0f}%"
+
+
+def build(reg: Registry, name: str) -> Path:
+    sp = S.load(reg, name)
+    root = S.results_root(sp)
+    out_dir = store.eval_root(name, root)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    trials = store.trials(name, root)
+    rows, mrows = [], []
+    for t in trials:
+        i = t.info
+        rows.append({"session": t.session, "machine": i.get("machine"), "server": i.get("server"),
+                     "server_gpu": i.get("server_gpu"), "condition": t.condition, "model": t.model, "trial": t.number,
+                     "round": i.get("round"), "valid": int(t.valid), "success": i.get("success"),
+                     "label": store.label_of(i), "time_to_success_s": i.get("time_to_success_s"), "void": i.get("void"),
+                     "outcome": i.get("outcome"), "started_at": i.get("started_at"), "revision": i.get("revision"),
+                     "git_commit": i.get("git_commit"), "path": str(t.path)})
+        if t.valid:
+            mrows.append({"condition": t.condition, "model": t.model, "trial": t.number, "session": t.session,
+                          "machine": i.get("machine"), "server": i.get("server"), **M.trial_metrics(t.path)})
+    with open(out_dir / "trials.csv", "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=TRIAL_COLS)
+        w.writeheader()
+        w.writerows(rows)
+    mcols = ["condition", "model", "trial", "session", "machine", "server", "M1_success", "M1f_fault"] + [c for c, _, _ in
+                                                                                           M.CONTINUOUS]
+    mcols += [f"M11_{k}_{f}" if k == "recovered" else f"M11_recovery_{f}_s" for f in M.RECOVERY_FAULTS
+              for k in ("recovered", "time")]
+    with open(out_dir / "metrics.csv", "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=mcols, extrasaction="ignore")
+        w.writeheader()
+        w.writerows(mrows)
+    (out_dir / "report.md").write_text(render(reg, name, sp, trials, mrows))
+    return out_dir
+
+
+def render(reg, name, sp, trials, mrows) -> str:
+    rig = sp.robot == "rig"
+    L = [f"# {name}: {sp.description}", "",
+         f"*Rebuilt {datetime.now():%Y-%m-%d %H:%M} by `lab eval report {name}` from {len({t.session for t in trials})} "
+         f"sessions. Metrics {M.VERSION} ([lab/METRICS.md](../../../lab/METRICS.md)). Do not edit: rebuilt every time.*",
+         "", f"- **Task:** {S.task_of(reg, sp)}", f"- **Success rule:** {sp.success}",
+         f"- **Plan:** {len(sp.models)} models x {len(sp.conditions)} conditions x {sp.trials} trials; time limit "
+         f"{sp.time_limit_s:g} s; robot: {sp.robot}"]
+    machines = sorted({(r["machine"], r["server"]) for r in mrows})
+    if machines:
+        L.append("- **Robot computer / server:** " + ", ".join(f"{m} / {s}" for m, s in machines)
+                 + ("  \n  *(several: timing metrics M2-M6 are shown per robot computer and server below; METRICS.md "
+                    "rule 6)*" if len(machines) > 1 else ""))
+    L.append("")
+    groups: dict = {}
+    for r in mrows:
+        groups.setdefault((r["condition"], r["model"]), []).append(r)
+    # success
+    if rig:
+        L += ["## Success (M1, M1f)", "", "| Condition | Model | Valid | Successes | Rate | 95% interval | Ended by a fault "
+              "(M1f) | Time to success (s), median [IQR] |", "|---|---|---|---|---|---|---|---|"]
+        for c in sp.conditions:
+            for m in sp.models:
+                g = groups.get((c, m), [])
+                k, n = sum(1 for r in g if r["M1_success"] == 1), len(g)
+                lo, hi = M.wilson(k, n)
+                t = M.median_iqr(r["M1t_time_to_success_s"] for r in g)
+                tt = "-" if t is None else f"{t[0]:.1f} [{t[1]:.1f}-{t[2]:.1f}]"
+                nf = sum(1 for r in g if r.get("M1f_fault") == 1)
+                L.append(f"| {c} | {m} | {n}/{sp.trials} | {k} | {_pct(k / n) if n else '-'} | "
+                         f"{_pct(lo) if n else '-'} - {_pct(hi) if n else '-'} | {nf}/{n} | {tt} |")
+        L.append("")
+    # continuous
+    cols = [x for x in M.CONTINUOUS if rig or not x[0].startswith("M1")]
+    for split in (machines if len(machines) > 1 else [None]):
+        title = "## Timing and smoothness (M2-M8), median [IQR] over trials"
+        if split:
+            title += f": {split[0]} / {split[1]}"
+        L += [title, "", "| Condition | Model | n | Ended by a fault | " + " | ".join(lbl for _, lbl, _ in cols) + " |",
+              "|---|---|---|---|" + "---|" * len(cols)]
+        for c in sp.conditions:
+            for m in sp.models:
+                g = [r for r in groups.get((c, m), []) if split is None or (r["machine"], r["server"]) == split]
+                if not g:
+                    continue
+                cells = []
+                for col, _, d in cols:
+                    v = M.median_iqr(r.get(col) for r in g)
+                    cells.append("-" if v is None else f"{v[0]:.{d}f} [{v[1]:.{d}f}-{v[2]:.{d}f}]")
+                nf = sum(1 for r in g if r.get("M1f_fault") == 1)
+                L.append(f"| {c} | {m} | {len(g)} | {nf}/{len(g)} | " + " | ".join(cells) + " |")
+        L.append("")
+    # M11 recovery (metrics v3): per timed fault, how many runs moved again after it and how long that took
+    rec = [f for f in M.RECOVERY_FAULTS if any(r.get(f"M11_recovered_{f}") is not None for r in mrows)]
+    if rec:
+        L += ["## Recovery (M11): from the end of each fault until the arm moves again", "",
+              "Recovered = runs in which the arm moved again after the fault (0 s when it never stopped); the time is the "
+              "median [IQR] over the recovered runs.", "",
+              "| Condition | Model | " + " | ".join(f"{f}: recovered | {f}: time (s)" for f in rec) + " |",
+              "|---|---|" + "---|---|" * len(rec)]
+        for c in sp.conditions:
+            for m in sp.models:
+                g = groups.get((c, m), [])
+                if not g or not any(r.get(f"M11_recovered_{f}") is not None for f in rec for r in g):
+                    continue
+                cells = []
+                for f in rec:
+                    have = [r for r in g if r.get(f"M11_recovered_{f}") is not None]
+                    if not have:
+                        cells += ["-", "-"]
+                        continue
+                    k = sum(1 for r in have if r[f"M11_recovered_{f}"] == 1)
+                    v = M.median_iqr(r.get(f"M11_recovery_{f}_s") for r in have)
+                    cells += [f"{k}/{len(have)}", "-" if v is None else f"{v[0]:.2f} [{v[1]:.2f}-{v[2]:.2f}]"]
+                L.append(f"| {c} | {m} | " + " | ".join(cells) + " |")
+        L.append("")
+    # comparisons (metrics v3): the eval's declared pairs (else the older default: against the first condition and the
+    # one before). Primary comparisons are tested, Holm-corrected over the eval; all others are exploratory.
+    pairs = S.comparison_pairs(sp)
+    primary = {tuple(x.strip() for x in c.split(" vs ")) for c in sp.primary}
+
+    def values(rows, col):
+        if col.startswith("M11_recovery_"):
+            return M.recovery_values(rows, col[len("M11_recovery_"):-2])
+        return [r.get(col) for r in rows]
+
+    if primary:
+        tests = []  # (condition, reference, model, metric, p, delta, direction)
+        for c, ref in [p for p in pairs if p in primary]:
+            for m in sp.models:
+                a, b = groups.get((c, m), []), groups.get((ref, m), [])
+                if not a or not b:
+                    continue
+                for col in M.primary_metrics(c, rig):
+                    if col == "M1_success":
+                        ka, kb = sum(1 for r in a if r[col] == 1), sum(1 for r in b if r[col] == 1)
+                        tests.append((c, ref, m, col, M.fisher_p(ka, len(a), kb, len(b)),
+                                      f"{_pct(ka / len(a))} vs {_pct(kb / len(b))}", ka / len(a) - kb / len(b)))
+                        continue
+                    va, vb = [x for x in values(a, col) if x is not None], [x for x in values(b, col) if x is not None]
+                    if not va or not vb:
+                        continue
+                    import statistics as _st
+
+                    ma, mb = _st.median(va), _st.median(vb)
+                    show = lambda x: "not recovered" if x >= M.NOT_RECOVERED else f"{x:.2f}"
+                    tests.append((c, ref, m, col, M.mannwhitney_p(va, vb), f"{show(ma)} vs {show(mb)}", mb - ma))
+        adj = M.holm([t[4] for t in tests])
+        L += ["## Primary comparisons (tested; Holm-corrected over this eval)", "",
+              "Named before the runs (lab/METRICS.md v3, rule 7). Success: Fisher's exact test; the others: Mann-Whitney U "
+              "on the runs (M11: a run that never moved again ranks last). `better` = the condition beats its reference.",
+              "", "| Condition | Reference | Model | Metric | Condition vs reference | p | p (Holm) | Better |",
+              "|---|---|---|---|---|---|---|---|"]
+        for (c, ref, m, col, p, shown, gain), pa in zip(tests, adj):
+            better = gain > 0
+            L.append(f"| {c} | {ref} | {m} | {col} | {shown} | {_fmt(p, 4)} | {_fmt(pa, 4)} | "
+                     f"{'yes' if better else 'no'}{' (significant)' if better and pa is not None and pa < 0.05 else ''} |")
+        L.append("")
+        # across models: in how many models the condition beats its reference, per comparison and metric
+        L += ["### Across models", "", "| Condition | Reference | Metric | Models where it is better |", "|---|---|---|---|"]
+        seen = {}
+        for (c, ref, m, col, p, shown, gain) in tests:
+            seen.setdefault((c, ref, col), []).append(gain > 0)
+        for (c, ref, col), wins in seen.items():
+            L.append(f"| {c} | {ref} | {col} | {sum(wins)}/{len(wins)} |")
+        L.append("")
+    for ref in dict.fromkeys(r for _, r in pairs):
+        others = [c for c, r in pairs if r == ref]
+        if not others:
+            continue
+        L += [f"## Against `{ref}` (same model; METRICS.md rule 5){' - exploratory' if primary else ''}", "",
+              f"p-values: Fisher's exact test (M1), Mann-Whitney U (the others), not corrected for the number of tests"
+              f"{' (only the primary comparisons above are)' if primary else ''}. Δ = condition minus `{ref}` (medians).",
+              ""]
+        heads = ([("M1_success", "M1")] if rig else []) + [(c, lbl.split(" (")[0]) for c, lbl, _ in cols]
+        L += ["| Condition | Model | " + " | ".join(h for _, h in heads) + " |", "|---|---|" + "---|" * len(heads)]
+        base = ref
+        for c in others:
+            for m in sp.models:
+                a, b = groups.get((c, m), []), groups.get((base, m), [])
+                if not a or not b:
+                    continue
+                cells = []
+                for col, _ in heads:
+                    if col == "M1_success":
+                        ka, kb = sum(1 for r in a if r[col] == 1), sum(1 for r in b if r[col] == 1)
+                        p = M.fisher_p(ka, len(a), kb, len(b))
+                        cells.append(f"{_pct(ka / len(a))} vs {_pct(kb / len(b))}, p={_fmt(p, 3)}")
+                    else:
+                        va = M.median_iqr(r.get(col) for r in a)
+                        vb = M.median_iqr(r.get(col) for r in b)
+                        p = M.mannwhitney_p([r.get(col) for r in a], [r.get(col) for r in b])
+                        cells.append("-" if va is None or vb is None else f"Δ {va[0] - vb[0]:+.2f}, p={_fmt(p, 3)}")
+                L.append(f"| {c} | {m} | " + " | ".join(cells) + " |")
+        L.append("")
+    offline_rows = []
+    for m in sp.models:
+        f = Path("results") / "offline" / reg.resolve(m).dataset.id / f"{m}.json"
+        if f.is_file():
+            d = json.loads(f.read_text())
+            if offline_matches(reg.resolve(m).hub, d.get("revision"), sp.frozen.get(m), m):
+                offline_rows.append((m, d))
+    if offline_rows:
+        L += ["## Without the robot (M9, M10)", "",
+              "M9: mean absolute error of the first 15 predicted actions on the held-out episodes, in the dataset's "
+              "units (`root` is the served checkpoint). M10: inference time and peak GPU memory of the served "
+              "checkpoint. A result made at another Hub commit than the frozen one counts when the served files "
+              "(everything outside `checkpoints/`) are identical at both commits; its commit is shown.", "",
+              "| Model | Checkpoint | M9 arm | M9 gripper | M10 median (ms) | M10 p95 (ms) | GPU (GB) | Units | Measured on |",
+              "|---|---|---|---|---|---|---|---|---|"]
+        for m, d in offline_rows:
+            other = "" if d.get("revision") == sp.frozen.get(m) else \
+                f" (commit {d['revision'][:8]}: same served files as the frozen {sp.frozen[m][:8]})"
+            for ck, e in d["checkpoints"].items():
+                b = e.get("M10") or {}
+                L.append(f"| {m} | {ck} | {_fmt(e.get('M9_arm_mae'), 2)} | {_fmt(e.get('M9_gripper_mae'), 2)} | "
+                         f"{_fmt(b.get('server_ms_median'), 0)} | {_fmt(b.get('server_ms_p95'), 0)} | "
+                         f"{_fmt(b.get('peak_gpu_gb'), 1)} | {d.get('units')} | {d.get('gpu')}{other} |")
+        L.append("")
+    voids = [t for t in trials if t.void]
+    bad = [t for t in trials if not t.void and not t.valid]
+    if voids or bad:
+        L += ["## Not counted", "", "| Trial | Why |", "|---|---|"]
+        L += [f"| {t.condition}/{t.model}/t{t.number:02d} ({t.session}) | void: {t.info['void']} |" for t in voids]
+        L += [f"| {t.condition}/{t.model}/t{t.number:02d} ({t.session}) | {t.info.get('label')}: "
+              f"{t.info.get('outcome')} {t.info.get('error') or ''} |" for t in bad]
+        L.append("")
+    L += ["## Sessions", "", "| Session | Robot computer | Server | Trials |", "|---|---|---|---|"]
+    for s in sorted({t.session for t in trials}):
+        ts = [t for t in trials if t.session == s]
+        L.append(f"| {s} | {ts[0].info.get('machine')} | {ts[0].info.get('server')} ({ts[0].info.get('server_gpu')}) "
+                 f"| {len(ts)} |")
+    L.append("")
+    return "\n".join(L)
+
+
+_SERVED: dict[tuple[str, str], dict[str, str] | None] = {}
+
+
+def served_files(hub: str, revision: str) -> dict[str, str] | None:
+    """What `lab serve` downloads from `hub` at `revision` (every file outside checkpoints/, as SERVE_IGNORE):
+    path -> git blob id (for LFS files the pointer, so it changes with the content). None if the Hub can't be read."""
+    if (hub, revision) not in _SERVED:
+        from huggingface_hub import HfApi
+        from huggingface_hub.hf_api import RepoFile
+
+        try:
+            tree = HfApi().list_repo_tree(hub, revision=revision, recursive=True)
+            _SERVED[(hub, revision)] = {e.path: e.blob_id for e in tree
+                                        if isinstance(e, RepoFile) and not e.path.startswith("checkpoints/")}
+        except Exception:  # noqa: BLE001 - offline, or the commit is gone: treated as "can't tell"
+            _SERVED[(hub, revision)] = None
+    return _SERVED[(hub, revision)]
+
+
+def offline_matches(hub: str, measured: str | None, frozen: str | None, model: str) -> bool:
+    """An offline result belongs to the eval when it was made at the frozen commit, or at a commit of the same repo
+    whose served files are identical (e.g. only an earlier checkpoints/<step>/ was uploaded in between)."""
+    if not measured or not frozen:
+        return False
+    if measured == frozen:
+        return True
+    a, b = served_files(hub, measured), served_files(hub, frozen)
+    if a is None or b is None:
+        print(f"  note: offline result of {model} (commit {measured[:8]}) left out: could not compare its files with "
+              f"the frozen commit {frozen[:8]} on the Hub (no network?); run the report again online")
+        return False
+    if a != b:
+        print(f"  note: offline result of {model} left out: made at commit {measured[:8]}, whose served files differ "
+              f"from the frozen {frozen[:8]}; run `lab eval offline <eval>` for the frozen version")
+        return False
+    return True
+
+
+def main(reg: Registry, name: str) -> int:
+    out = build(reg, name)
+    print(f"{out}/report.md (and trials.csv, metrics.csv)")
+    return 0

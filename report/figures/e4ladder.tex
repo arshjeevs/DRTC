@@ -1,0 +1,15 @@
+% D8.1 The four conditions of E4 and the comparison each step makes.
+\input{figures/colors}
+\begin{tikzpicture}[font=\footnotesize, node distance=5mm and 19mm,
+  st/.style={draw=#1, thick, rounded corners=3pt, fill=#1!8, align=center, text width=31mm, minimum height=17mm},
+  cmp/.style={-{Latex[length=2.2mm]}, very thick, ink2}, lab/.style={font=\scriptsize, text=ink2, align=center}]
+\node[st=robotline] (c1) {{\bfseries 1. Reference}\\ patient LeRobot,\\ normal network};
+\node[st=serverline, right=of c1] (c2) {{\bfseries 2. Faults}\\ patient LeRobot,\\ the fault mix};
+\node[st=greenline, right=of c2] (c3) {{\bfseries 3. \drtc}\\ \drtc's scheduling,\\ the fault mix};
+\node[st=purpleline, right=of c3] (c4) {{\bfseries 4. \drtc{} + stack}\\ adaptive, ensembling,\\ Butterworth, ramp; the mix};
+\draw[cmp] (c1) -- node[lab, above, text width=16mm]{what the faults cost} (c2);
+\draw[cmp] (c2) -- node[lab, above, text width=16mm]{what \drtc{} wins back} (c3);
+\draw[cmp] (c3) -- node[lab, above, text width=16mm]{what smoothing adds} (c4);
+\node[lab, below=4mm of c2.south east] {primary comparisons: 2 vs 1, 3 vs 2, 4 vs 3, each with M1 (task success);
+  4 policies $\times$ 10 trials per condition on cube in box v1, interleaved in seeded rounds};
+\end{tikzpicture}

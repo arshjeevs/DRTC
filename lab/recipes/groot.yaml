@@ -1,0 +1,24 @@
+# Training recipes. `source`: who made this work and where it comes from.
+
+groot_n15_lora:
+  source: 'Our LoRA preset on the action expert (minor: ~80% placing on so101_cubebox_v1)'
+  policy: groot
+  finetune: lora
+  train: {epochs: 10, batch_size: 32, save_freq: 2000}
+  flags: {policy.chunk_size: 16, policy.n_action_steps: 16}
+  lora: {r: 32, alpha: 64, dropout: 0.05, targets: expert}
+  serve: {rtc_enabled: false, num_flow_matching_steps: null, actions_per_chunk: 16, s_min: 8}
+groot_n15_nvidia:
+  source: 'NVIDIA GR00T N1.5 SO-101 recipe: projector + DiT trained, LLM and vision frozen; 10k steps x batch 32
+    (gr00t_finetune.py defaults, NVIDIA SO-101 blog); AdamW (0.95, 0.999) LR 1e-4 wd 1e-5, 5% warmup, cosine; chunk
+    16, absolute actions (github.com/NVIDIA/Isaac-GR00T, n1.5-release)'
+  policy: groot_n15   # our N1.5 plugin (0.7's `groot` is N1.7)
+  finetune: full
+  train: {steps: 10000, batch_size: 32, save_freq: 1000}
+  flags: {policy.chunk_size: 16, policy.n_action_steps: 16, policy.tune_llm: false, policy.tune_visual: false,
+    policy.tune_projector: true, policy.tune_diffusion_model: true, policy.optimizer_lr: 1.0e-4,
+    policy.optimizer_betas: [0.95, 0.999], policy.optimizer_weight_decay: 1.0e-5, policy.warmup_ratio: 0.05}
+  serve: {rtc_enabled: false, num_flow_matching_steps: null, actions_per_chunk: 16, s_min: 8}
+  # Speed (Phase 3): frames cached at the Eagle processor's 224x224 tile (its own bicubic resize), so the model input
+  # is bit-identical and the CPU preprocessing skips the full-size resize; see drtc.data.prepare.
+  data: {frames: [224, 224]}

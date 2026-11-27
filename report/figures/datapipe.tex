@@ -1,0 +1,21 @@
+% D4.1 The data pipeline: teleoperation -> recording -> review -> trimming -> split and version -> Hub.
+\input{figures/colors}
+\begin{tikzpicture}[font=\small, node distance=4mm and 5.5mm,
+  st/.style={draw=#1, thick, rounded corners=3pt, fill=white, align=center, text width=24mm, minimum height=21mm,
+             font=\footnotesize},
+  arr/.style={-{Latex[length=2.2mm]}, very thick, ink2}]
+\node[st=robotline] (tele) {{\bfseries Teleoperation}\\[2pt] the operator moves the leader arm; the follower
+  copies it; layouts rotate in a fixed order};
+\node[st=robotline, right=of tele] (rec) {{\bfseries \texttt{lab record}}\\[2pt] both cameras and the joint states at
+  30~fps; fixed episode and reset time};
+\node[st=robotline, right=of rec] (chk) {{\bfseries Checks}\\[2pt] dropped frames, camera rates, joint limits};
+\node[st=greenline, right=of chk] (trim) {{\bfseries Two copies}\\[2pt] raw (the only one edited) and trimmed (idle
+  start and end cut)};
+\node[st=purpleline, right=of trim] (split) {{\bfseries Hub and registry}\\[2pt] both pushed; pinned revision;
+  seeded held-out split};
+\foreach \a/\b in {tele/rec, rec/chk, chk/trim, trim/split} \draw[arr] (\a) -- (\b);
+\node[draw=ink2, rounded corners=2pt, font=\scriptsize, align=center, text width=50mm, below=6mm of trim.south west,
+  anchor=north] (edit) {editing tools: view, delete bad episodes, manual trim, undo; on the raw copy, the trimmed copy
+  is rebuilt};
+\draw[arr, dashed] (edit.north) -- (edit.north|-trim.south);
+\end{tikzpicture}

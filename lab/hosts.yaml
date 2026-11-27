@@ -1,0 +1,59 @@
+# Imported from the old lab config by drtc.compat.import_legacy (2026-11-18); edit freely.
+
+network:
+  legacy_server:
+    host: {default: 10.42.0.1, windows-laptop: 127.0.0.1}
+    port: 8080
+    host_id: {default: laptop, windows-laptop: windows-laptop}
+    client_id: {default: pi, windows-laptop: windows-laptop}
+  zenoh_router: null
+hosts:
+  laptop:
+    label: laptop4060
+    hostname: arshjeevs
+    roles: [control, record, client, serve, train]
+    address: 10.42.0.1
+    repo: ~/Projects/drtc
+    gpus:
+    - {name: RTX 4060 Laptop, memory_gb: 8}
+  pi:
+    label: raspberrypiv5
+    hostname: raspberrypi
+    roles: [client]
+    ssh: rasp@raspberrypi.local   # on the laptop's hotspot (10.42.0.x); the laptop's key is authorized
+    repo: /home/rasp/drtc_major   # lab/bin/pi-setup (Raspberry Pi 5, 8 GB, Debian 13, no GPU)
+  h200:
+    label: gpuh200
+    roles: [serve, train]
+    ssh: jayaraj@192.168.41.118
+    container: drtc_lab
+    secrets: /workspace/drtc_lab/.secrets.env   # HF_TOKEN, WANDB_API_KEY (inside the container)
+    repo: /home/jayaraj/drtc_major   # new setup (branch major); /workspace/drtc_major inside the drtc_lab container
+    # 48 CPUs. For several trainings at once: the A100's measured budget scaled to 48 CPUs (not yet measured here).
+    cpu_budget:
+      act: {threads: 4, workers: 3}
+      smolvla: {threads: 8, workers: 4}
+      groot_n15: {threads: 24, workers: 4}
+    gpus:
+    - {name: H200, memory_gb: 141}
+    shared: true
+  windows-laptop:
+    label: windows-laptop
+    roles: [record, client, serve]
+    gpus:
+    - {name: RTX 4060 Laptop, memory_gb: 8}
+  a100:
+    label: GPUserver
+    roles: [serve, train]
+    ssh: b230968ee@192.168.5.13
+    secrets: ~/.drtc.env   # HF_TOKEN, WANDB_API_KEY
+    # 24 CPUs. Measured 2026-11-19 with ACT, SmolVLA and GR00T N1.5 training at once: without a budget the load
+    # was 28 and GR00T N1.5's preprocessing took 3.8 s per step; with this one 1.1 s, load ~6.
+    cpu_budget:
+      act: {threads: 2, workers: 2}
+      smolvla: {threads: 4, workers: 4}
+      groot_n15: {threads: 12, workers: 2}
+    repo: /home/b230968ee/drtc_major   # new setup on the host, no container (lab/bin/a100-setup)
+    gpus:
+    - {name: A100 80GB PCIe, memory_gb: 80}
+    shared: true

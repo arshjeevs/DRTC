@@ -1,0 +1,14 @@
+\begin{tabular}{l l cr cr cr}
+\toprule
+ & & \multicolumn{2}{c}{Spike} & \multicolumn{2}{c}{Dropped replies} & \multicolumn{2}{c}{Outage} \\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}\cmidrule(lr){7-8}
+Condition & Policy & recovered & s & recovered & s & recovered & s \\
+\midrule
+Baseline + faults & SmolVLA & 0/10 & -- & 0/10 & -- & 0/10 & -- \\
+Baseline + faults & GR00T N1.5 & 0/10 & -- & 0/10 & -- & 0/10 & -- \\
+DRTC + faults & SmolVLA & 10/10 & 0.95 & 8/8 & 0.00 & 2/2 & 0.50 \\
+DRTC + faults & GR00T N1.5 & 10/10 & 0.42 & 10/10 & 0.66 & 9/9 & 1.45 \\
+DRTC + smoothing + faults & SmolVLA & 10/10 & 0.95 & 10/10 & 0.00 & 6/6 & 0.62 \\
+DRTC + smoothing + faults & GR00T N1.5 & 10/10 & 0.69 & 10/10 & 0.49 & 10/10 & 0.65 \\
+\bottomrule
+\end{tabular}

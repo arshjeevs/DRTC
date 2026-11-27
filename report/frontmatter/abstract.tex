@@ -1,0 +1,26 @@
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+\thispagestyle{plain}
+
+Vision-language-action models are too large to run on the small computer that drives a low-cost robot arm, so they are
+served from a remote GPU and every action depends on the network. When the network delays or loses messages, the
+robot's queue of actions empties and the arm stops; the remote-inference client shipped with LeRobot~0.7 ends the run
+after one second without actions and never replaces a lost reply. This project studies that failure on an SO-101 arm
+and tests whether the scheduling of Distributed Real-Time Chunking (\drtc), designed for unreliable networks, recovers
+it, which of its parts matter, and how the motion can be kept smooth.
+
+We built a platform on LeRobot~0.7 for recording, training, serving and evaluating policies across a laptop, a
+Raspberry~Pi~5 and two shared GPU servers; recorded and trimmed three datasets for two tasks; and trained seven policies
+with their authors' recipes. We ported \drtc's scheduling into LeRobot's remote-inference runtime with four fixes,
+implemented six smoothing methods and seven kinds of network fault, and built an evaluation framework with frozen plans,
+seeded rounds, raw records of every trial and primary comparisons named in advance. On the robot, with the Raspberry Pi
+as the robot computer, the baselines of the seven policies range from 0 to 90\% task success; GR00T~N1.7 and \smolvla{}
+reach 90\% on sorting, and Diffusion Policy 90\% on cube in box.
+On the replay bench, \drtc{} recovered from every injected fault for all seven policies on both tasks, where the
+waiting client often did not, and its cooldown carried almost all of the benefit. On the robot, a short fault mix
+lowered the success of LeRobot's waiting client on cube in box from 68 to 13\%; \drtc{} restored it to 65\%, and a
+smoothing stack without RTC kept it (75\%) while making the motion about three times smoother.
+
+\vspace{1em}
+\noindent\textbf{Keywords:} robot learning, vision-language-action models, remote inference, action chunking,
+network faults, chunk scheduling, motion smoothing.

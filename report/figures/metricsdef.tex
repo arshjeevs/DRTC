@@ -1,0 +1,24 @@
+% D7.2 The motion metrics defined on one trial.
+\input{figures/colors}
+\begin{tikzpicture}[font=\footnotesize, x=9mm, y=6mm]
+\fill[faultc!45] (4,-0.3) rectangle (5.5,7.6); \node[font=\scriptsize, text=ink2] at (4.75,7.95) {fault};
+% queue
+\node[anchor=east, font=\scriptsize] at (-0.2,6) {actions queued};
+\draw[robotline, very thick] (0,7) -- (2,5.6) -- (2,7) -- (4.3,5.4) -- (5.0,4.5) -- (6.3,4.5) -- (6.3,7) -- (9,5.2)
+  -- (9,7) -- (12,5.6);
+\draw[ink2, densely dotted] (0,4.5) -- (12,4.5) node[right, font=\scriptsize, text=ink2] {empty};
+\fill[serverline] (5.0,4.4) rectangle (6.3,4.6);
+\node[font=\scriptsize, text=serverline, anchor=north] at (5.65,4.3) {stall (M2, M3)};
+% joint speed
+\node[anchor=east, font=\scriptsize] at (-0.2,2.2) {arm joint speed};
+\draw[ink, thick] plot[smooth] coordinates {(0,2) (1,2.6) (2,2.3) (3,2.8) (4,2.4) (5.0,0.2)} -- (6.3,0.2);
+\draw[ink, thick] plot[smooth] coordinates {(6.3,0.2) (6.8,1.6) (7.5,2.5) (9,2.2) (10.5,2.7) (12,2.3)};
+% recovery
+\draw[{Latex[length=1.5mm]}-{Latex[length=1.5mm]}, greenline, thick] (5.5,-0.9) -- node[below, font=\scriptsize]{M11 recovery} (6.4,-0.9);
+\draw[greenline, densely dotted] (5.5,-0.9) -- (5.5,0); \draw[greenline, densely dotted] (6.4,-0.9) -- (6.4,0.3);
+% jerk and deviation
+\node[font=\scriptsize, text=ink2, align=left, anchor=west] at (7.2,1.0) {M7 jerk: the third derivative of\\[-1pt] the commanded joints while moving};
+\draw[purpleline, thick, dashed] plot[smooth] coordinates {(6.3,0.5) (6.8,2.0) (7.5,2.8)};
+\node[font=\scriptsize, text=purpleline, anchor=west] at (7.7,3.3) {M12: commanded position against the policy's own action};
+\draw[-{Latex[length=2mm]}, thick] (0,-1.6) -- (12.4,-1.6) node[right, font=\scriptsize]{time};
+\end{tikzpicture}

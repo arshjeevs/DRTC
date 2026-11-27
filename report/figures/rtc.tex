@@ -1,0 +1,23 @@
+% D2.4 Real-time chunking: the new chunk's start is in-painted to continue the actions still to be executed.
+\input{figures/colors}
+\begin{tikzpicture}[font=\small, x=8mm, y=9mm]
+\foreach \panel/\xs/\title in {0/0/{Without RTC: a jump at the switch}, 1/9.5/{With RTC: a continuous switch}} {
+  \begin{scope}[shift={(\xs,0)}]
+  \draw[-{Latex[length=1.8mm]}, thick] (0,0) -- (8.3,0) node[right, font=\scriptsize] {time};
+  \draw[-{Latex[length=1.8mm]}, thick] (0,0) -- (0,3.3) node[above, font=\scriptsize] {joint angle};
+  \node[font=\small\bfseries] at (4.3,4.35) {\title};
+  \draw[robotline, very thick] plot[smooth] coordinates {(0,0.8) (1.5,1.2) (3,1.7) (4,2.0)};
+  \draw[robotline, very thick, dashed] plot[smooth] coordinates {(4,2.0) (5,2.2) (6,2.3)};
+  \node[font=\scriptsize, text=robotline, anchor=south east] at (3.6,2.0) {old chunk};
+  \draw[ink2, densely dotted] (4,0) -- (4,3.1); \node[font=\scriptsize, text=ink2, anchor=north] at (4,-0.05) {switch};
+  \end{scope}}
+% without RTC: new chunk starts elsewhere
+\draw[greenline, very thick] plot[smooth] coordinates {(4,1.35) (5.5,1.5) (7,1.85) (8,2.3)};
+\draw[serverline, thick, -{Latex[length=1.6mm]}] (4.25,2.0) -- (4.25,1.45); \node[font=\scriptsize, text=serverline, anchor=west] at (4.35,1.75) {jump};
+\node[font=\scriptsize, text=greenline, anchor=north west] at (5.2,1.35) {new chunk};
+% with RTC: frozen prefix then new path
+\fill[greenfill] (9.5+4,0.05) rectangle (9.5+6,3.0);
+\node[font=\scriptsize, text=greenline, align=center] at (9.5+5,2.75) {frozen prefix};
+\draw[greenline, very thick] plot[smooth] coordinates {(9.5+4,2.0) (9.5+5,2.2) (9.5+6,2.28) (9.5+7,2.0) (9.5+8,1.6)};
+\node[font=\scriptsize, text=greenline, align=left, anchor=north west] at (9.5+6.0,1.45) {new chunk follows\\[-2pt] the new observation};
+\end{tikzpicture}

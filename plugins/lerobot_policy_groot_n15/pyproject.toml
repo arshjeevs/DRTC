@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+# The name must start with lerobot_policy_: LeRobot discovers plugins by distribution name.
+name = "lerobot_policy_groot_n15"
+version = "0.1.0"
+description = "GR00T N1.5 for LeRobot 0.7 (removed upstream after 0.5.1), ported from the DRTC lab's fork"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.12,<3.13"
+dependencies = ["lerobot[groot]==0.7.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/lerobot_policy_groot_n15"]

@@ -1,0 +1,9 @@
+description: "Bench condition 3 (spike): DRTC (our version, no filter) + spike"
+model: smolvla_sort_one_v1_full
+scheduler: drtc
+estimator: jk
+cooldown: true
+action_filter_mode: none
+spikes:
+  - {start_s: 2.0, delay_ms: 1000}
+latency: {base_ms: 250, jitter_ms: 20, seed: 0}   # the network part of the robot round trip in sort_one_drtc_main (2026-11-20): ~260 ms

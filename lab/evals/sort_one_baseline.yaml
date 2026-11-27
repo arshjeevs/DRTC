@@ -1,0 +1,30 @@
+# Baseline on sort_one (lab/PLAN.md, setup v2 robot evals, 2026-11-22): upstream LeRobot with the starvation grace
+# raised to the whole trial (the same reference condition as E4), normal network, 10 trials per model.
+# All 7 trained models (π0.5 and MolmoAct 2 added 2026-11-26, before the first freeze); later models are frozen with
+# `lab eval freeze` (append-only: the frozen models never change; lab/WORKFLOW.md, "Growing an eval").
+description: Baseline, sort_one - upstream LeRobot (patient), normal network
+success: The cube is fully inside the square of its colour and the gripper has let go of it, before the time limit.
+time_limit_s: 30
+trials: 10
+seed: 0
+models:
+- smolvla_sort_one_v1_full
+- groot_sort_one_v1_full
+- grootn17_sort_one_v1_full
+- act_sort_one_v1_full
+- diffusion_sort_one_v1_full
+- pi05_sort_one_v1_full
+- molmoact2_sort_one_v1_lora
+conditions:
+  baseline: v2_robot/upstream_patient__none
+video: true
+
+# Written by `lab eval freeze`: the Hub commit each model is served at. Do not edit by hand.
+frozen:
+  smolvla_sort_one_v1_full: '45d5b9e60ad2cc8e2ebdd51b62cf44f2de9ed0cf'
+  groot_sort_one_v1_full: 'fcf412c9282bde6a14c2f40052b562508700e313'
+  grootn17_sort_one_v1_full: '7e05e85dd814f65022919b3b582a2634a9e2c921'
+  act_sort_one_v1_full: 'd48c71fc18b2bdf610b0bd6e1f488c2ffef497e4'
+  diffusion_sort_one_v1_full: '94d516787ef127e691ef6469c029dc8817a47f4a'
+  pi05_sort_one_v1_full: 'a9462e90ee26260c14ebd3f9a8f08da68b9af5ea'
+  molmoact2_sort_one_v1_lora: 'c166686e7082b0790953745d829fcd82d2dd65bd'

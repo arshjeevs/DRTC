@@ -1,0 +1,5 @@
+#!/bin/bash
+# Not part of the new setup yet.
+echo "lab/bin/edit-dataset: replaced: lab trim <raw dataset> <out> (automatic, no editor) and lab record (records, trims, pushes)."
+echo "The old tool is in the minor-final checkout (~/Projects/drtc, branch drtc)."
+exit 1

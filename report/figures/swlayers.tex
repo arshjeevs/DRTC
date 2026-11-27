@@ -1,0 +1,32 @@
+% D3.2 Software layers: LeRobot 0.7, the project's layer, the lab command.
+\input{figures/colors}
+\begin{tikzpicture}[font=\small, node distance=2.5mm,
+  box/.style={draw=#1, rounded corners=2pt, fill=#1!12, align=center, font=\footnotesize, minimum height=11mm,
+              inner sep=3pt},
+  lay/.style={draw=#1, thick, rounded corners=4pt, inner xsep=3mm, inner ysep=2.5mm},
+  ttl/.style={font=\small\bfseries, text=#1, anchor=south west}]
+% the lab command
+\node[box=greenline, text width=13mm] (c1) {record};
+\foreach \t [count=\i from 2] in {data, prepare, train, serve, run, eval, results}
+  {\pgfmathtruncatemacro{\p}{\i-1}\node[box=greenline, text width=13mm, right=of c\p] (c\i) {\t};}
+\node[lay=greenline, fit=(c1)(c8)] (cmd) {};
+\node[ttl=greenline] at ([yshift=0.5mm]cmd.north west) {The \texttt{lab} command};
+% our layer
+\node[box=purpleline, text width=27mm, below=14mm of c1.south west, anchor=north west] (o1) {registry: rigs, datasets,
+  recipes, models, plans};
+\node[box=purpleline, text width=19mm, right=of o1] (o2) {plugins: GR00T N1.5, replay robot};
+\node[box=purpleline, text width=15mm, right=of o2] (o3) {\drtc{} scheduler};
+\node[box=purpleline, text width=17mm, right=of o3] (o4) {smoothing (6 methods)};
+\node[box=purpleline, text width=13mm, right=of o4] (o5) {fault injector};
+\node[box=purpleline, text width=17mm, right=of o5] (o6) {evaluation framework};
+\node[lay=purpleline, fit=(o1)(o6)(cmd.east|-o1)] (ours) {};
+\node[ttl=purpleline] at ([yshift=0.5mm]ours.north west) {This project's layer (LeRobot itself unchanged)};
+% LeRobot
+\node[box=robotline, text width=21mm, below=14mm of o1.south west, anchor=north west] (l1) {robots and cameras};
+\foreach \t [count=\i from 2] in {datasets, policies, training, remote-inference runtime}
+  {\pgfmathtruncatemacro{\p}{\i-1}\node[box=robotline, text width=21mm, right=of l\p] (l\i) {\t};}
+\node[lay=robotline, fit=(l1)(l5)(cmd.east|-l1)] (lr) {};
+\node[ttl=robotline] at ([yshift=0.5mm]lr.north west) {LeRobot 0.7 (unmodified)};
+\draw[-{Latex[length=2mm]}, thick, ink2] ([xshift=-12mm]cmd.south east) -- ([xshift=-12mm]cmd.south east|-ours.north);
+\draw[-{Latex[length=2mm]}, thick, ink2] ([xshift=-12mm]ours.south east) -- ([xshift=-12mm]ours.south east|-lr.north);
+\end{tikzpicture}

@@ -1,0 +1,15 @@
+model,policy,task,params
+act_sort_one_v1_full,act,sort_one,51668614
+diffusion_sort_one_v1_full,diffusion,sort_one,273978050
+smolvla_sort_one_v1_full,smolvla,sort_one,450046176
+groot_sort_one_v1_full,groot,sort_one,2724163520
+grootn17_sort_one_v1_full,grootn17,sort_one,3144016000
+pi05_sort_one_v1_full,pi05,sort_one,4143404816
+molmoact2_sort_one_v1_lora,molmoact2,sort_one,5601988144
+act_cubebox_v1_full,act,cubebox_v1,51668614
+diffusion_cubebox_v1_full,diffusion,cubebox_v1,273978050
+smolvla_cubebox_v1_full,smolvla,cubebox_v1,450046176
+groot_cubebox_v1_full,groot,cubebox_v1,2724163520
+grootn17_cubebox_v1_full,grootn17,cubebox_v1,3144016000
+pi05_cubebox_v1_full,pi05,cubebox_v1,4143404816
+molmoact2_cubebox_v1_lora,molmoact2,cubebox_v1,5601988144

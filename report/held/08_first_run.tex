@@ -1,0 +1,40 @@
+% Held out of the report (2026-11-26, user): older DRTC results wait for the new robot results (E4).
+% Not built; kept unchanged for later.
+
+\section{The first run}\label{sec:firstrun}
+
+The first run used \smolvla{} and \groot{} on the sorting task, ten trials per condition, under four conditions on the
+real network (Table~\ref{tab:conditions1}). Conditions 2--4 added the fault mix without a shift.
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \begin{tabularx}{\textwidth}{c l l X}
+    \toprule
+    \# & Condition & Network & Robot side \\
+    \midrule
+    1 & Baseline & normal & upstream as shipped (1~s grace, 5~s request deadline) \\
+    2 & Baseline + faults & fault mix & as 1 \\
+    3 & \drtc{} + faults & fault mix & \drtc{} with our fixes; no smoothing; holds the arm through stalls \\
+    4 & \drtc{} + smoothing + faults & fault mix & as 3, with the Butterworth filter and adaptive playback \\
+    \bottomrule
+  \end{tabularx}
+  \caption{The conditions of the first run.}\label{tab:conditions1}
+\end{table}
+
+\section{Why it was redesigned}\label{sec:redesign}
+
+Every trial of condition~2 was ended by upstream's own one-second starvation grace at the first fault, the latency
+spike (Section~\ref{sec:main}). Three things followed.
+\begin{itemize}
+\item The faulted baseline gave up by design, and raising its limit is a single setting. Beating it shows that the
+      default is fragile, not that \drtc's scheduling is better.
+\item Condition~3 differed from condition~2 in two things at once: the scheduling and the patience (a whole-trial
+      grace). The recovery could not be attributed to either.
+\item Condition~4 added two smoothing methods at once, so their effects could not be separated, and the bench had used
+      only two policies and one task.
+\end{itemize}
+Setup~v2 therefore compares \drtc{} with a \emph{patient} upstream that has the same limits (Section~\ref{sec:baseline}),
+adds the ablations that take \drtc{} apart, tests each smoothing method on its own before combining them, runs the bench
+on both tasks and seven policies, and moves the faults by a seeded shift so they also hit the grasp.
+

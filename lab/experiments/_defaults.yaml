@@ -5,6 +5,7 @@ estimator: jk
 cooldown: true
 latency_k: 1.5
 epsilon: 1
+cooldown_cap: none     # none: never shorter than the measured latency (2026-11-20); half_chunk: DRTC's original H/2 cap
 actions_per_chunk: 50
 s_min: 20
 latency_alpha: 0.125
@@ -16,7 +17,7 @@ fps: 30
 
 # Flow matching / RTC
 num_flow_matching_steps: 8
-rtc_enabled: true
+rtc_enabled: false   # true: guided RTC (SmolVLA, GR00T N1.5 only); was true but never applied before 2026-11-20
 rtc_sigma_d: 0.2
 rtc_prefix_attention_schedule: linear
 

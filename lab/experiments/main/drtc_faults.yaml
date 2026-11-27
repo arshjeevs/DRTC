@@ -1,0 +1,12 @@
+description: "Condition 3: DRTC + faults - DRTC (our version, no filter), the fault mix"
+model: smolvla_sort_one_v1_full
+scheduler: drtc
+estimator: jk
+cooldown: true               # our DRTC version (lab/PLAN.md, the 2026-11-20 fixes)
+action_filter_mode: none
+spikes:                      # the fault mix (lab/PLAN.md)
+  - {start_s: 2.0, delay_ms: 1000}
+drop_action:
+  - {start_s: 4.0, duration_s: 1.0}
+disconnect:
+  - {start_s: 6.0, duration_s: 1.5}

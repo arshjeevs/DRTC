@@ -1,0 +1,15 @@
+\begin{tabular}{l l rrr r rr r rr}
+\toprule
+ & & \multicolumn{3}{c}{Stall (\%)} & Jerk & \multicolumn{2}{c}{Largest step ($^\circ$)} & Deviation & \multicolumn{2}{c}{Recovery (s)} \\
+\cmidrule(lr){3-5}\cmidrule(lr){7-8}\cmidrule(lr){10-11}
+Policy & Seam & \drtc{} & stack & stack, no faults & vs \drtc{} & \drtc{} & stack & ($^\circ$) & \drtc{} & stack \\
+\midrule
+ACT & ensembling & 3.5 & 3.4 & 0.4 & \textbf{0.12} & 32.7 & \textbf{7.4} & 1.95 & 0.00 & 0.00 \\
+Diffusion Policy & ensembling & 48.9 & \textbf{28.1} & 0.5 & \textbf{0.15} & 23.5 & \textbf{7.1} & 1.60 & 0.69 & 0.70 \\
+GR00T N1.5 & RTC & 63.9 & \textbf{46.6} & 22.9 & \textbf{0.09} & 34.2 & \textbf{8.9} & 1.69 & 0.82 & \textbf{0.75} \\
+GR00T N1.7 & ensembling & 67.8 & \textbf{51.4} & 35.9 & \textbf{0.20} & 11.1 & \textbf{5.5} & 0.69 & 0.94 & \textbf{0.90} \\
+MolmoAct 2 & ensembling & 54.7 & \textbf{30.9} & 10.9 & \textbf{0.06} & 58.3 & \textbf{10.2} & 1.37 & 0.87 & 0.87 \\
+$\pi_{0.5}$ & ensembling & 39.5 & \textbf{33.4} & 12.5 & \textbf{0.31} & 15.1 & \textbf{5.0} & 1.19 & 0.88 & 0.98 \\
+SmolVLA & RTC & 14.3 & 31.1 & 22.8 & \textbf{0.26} & 17.6 & \textbf{5.7} & 1.09 & 0.54 & 0.65 \\
+\bottomrule
+\end{tabular}

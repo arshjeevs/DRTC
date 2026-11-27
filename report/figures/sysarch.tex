@@ -1,0 +1,37 @@
+% D3.1 System architecture: robot side, links, servers, cloud services.
+\input{figures/colors}
+\begin{tikzpicture}[font=\small,
+  dev/.style={draw=#1, thick, rounded corners=2pt, fill=white, align=center, text width=25mm, minimum height=10mm,
+              font=\footnotesize},
+  grp/.style={draw=#1, thick, dashed, rounded corners=5pt, inner sep=3.5mm},
+  lnk/.style={thick, ink2},
+  lab/.style={font=\scriptsize, text=ink2, fill=white, inner sep=1pt}]
+% robot side
+\node[dev=robotline] (leader) at (0,4.2) {{\bfseries Leader arm}\\ SO-101 (teleoperation)};
+\node[dev=robotline] (follower) at (0,2.7) {{\bfseries Follower arm}\\ SO-101, 6 motors};
+\node[dev=robotline] (wrist) at (0,1.2) {{\bfseries Wrist camera}\\ USB, on the gripper};
+\node[dev=robotline] (phone) at (0,-0.3) {{\bfseries Phone}\\ scene camera, USB};
+\node[dev=robotline, text width=34mm, minimum height=16mm] (pi) at (4.4,3.2) {{\bfseries Raspberry Pi 5}\\ robot computer (official trials): 30~Hz loop, \drtc, smoothing};
+\node[dev=robotline, text width=34mm, minimum height=16mm] (laptop) at (4.4,-0.4) {{\bfseries Laptop}\\ RTX 4060; recording, development; the Pi's gateway};
+\foreach \d in {leader, follower, wrist, phone} \draw[lnk] (\d.east) -- (\d.east-|1.95,0) |- (pi.west);
+\node[lab] at (2.25,4.55) {USB};
+\draw[lnk, very thick] (pi.south) -- node[lab, right] {Ethernet cable (E4)\,/\,WiFi} (laptop.north);
+\node[grp=robotline, fit=(leader)(phone)(pi)(laptop), label={[font=\small\bfseries, text=robotline]above:Robot side}] {};
+% network
+\node[draw=ink2, thick, fill=netfill, rounded corners=8pt, align=center, text width=24mm, minimum height=14mm,
+      font=\footnotesize] (net) at (9.3,1.35) {{\bfseries Campus network}\\ SSH tunnels;\\ Zenoh transport};
+\draw[lnk, very thick] (laptop.east) -| (net.south);
+% servers
+\node[dev=serverline, text width=34mm, minimum height=16mm] (h200) at (14.2,2.7) {{\bfseries H200 server} (141~GB)\\
+  Docker container: models served, bench, training};
+\node[dev=serverline, text width=34mm, minimum height=16mm] (a100) at (14.2,0.0) {{\bfseries A100 server} (80~GB)\\
+  training, serving};
+\draw[lnk, very thick] (net.east) -- ++(0.4,0) |- (h200.west); \draw[lnk, very thick] (net.east) -- ++(0.4,0) |- (a100.west);
+\node[grp=serverline, fit=(h200)(a100), label={[font=\small\bfseries, text=serverline]below:Shared GPU servers}] {};
+% cloud
+\node[dev=purpleline, text width=40mm] (hub) at (9.0,5.4) {{\bfseries Hugging Face Hub}\\ datasets, models,\\ results store};
+\node[dev=purpleline, text width=40mm] (wandb) at (14.2,5.4) {{\bfseries Weights \& Biases}\\ and Trackio: training logs};
+\draw[lnk, dashed] (hub.south) -- (net.north); \draw[lnk, dashed] (h200.north) -- (wandb.south);
+\draw[lnk, dashed] (a100.east) -- ++(4mm,0) |- (wandb.east);
+\draw[lnk, dashed] (hub.east) -- (wandb.west);
+\end{tikzpicture}

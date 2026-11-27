@@ -1,0 +1,32 @@
+# The test suite on a CPU runner, installed the way the Raspberry Pi is (lab/bin/pi-setup): the locked
+# dependencies without the CUDA packages, CPU PyTorch, plus the two model libraries the adapter tests build tiny
+# models with. The GR00T N1.5 plugin test needs the GPU extra and is skipped here.
+name: tests
+
+on:
+  push:
+    branches: [major]
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: System packages
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - uses: astral-sh/setup-uv@v6
+      - name: Install (locked, CPU PyTorch)
+        run: |
+          CUDA=$(grep -oE '^name = "(cuda-[a-z0-9-]+|nvidia-[a-z0-9-]+|triton)"' uv.lock | cut -d'"' -f2 \
+            | grep -v '^nvidia-ml-py$' | sort -u | sed 's/^/--no-install-package /')
+          uv sync --frozen --extra sim --group dev --python 3.12 \
+            --no-install-package torch --no-install-package torchvision $CUDA
+          uv pip install --python .venv/bin/python --index-url https://download.pytorch.org/whl/cpu \
+            --extra-index-url https://pypi.org/simple --index-strategy unsafe-best-match \
+            torch==2.14.1+cpu torchvision==0.29.1+cpu
+          lock() { grep -A1 "^name = \"$1\"" uv.lock | tail -1 | cut -d'"' -f2; }
+          uv pip install --python .venv/bin/python "transformers==$(lock transformers)" "diffusers==$(lock diffusers)"
+      - name: Tests
+        run: .venv/bin/python -m pytest -q

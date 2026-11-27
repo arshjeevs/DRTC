@@ -1,0 +1,5 @@
+#!/bin/bash
+# Not part of the new setup yet.
+echo "lab/bin/logstats: not ported yet; training progress is in Trackio (Space orangemoon599/drtc-lab) and the progress bar."
+echo "The old tool is in the minor-final checkout (~/Projects/drtc, branch drtc)."
+exit 1

@@ -1,0 +1,234 @@
+\chapter{Remote Inference and DRTC}\label{ch:control}
+
+\section{Introduction}
+This chapter explains how the robot computer and the model server interact under network faults. It begins with the 30~Hz client-server loop built on LeRobot~0.7 (Figure~\ref{fig:architecture}, Figure~\ref{fig:sequence}) and examines how LeRobot's upstream client handles late and lost replies in its as-shipped and patient settings (Figure~\ref{fig:flowupstream}). It then presents \drtc{}, which uses a latency-based cooldown to replace lost replies, along with four fixes found on the real setup (Figure~\ref{fig:flowdrtc}). Finally, it covers six smoothing methods that address jerky motion (Figure~\ref{fig:smoothpipe}) and the transport-level fault injector with seven seeded fault types (Figure~\ref{fig:faulttypes}).
+
+\section{The client-server loop}\label{sec:loop}
+
+Figure~\ref{fig:architecture} shows the loop every experiment runs. The robot computer reads the two cameras and the
+arm's joint positions; when its scheduler decides, it sends an observation to the policy server; the server answers
+with a chunk of $H$ actions, which goes into the robot's action queue; and at every control tick ($\Delta = 1/30$~s)
+one action is taken from the queue, shaped by the smoothing, and sent to the arm. A reply takes one \emph{turnaround}:
+the upload of the images, the queueing and inference on the server, and the download of the chunk. If the queue runs
+dry before the next chunk arrives, the arm has nothing to do: it holds its last position, a \emph{stall}.
+
+Everything on the robot computer except the scheduler, the smoothing and the fault injector is LeRobot~0.7's own
+remote-inference engine, with its checks: one request in flight, observation freshness, execution generations,
+deadlines and latched faults. The policy server is LeRobot's, unchanged.
+
+\begin{figure}[htbp]
+  \centering
+  \begin{adjustbox}{max width=\textwidth}\input{figures/architecture}\end{adjustbox}
+  \caption{The control loop. The robot computer runs at 30~Hz; the scheduler decides when to request the next chunk,
+           and the smoothing shapes the commands sent to the arm. Faults are injected where a real network would cause
+           them, so every scheduler reacts to them with its own logic.}
+  \label{fig:architecture}
+\end{figure}
+
+\diagram{sequence}{One request and its reply between the robot computer and the model server.}{fig:sequence}
+
+\section{The upstream client}\label{sec:baseline}
+
+LeRobot~0.7's client (\emph{upstream}) requests the next chunk when the queued playback falls to the refill time or
+one turnaround:
+\begin{equation}
+  q_t\,\Delta \;\le\; \max\!\left(T_{\mathrm{refill}},\; \hat L + \Delta\right),
+\end{equation}
+with $q_t$ the queued actions, $T_{\mathrm{refill}}=0.5$~s, and $\hat L$ the largest of the last 100 measured
+turnarounds. It keeps one request in flight and has two give-up limits:
+\begin{itemize}
+\item the \textbf{starvation grace} (1~s by default): when the queue has been empty this long, the run is ended with a
+      fault; when the queue runs dry, the request in flight is forgotten, so its late reply is discarded; and
+\item the \textbf{request deadline} (5~s by default): a request not answered in this time ends the run with a fault.
+      When the queue runs dry the client forgets the request in flight and sends one fresh request; it never sends
+      another for a lost reply.
+\end{itemize}
+We evaluate the client in two settings (Chapter~\ref{ch:design}). \textbf{As shipped}, with both defaults. And
+\textbf{patient}, with both limits raised to the whole trial: each is a single setting, so this is upstream at its best
+under faults, and the fair baseline for \drtc. Patient upstream does not end a run at its own limits. When a reply is lost it holds the arm; when the
+queue runs dry it sends one fresh request, and if that reply is lost too it sends nothing more, so LeRobot's 10~s
+start-up deadline ends the run (Figure~\ref{fig:flowupstream}).
+
+\diagram{flowupstream}{LeRobot's client: what it does when a reply is late or lost.}{fig:flowupstream}
+
+\section{\drtc{} on LeRobot 0.7}\label{sec:drtc}
+
+We implemented \drtc's scheduling inside LeRobot's own runtime, replacing only the decision of when to request and
+when to give up on a request; all of LeRobot's checks stay in place.
+
+\paragraph{Trigger.} A chunk is requested when $q_t \le H - s_{\min}$, with $H$ the length of the last accepted chunk:
+$s_{\min}=20$ steps for the 50-action policies, $s_{\min}=8$ for the 16- and 24-action ones. \smolvla{} therefore
+asks with 30 actions (1~s) left, where upstream asks with 0.5~s left.
+
+\paragraph{Latency estimate.} For every measured turnaround $R$, the Jacobson--Karels estimator updates a smoothed mean
+$\bar R$ and a smoothed mean deviation $D$,
+\begin{equation}
+  D \leftarrow (1-\beta)\,D + \beta\,|R-\bar R|, \qquad \bar R \leftarrow (1-\alpha)\,\bar R + \alpha R, \qquad
+  \hat L = \bar R + k\,D,
+\end{equation}
+with $\alpha=1/8$, $\beta=1/4$ (as in TCP~\cite{rfc6298}) and $k=1.5$.
+
+\paragraph{Cooldown re-request.} A request not answered within its cooldown $c$ is given up and a fresh observation is
+sent; the freshest always wins, and duplicated or stale replies are ignored. In \drtc{} the cooldown is the latency
+estimate in steps, capped at $H/2$, plus a margin of $\varepsilon$ steps. Ours is
+\begin{equation}
+  c = \max\!\left(2,\; \left\lceil \tilde L / \Delta \right\rceil + \varepsilon\right)\Delta, \qquad
+  \tilde L = \max\!\left(\hat L,\; \max_{i\,\in\,\text{last 10}} R_i\right),
+\end{equation}
+with $\varepsilon = 1$, and before the first reply $c = \max\!\left((s_{\min}+\varepsilon)\Delta,\;
+T_{\mathrm{start}}\right)$ with the start-up timeout $T_{\mathrm{start}}=10$~s. The cooldown is what replaces a lost
+reply; without it, a lost reply leaves the client waiting, as upstream does.
+
+\paragraph{Limits.} \drtc{} runs with the same whole-trial grace and request deadline as patient upstream, so the two
+differ only in their scheduling.
+
+\paragraph{Fixes found on the real setup.} Table~\ref{tab:fixes} lists the four changes to \drtc{} that the
+experiments required. Each was found as a failure on the real robot and checked on the replay bench.
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{0.21\textwidth} X X}
+    \toprule
+    Failure & Cause & Fix \\
+    \midrule
+    \groot{} never received a chunk & The cooldown is capped at $H/2$: 8 steps (0.27~s) for a 16-action chunk, while
+      replies took 0.4--0.7~s, so every request was given up before its reply & The cooldown is never shorter than the
+      measured latency (no cap; the original cap remains as an option and is ablation A4) \\
+    A storm of re-requests & Replies close to the estimate were given up; the server, still computing them, slowed
+      further & The cooldown also covers the slowest of the last 10 replies \\
+    The robot never started on a slow link & Before the first reply the cooldown is only $s_{\min}+\varepsilon$ steps
+      & Until the first reply, wait up to the start-up timeout \\
+    \enquote{Invalid RTC delay} errors & The requested inference delay could exceed the server's chunk & Cap the
+      delay at the server's prediction steps \\
+    \bottomrule
+  \end{tabularx}
+  \caption{Failure modes of \drtc{} on the real setup and our fixes.}\label{tab:fixes}
+\end{table}
+
+\diagram{flowdrtc}{\drtc: the trigger, the latency estimate and the cooldown.}{fig:flowdrtc}
+
+\section{Smoothing}\label{sec:smoothing}
+
+\paragraph{Where non-smooth motion comes from.} Four sources make the commanded motion jerky:
+\begin{enumerate*}[label=(\roman*)]
+\item \emph{seams}: a new chunk, predicted from a newer observation, does not continue where the old one was heading,
+      so the arm jumps at the switch;
+\item \emph{stalls}: the queue runs dry and the arm stops and restarts;
+\item \emph{jitter}: small oscillations inside a chunk from the policy's own noise; and
+\item \emph{fault restarts}: after an outage, the first new action can be far from where the arm is waiting.
+\end{enumerate*}
+Six methods were implemented, each aimed at one source (Table~\ref{tab:smoothing}); the final \emph{stack} combines one
+method per source (Section~\ref{sec:stackrule}).
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \begin{tabularx}{\textwidth}{l l l X}
+    \toprule
+    Method & Source & Where & Policies \\
+    \midrule
+    Butterworth filter & jitter, seams & every command & all \\
+    Zero-lag queue smoothing & jitter & chunk accepted & all \\
+    RTC & seams & server & flow matching with absolute actions (\smolvla, \groot) \\
+    Temporal ensembling & seams & chunk accepted & all \\
+    Adaptive playback & stalls & every command & all \\
+    Resume ramp & fault restarts & every command & all \\
+    \bottomrule
+  \end{tabularx}
+  \caption{The smoothing methods. Where: on the server while the chunk is generated, at the moment a chunk is accepted,
+           or on every command.}\label{tab:smoothing}
+\end{table}
+
+\paragraph{Butterworth filter.} Every commanded arm position passes through a causal second-order Butterworth low-pass
+filter~\cite{butterworth1930} per joint, cutoff 3~Hz at the 30~Hz control rate, as second-order sections. A gain
+$g=1.4$ on each step compensates the filter's loss of amplitude: with $y_t$ the filter output, the command is
+$u_t = u_{t-1} + g\,(y_t - u_{t-1})$. The filter keeps its state across chunk boundaries and is reset when motion is
+invalidated. Its cost is lag: being causal, it only sees the past.
+
+\paragraph{Zero-lag queue smoothing.} Unlike a filter on the stream, the robot knows its future: it is in the queue.
+When a chunk is accepted, the last $h=15$ executed actions and the queued future are filtered forward and
+backward~\cite{gustafsson1996} with the same Butterworth design, and the smoothed future is queued. Zero-phase
+filtering removes the jitter without delaying the motion, and the executed past makes the seam continuous.
+
+\paragraph{RTC.}\label{sec:rtcmethod} With guided real-time chunking~\cite{black2025rtc} the server is told how many
+actions will run while it computes, and the flow-matching denoising is guided to continue the actions still queued, so
+the seam is smooth at the source. It needs a flow-matching policy with absolute actions; in LeRobot~0.7 it uses the
+append merge, and our \drtc{} trigger and cooldown work with it unchanged. The first RTC request after a server starts
+compiles the guided path and can exceed the server's 5~s operation deadline, so every RTC evaluation starts with one
+uncounted warm-up round.
+
+\paragraph{Temporal ensembling.} As in ACT~\cite{zhao2023act}, each queued step becomes the weighted average of every
+chunk that predicted it. With $a^{(i)}_t$ the $i$-th prediction of step $t$ ($i=0$ the oldest),
+\begin{equation}
+  \bar a_t = \frac{\sum_i w_i\, a^{(i)}_t}{\sum_i w_i}, \qquad w_i = e^{-m i}, \quad m = 0.01,
+\end{equation}
+kept per step of the runtime's queue cursor, so it follows exactly what has been executed; a chunk that is not
+accepted leaves no trace.
+
+\paragraph{Adaptive playback.} When the queue would empty before the next chunk arrives, the actions are played more
+slowly instead of the arm stopping. With $n_t$ the expected ticks until the next chunk (from the latency estimate and
+the time since the request was sent), the playback rate is
+\begin{equation}
+  r^\star_t = \mathrm{clip}\!\left(\frac{q_t}{n_t + m},\; r_{\min},\; 1\right), \qquad
+  r_t = r_{t-1} + \mathrm{clip}\!\left(r^\star_t - r_{t-1},\, -\sigma,\, \sigma\right),
+\end{equation}
+with $r_{\min}=0.5$, a margin $m=4$ steps and a slew limit $\sigma=0.05$ per tick. A phase advances by $r_t$ per tick
+and the command is interpolated linearly between the two actions around it. With a full queue, $r_t=1$.
+
+\paragraph{Resume ramp.} After a stall of at least 0.1~s, the first $N=10$ commands are blended from the held pose
+$p_0$ into the policy's stream $a_t$ with a minimum-jerk profile~\cite{flash1985},
+\begin{equation}
+  u_k = p_0 + w(\tau_k)\,(a_k - p_0), \qquad w(\tau) = 10\tau^3 - 15\tau^4 + 6\tau^5, \quad \tau_k = k/N,
+\end{equation}
+which starts with zero speed and acceleration and ends at the stream's own speed, instead of jumping to the new chunk.
+
+\paragraph{Methods tried and dropped.} A \emph{soft stop}, which slowed the last actions before the queue ran dry so the
+arm would not stop at full speed, was part of the resume ramp at first. On \smolvla{} under faults it kept the queue
+alive long enough for a reply made from a 1.3~s old observation to be accepted, and the next fresh chunk jumped
+(in the local check runs, a largest step of 38--42\degree{} against 18\degree{} for \drtc{} alone); without it the ramp lowered
+both the jerk and the largest step, so it was dropped. Also considered and not built: smoothness guidance during
+denoising (the same job as RTC), a crossfade at the seam (a weaker form of ensembling), a One Euro filter (a second
+filter next to zero-lag smoothing adds little) and a step limiter (a safety cap, not smoothing).
+
+\diagram{smoothpipe}{Where each smoothing method acts in the loop.}{fig:smoothpipe}
+
+\section{Network fault injection}\label{sec:faults}
+
+Faults are injected in the client's transport, where a real network would cause them, so the scheduler, the deadlines
+and the starvation logic all respond as they would to a real fault. Every injected fault is logged. The injector
+supports dropping, duplicating and reordering observations and replies, one-time latency spikes, windows of extra
+latency, random loss, disconnects of both directions, and on the bench a steady latency with jitter. The experiments
+use seven fault types (Table~\ref{tab:faults}, Figure~\ref{fig:faulttypes}).
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \begin{tabularx}{\textwidth}{l X X}
+    \toprule
+    Fault & What & What it tests \\
+    \midrule
+    none & -- & the cost of a scheduler on a good network \\
+    spike & one reply delayed by 1~s, at 2~s & a slow moment; holding through a stall \\
+    drops & every reply lost from 4 to 5~s & lost messages; the re-request \\
+    outage & both directions lost from 6 to 7.5~s & a dead link and the restart after it \\
+    mix & spike, drops and outage together & the robot's fault condition \\
+    rise & every reply 400~ms slower from 2 to 7~s & a lasting change of latency; the estimator \\
+    loss & each reply lost with probability 0.1, the whole run & random loss; the re-request \\
+    \bottomrule
+  \end{tabularx}
+  \caption{The fault types, in seconds from the start of a trial before the shift.}\label{tab:faults}
+\end{table}
+
+\paragraph{The fault shift.} With fixed times, every fault would hit the same phase of the task (the reach) in every
+trial. Each trial's timed faults are therefore moved by a shift drawn uniformly from 0 to 4~s, seeded by the trial
+number only: trial $k$ meets its faults at the same moments in every condition and for every policy, so the conditions
+stay comparable trial by trial, while the faults also hit the grasp and the place. Random loss is seeded by the trial
+number in the same way.
+
+
+
+\diagram{faulttypes}{The seven fault types on a timeline.}{fig:faulttypes}
+
+\section{Summary}
+This chapter presented the 30~Hz client-server loop built on LeRobot~0.7's remote-inference engine and unchanged policy server. It described LeRobot's upstream client in its as-shipped (1~s starvation grace, 5~s request deadline) and patient (whole-trial limits) settings, both issuing at most one fresh request when the queue empties. Under the same whole-trial limits, \drtc{} schedules requests using a $q_t \le H - s_{\min}$ trigger, a Jacobson--Karels latency estimator, and a cooldown re-request to replace lost replies, incorporating four fixes found on the real setup. It also covered six smoothing methods addressing seams, stalls, jitter, and fault restarts, and why soft stop was dropped. Finally, it detailed the transport-level fault injector and seven fault types with a trial-seeded 0 to 4~s shift and seeded random loss.

@@ -1,0 +1,125 @@
+\chapter{Data Collection}\label{ch:data}
+
+\section{Introduction}
+This chapter describes how demonstration data were recorded and processed into reproducible training and held-out datasets, following the pipeline in Figure~\ref{fig:datapipe}. Section~\ref{sec:tasks} introduces the cube-in-box and sorting tasks across three datasets (Figure~\ref{fig:tasks}). Section~\ref{sec:recording} details the 30~fps teleoperation capture, balanced layout rotation, and seeded held-out splits. Section~\ref{sec:trimming} explains how episodes are edited and trimmed of idle starts and ends so policies do not learn to stand still. Finally, Section~\ref{sec:versions} covers Hub revision pinning and separation by joint units (Figure~\ref{fig:datastats}).
+
+\diagram{datapipe}{The data pipeline, from teleoperation to a versioned dataset on the Hub.}{fig:datapipe}
+
+\section{Tasks}\label{sec:tasks}
+
+Two tasks were recorded, on three datasets (Table~\ref{tab:datasets}, Figure~\ref{fig:tasks}).
+\begin{itemize}
+\item \textbf{Cube in box.} A green cube is picked up and put into a box. It is done when the cube is inside the box
+      and the gripper is open. The first recording (v0) was a smaller, initial dataset; the second (v1) repeats the
+      task with more demonstrations and the final camera arrangement.
+\item \textbf{Sorting.} A red or a blue cube, at a fixed position, is put into the square of its colour; the two
+      coloured squares swap sides between layouts. It is done when the cube is fully inside the square of its colour
+      and the gripper has let go of it. Sorting needs the policy to read the scene (which colour, which side), not
+      only to repeat one motion, and is the main task of the DRTC experiments.
+\end{itemize}
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \gentable{tab_datasets}
+  \caption{Datasets (pinned Hub revisions). Episodes: training + held out. Joint units: degrees, or LeRobot's normalised range ($-100$ to $100$) for
+           the cube-in-box recordings.}\label{tab:datasets}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \begin{subfigure}[t]{0.48\textwidth}
+    \centering
+    \photo[\textwidth]{task_sort_one.jpg}{The sorting task: the cube and the coloured squares, seen by the scene camera.}
+    \caption{Sorting.}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.48\textwidth}
+    \centering
+    \photo[\textwidth]{task_cubebox.jpg}{The cube-in-box task.}
+    \caption{Cube in box.}
+  \end{subfigure}
+  \caption{The two tasks at the start of a trial, seen by the scene camera (frames of the trial videos).}
+  \label{fig:tasks}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \begin{subfigure}[t]{0.49\textwidth}\centering
+    \includegraphics[width=\textwidth]{assets/sort_one.jpeg}
+    \caption{Sorting: the red and the blue square, and the cube on its taped mark.}\end{subfigure}\hfill
+  \begin{subfigure}[t]{0.49\textwidth}\centering
+    \includegraphics[width=\textwidth]{assets/cube_box.jpeg}
+    \caption{Cube in box: the green cube on its taped position, and the box.}\end{subfigure}
+  \caption{The task layouts seen from above, with the follower arm at rest.}\label{fig:layouts}
+\end{figure}
+
+\section{Recording}\label{sec:recording}
+
+Demonstrations are recorded by teleoperation: the operator moves the leader arm by hand and the follower copies it,
+while both cameras and the follower's joint positions are recorded at 30~fps. One command runs the whole recording
+session from the registry's rig: it opens the arms and cameras, counts episodes with a fixed episode time and reset
+time, and afterwards checks the recording (dropped frames, camera rates, joint limits), trims it, pushes it to the Hub
+and writes its pinned registry entry.
+
+\paragraph{Held-out episodes on top.} A recording of $N+K$ episodes is planned from the start: $N$ to train on and
+$K$ held out, chosen by a seeded random split and never used for training. The held-out episodes pick the best
+checkpoint during training, give the offline action error (Section~\ref{sec:offline-design}), and are what the replay
+bench plays (Section~\ref{sec:bench-design}). Sorting has $80+8$ episodes, cube in box v1 $100+10$.
+
+\paragraph{Layouts.} The object positions are taped on the task board. The layouts rotate in a fixed, balanced order
+over the episodes (for sorting: red or blue cube, times the two sides of the squares, four combinations), so every
+combination is equally represented in training and in the held-out episodes.
+
+\paragraph{Inspecting a recording.} Every recorded episode can be replayed in the Rerun viewer with
+\texttt{lab data view} (LeRobot's dataset visualiser), which shows the task instruction, both camera streams and the
+joint positions over time, with a cursor that moves through the episode (Figure~\ref{fig:rerun}). It is how bad
+episodes were found before training: a missed grasp, a camera that froze, or an arm that stood still too long.
+
+\begin{figure}[!htbp]
+  \centering
+  \begin{subfigure}{\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{assets/rerun_episode.png}
+    \caption{The Rerun viewer at 4.5~s: the task, the wrist camera (\texttt{camera1}), the scene camera
+             (\texttt{camera2}), the action (the leader arm's joint targets) and the state (the follower's measured
+             joints), six joints each, in degrees; the white line is the current time.}
+  \end{subfigure}\\[6pt]
+  \begin{subfigure}{0.32\textwidth}\centering
+    \includegraphics[width=\textwidth]{assets/rerun_t20.jpg}\caption{2.0~s: approaching the cube.}\end{subfigure}\hfill
+  \begin{subfigure}{0.32\textwidth}\centering
+    \includegraphics[width=\textwidth]{assets/rerun_t29.jpg}\caption{2.9~s: grasping it.}\end{subfigure}\hfill
+  \begin{subfigure}{0.32\textwidth}\centering
+    \includegraphics[width=\textwidth]{assets/rerun_t45.jpg}\caption{4.5~s: placing it on the blue square.}\end{subfigure}
+  \caption{One recorded sorting demonstration (episode~5 of the trimmed sorting dataset) inspected in the Rerun
+           viewer, and the scene camera at three moments of the episode.}
+  \label{fig:rerun}
+\end{figure}
+
+\section{Trimming and editing}\label{sec:trimming}
+
+A recorded episode starts and ends with the arm at rest while the operator gets ready and lets go. Trained on such
+episodes, a policy learns that standing still is a valid action at the start: published SO-101 results show that
+\enquote{never starting} is a major failure mode, which trimming the idle start and end removed almost
+entirely~\cite{valloss2026}. Every dataset is therefore kept in two copies:
+\begin{itemize}
+\item the \textbf{raw} copy, the recording as made, which is the only copy ever edited; and
+\item the \textbf{trimmed} copy, rebuilt from the raw one after every change, which is the one models train on.
+\end{itemize}
+The automatic trim measures the recording's own joint noise floor and cuts each episode's start and end where the arm
+is still, without re-encoding the videos (each episode's video window moves). Editing tools on top let the operator
+inspect every episode, view it, delete bad episodes (the rest are renumbered), set a manual trim, undo the last edit
+and push. Manual trims are stored inside the raw copy, so they travel with it. Deleting episodes changes the seeded
+held-out split, so all editing happens before training.
+
+\section{Versions and splits}\label{sec:versions}
+
+A dataset in the registry is pinned to one Hub revision, with its episode and frame counts and its joint units; a
+training run refuses a local copy that does not match. The trimmed copy has the plain name and the raw copy the suffix
+\texttt{\_raw}, so a name without the suffix is always trimmed. The joint units are part of the entry because the two
+cube-in-box recordings use LeRobot's normalised range and the sorting recording uses degrees; datasets in different
+units are never mixed, and errors are only compared within one dataset.
+
+\chart{fig_datasets}{The datasets: episodes and episode lengths, before and after trimming.}{fig:datastats}
+
+\section{Summary}
+This chapter presented the data pipeline for two tasks, cube in box and sorting, recorded across three datasets. Teleoperation captures both cameras and follower joint positions at 30~fps with balanced layout rotations and seeded held-out splits ($80+8$ episodes for sorting and $100+10$ for cube in box v1). Each dataset is kept in an editable raw copy and a rebuilt trimmed copy for training. Trimming cuts idle starts and ends based on the joint noise floor without re-encoding video, preventing policies from learning to stand still. Finally, each dataset is pinned to one Hub revision with its episode and frame counts and joint units (degrees for sorting, normalised range $-100$ to $100$ for cube in box) so different units are never mixed.

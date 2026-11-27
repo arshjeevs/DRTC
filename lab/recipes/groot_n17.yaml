@@ -1,0 +1,18 @@
+# Training recipes. `source`: who made this work and where it comes from.
+
+groot_n17_nvidia:
+  source: 'NVIDIA / LeRobot GR00T N1.7 SO-101 recipe: projector + DiT + VLLN trained, LLM and vision frozen; 20k
+    steps x batch 64; LR 1e-4, 5% warmup, wd 1e-5; chunk 16 of the 40-step head; relative arm + absolute gripper
+    (huggingface.co/docs/lerobot/groot; github.com/NVIDIA/Isaac-GR00T examples/SO100). Augmentation and state
+    dropout come from the NVIDIA base. Relative actions turn off GR00T N1.7''s native RTC prefix (modeling_groot.py)'
+  # LeRobot 0.7 registers GR00T N1.7 as `groot`; the NVIDIA weights load through policy.base_model_path (not
+  # policy.path: nvidia/GR00T-N1.7-3B is not a LeRobot checkpoint).
+  policy: groot
+  finetune: full
+  train: {steps: 20000, batch_size: 64, save_freq: 1000}
+  flags: {policy.base_model_path: nvidia/GR00T-N1.7-3B, policy.embodiment_tag: new_embodiment,
+    policy.chunk_size: 16, policy.n_action_steps: 16, policy.use_relative_actions: true,
+    policy.relative_exclude_joints: [gripper], policy.use_bf16: true, policy.tune_llm: false,
+    policy.tune_visual: false, policy.tune_projector: true, policy.tune_diffusion_model: true, policy.tune_vlln: true,
+    policy.optimizer_lr: 1.0e-4, policy.optimizer_weight_decay: 1.0e-5, policy.warmup_ratio: 0.05}
+  serve: {rtc_enabled: false, num_flow_matching_steps: null, actions_per_chunk: 16, s_min: 8}

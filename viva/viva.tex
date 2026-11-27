@@ -1,0 +1,408 @@
+% Viva preparation: the questions an examiner is likely to ask, with short answers built on the project's own numbers.
+% Numbers are \R{...} keys from ../report/generated/numbers.tex, so they always match the report.
+\documentclass[11pt,a4paper]{article}
+\usepackage[a4paper,margin=22mm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath}
+\usepackage{booktabs,tabularx,array}
+\usepackage{enumitem}
+\usepackage{csquotes}
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+
+\definecolor{accent}{HTML}{1C5CAB}
+\definecolor{muted}{HTML}{5E636D}
+\definecolor{warn}{HTML}{B4561E}
+\titleformat{\section}{\Large\bfseries\color{accent}}{\thesection}{0.8em}{}
+\titlespacing*{\section}{0pt}{18pt}{8pt}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{4pt}
+\pagestyle{fancy}\fancyhf{}\fancyfoot[C]{\small\color{muted}\thepage}\fancyhead[R]{\small\color{muted}Viva preparation}
+\renewcommand{\headrulewidth}{0pt}
+
+% the report's results and names
+\newcommand{\setR}[2]{\expandafter\def\csname R@#1\endcsname{#2}}
+\newcommand{\R}[1]{\ifcsname R@#1\endcsname\csname R@#1\endcsname\else\pending\fi}
+\newcommand{\pending}{\textit{\color{warn}(pending)}}
+\InputIfFileExists{../report/generated/numbers.tex}{}{}
+\newcommand{\drtc}{DRTC}
+\newcommand{\smolvla}{SmolVLA}
+\newcommand{\groot}{GR00T~N1.5}
+\newcommand{\pizerofive}{$\pi_{0.5}$}
+\newcommand{\degree}{$^\circ$}
+
+% one question: number, question, answer; \push = what to add if the examiner pushes; \trap = the mistake to avoid
+\newcounter{qn}
+\newcommand{\q}[2]{\stepcounter{qn}\par\medskip
+  {\bfseries\color{accent}Q\theqn.\ #1}\par\nopagebreak[4]#2\par}
+\newcommand{\push}[1]{\par{\small\color{muted}\textbf{If pushed:} #1}}
+\newcommand{\trap}[1]{\par{\small\color{warn}\textbf{Avoid:} #1}}
+\newcommand{\todo}[1]{{\color{warn}[#1]}}
+
+\begin{document}
+
+{\LARGE\bfseries Viva preparation}\par\smallskip
+{\large Reliable remote inference for low-cost robot manipulation under network faults}\par\smallskip
+{\color{muted}Likely questions with short answers from our own results. Every number is taken from the report's
+generated numbers, so it matches the report. Orange \pending{} marks results still running (setup v2 E1 + E2, E4).}
+
+\tableofcontents
+
+% ------------------------------------------------------------------------------------------------------------------
+\section{The two-minute answer}
+
+\textbf{What did you do?} Large robot policies (vision-language-action models of 0.45--3.4 billion parameters) are
+too big for the computer on a low-cost arm, so they run on a GPU server and the robot sends its camera images over
+the network for every chunk of actions. We built the whole system on LeRobot~0.7 for an SO-101 arm: datasets, seven
+trained policies, remote inference, network fault injection and an evaluation framework. We then asked what network
+faults do to such a robot and how to make it robust.
+
+\textbf{What did you find?} On the robot, a mix of a 1~s latency spike, 1~s of lost replies and a 1.5~s outage took
+the task success of LeRobot's shipped client from \R{main/smolvla/baseline/M1} to \R{main/smolvla/faults/M1}
+(\smolvla) and from \R{main/groot/baseline/M1} to \R{main/groot/faults/M1} (\groot): the client ended every faulted
+trial itself, one second after its action queue ran dry. With our implementation of Distributed Real-Time Chunking
+(\drtc), with four fixes we found on the real setup, success under the same faults was \R{main/smolvla/drtc/M1} and
+\R{main/groot/drtc/M1}, and the arm moved again within about 1.5~s of every fault. Smoothing the commands reduced the
+jerk \R{main/smolvla/jerkratio}$\times$ and \R{main/groot/jerkratio}$\times$ without lowering success.
+
+\textbf{Why should I believe it?} Because the first run's baseline gave up by design, we redesigned the experiments
+(setup~v2): \drtc{} against a \emph{patient} client with the same limits, ablations that take \drtc{} apart, each
+smoothing method alone before combining them, two tasks and seven policies on a replay bench, every plan frozen and
+every comparison named before the data.
+
+\subsection*{Numbers to have ready}
+\begin{tabularx}{\textwidth}{X l}
+\toprule
+Round trip on the laptop: \smolvla{} / \groot{} & \R{main/smolvla/baseline/M4med} / \R{main/groot/baseline/M4med} \\
+\quad of which inference on the A100 & \R{main/smolvla/baseline/M6} / \R{main/groot/baseline/M6} \\
+\quad network share (two uncompressed 800$\times$600 images, 2.9~MB) & about 260~ms \\
+First run: trials & \R{main/n} (2 policies $\times$ 4 conditions $\times$ 10) \\
+Success \smolvla: baseline, faults, \drtc, \drtc{} + smoothing & \R{main/smolvla/baseline/M1}, \R{main/smolvla/faults/M1},
+  \R{main/smolvla/drtc/M1}, \R{main/smolvla/smooth/M1} \\
+Success \groot: same order & \R{main/groot/baseline/M1}, \R{main/groot/faults/M1}, \R{main/groot/drtc/M1},
+  \R{main/groot/smooth/M1} \\
+Faults vs \drtc{} (Fisher): \smolvla{} / \groot & \R{main/smolvla/p/faults-drtc/M1} / \R{main/groot/p/faults-drtc/M1} \\
+Jerk reduction by smoothing & \R{main/smolvla/jerkratio}$\times$ / \R{main/groot/jerkratio}$\times$ \\
+\groot{} stall fraction: \drtc{} alone / with smoothing & \R{main/groot/drtc/M2} / \R{main/groot/smooth/M2} \\
+Raspberry Pi~5 as robot computer: loop rate; round trips & \R{edge/hz}; \R{edge/smolvla/rtt} / \R{edge/groot/rtt} \\
+Bench network & 250 $\pm$ 20~ms, 8 runs per cell, 14~s per run \\
+\bottomrule
+\end{tabularx}
+
+% ------------------------------------------------------------------------------------------------------------------
+\section{Motivation and the problem}
+
+\q{Why run the policy remotely at all?}{The policies worth using are vision-language-action models with 0.45 to 3.4
+billion parameters. A laptop GPU can serve the smallest (\smolvla), but a Raspberry Pi or a low-cost robot computer
+cannot run any of them at 30 actions per second. The usual answer, also LeRobot's, is a policy server on a GPU
+machine; the price is that every action now depends on the network.}
+
+\q{Why is the network a problem if the round trip is only 0.3--0.45~s?}{Because the robot plays the chunk while it
+waits for the next one. If the next chunk is late, the queue runs dry and the arm stops (a stall). For \groot{} the
+chunk is 16 actions, 0.53~s, barely longer than its 0.45~s round trip, so even a normal network leaves little margin.
+And real networks are not steady: WiFi has spikes, lost packets and short outages.}
+
+\q{What exactly goes wrong with LeRobot's shipped client?}{Two give-up limits. After 1~s with an empty queue it ends
+the run with a fault, and when the queue runs dry it forgets the request in flight, so the late reply that would have
+saved the run is thrown away. Also a request unanswered for 5~s ends the run. It keeps one request in flight and never
+re-sends a lost one. In the first run it ended all 20 faulted trials at the first fault; on the bench each fault type
+alone was enough (\R{bench/spike/smolvla/faults/M1f} \smolvla{} runs ended by the spike alone).}
+\push{The policies were fine: they succeeded in most trials on the normal network. The failures came from the
+client's rules.}
+
+\q{Isn't the fix just to raise the timeout?}{That removes the give-up but not the weakness. A patient client still
+keeps only half a second of actions in reserve and never replaces a lost reply: after the dropped replies it waits,
+holding the arm, until the end of the run. In our replay checks a patient client stalled for over half of a faulted
+run, with one stall of 7.5~s. That is exactly why setup~v2 compares \drtc{} with the patient client, not the shipped one.}
+\trap{Do not claim the first run proves \drtc's scheduling is better than waiting; it proves the default is
+fragile. Setup~v2 E1 answers the scheduling question: \R{v2/sort_one/e1/n} bench runs on sorting.}
+
+% ------------------------------------------------------------------------------------------------------------------
+\section{\drtc{} and our contribution}
+
+\q{What is \drtc?}{Distributed Real-Time Chunking (Jack Vial) changes \emph{when} the robot asks for actions and
+\emph{what it does} when a reply is late. Three parts: (1) a trigger that asks early, when the queue falls to
+$H-s_{\min}$ actions; (2) a latency estimate in the style of TCP (Jacobson--Karels: smoothed mean plus $1.5\times$ the
+smoothed deviation); (3) a cooldown re-request: a request unanswered within its cooldown is given up and a fresh
+observation is sent; the freshest reply always wins.}
+
+\q{What is yours and what is Vial's?}{The idea and the three mechanisms are Vial's. Ours: (a) the implementation
+inside LeRobot~0.7's own runtime, replacing only the decision of when to request and when to give up, so all of
+LeRobot's safety checks stay; (b) four fixes found on the real setup (next question); (c) six smoothing methods and a
+rule to combine them; (d) the fault injector, the evaluation framework and all the experiments on seven policies.}
+
+\q{What were the four fixes?}{All appeared only with a slow link and short chunks.
+\begin{enumerate}[nosep]
+\item \groot{} never received a chunk: the cooldown was capped at half a chunk, 8 steps = 0.27~s, while replies took
+  0.4--0.7~s, so every request was given up before its answer. Fix: the cooldown is never shorter than the measured
+  latency (the old cap is ablation A4).
+\item A storm of re-requests: replies near the estimate were given up, the server, still busy, slowed further. Fix:
+  the cooldown also covers the slowest of the last 10 replies.
+\item The robot never started on a slow link: before the first reply the cooldown was only $s_{\min}+\varepsilon$
+  steps. Fix: wait up to the 10~s start-up timeout for the first reply.
+\item \enquote{Invalid RTC delay} errors: the requested inference delay could exceed the server's chunk. Fix: cap it.
+\end{enumerate}}
+
+\q{Why Jacobson--Karels and not just the maximum of recent replies?}{Upstream uses the maximum of the last 100
+replies; one slow reply then inflates the estimate for 100 requests. Jacobson--Karels tracks the mean and the spread
+and recovers in a few replies, the same reason TCP uses it. We kept a guard on the slowest of the last 10 for the
+cooldown (fix 2), so we get a responsive estimate without giving up on replies that are merely slow. Ablation A2
+replaces our estimator with upstream's, and on sorting it changed the stall by a median of \R{v2/sort_one/e2/a2_upstream_estimator/mix/delta} points under the fault mix: on the bench's steady link the two estimates are nearly the same. Be honest that the estimator is the part that did not matter here; it should matter on a link whose latency drifts.}
+
+\q{How did you choose $s_{\min}$, $k$, the margins?}{$s_{\min}=20$ steps for 50-action policies and 8 for 16- and
+24-action ones, so the request leaves about one round trip of actions; $k=1.5$ and $\alpha=1/8$, $\beta=1/4$ as in
+TCP (RFC~6298). They were not tuned on the test data. Ablation A5 runs $s_{\min}$ at half and one and a half times
+its value to show the sensitivity.}
+
+\q{Does \drtc{} make the robot unsafe, e.g.\ acting on old observations?}{No more than upstream: LeRobot's checks stay
+in place (observation freshness, execution generations, deadlines, latched faults), and the freshest observation
+always wins, so after a fault the first chunk is computed from the current scene. The policies are closed-loop and
+continue the task from wherever the arm stopped.}
+
+% ------------------------------------------------------------------------------------------------------------------
+\section{Smoothing}
+
+\q{Where does jerky motion come from?}{Four sources: \emph{seams} (a new chunk from a newer observation does not
+continue where the old one was heading), \emph{stalls} (the arm stops and restarts), \emph{jitter} (the policy's own
+noise inside a chunk) and \emph{fault restarts} (after an outage the first new action can be far from the held pose).
+Each method targets one source.}
+
+\q{Explain each method in one line.}{\begin{itemize}[nosep]
+\item Butterworth filter: causal 2nd-order low-pass at 3~Hz on every command (jitter, seams); costs lag.
+\item Zero-lag smoothing: when a chunk arrives, filter the recent past and the queued future forward and backward
+  (zero phase), so no lag (jitter).
+\item RTC: the server is told how many actions will run during inference and guides the flow-matching denoising to
+  continue them (seams at the source); only flow-matching policies with absolute actions (\smolvla, \groot).
+\item Temporal ensembling: each step is a weighted average of every chunk that predicted it, as in ACT (seams).
+\item Adaptive playback: when the queue would run dry before the next chunk, play slower (down to half speed) instead
+  of stopping (stalls).
+\item Resume ramp: after a stall, blend from the held pose into the stream with a minimum-jerk profile (restarts).
+\end{itemize}}
+
+\q{How did you measure smoothness?}{Jerk (M7): the RMS of the third difference of the commanded arm joints at 30~Hz,
+in $10^3\,$\degree/s$^3$, \emph{only while the arm moves}. Counting idle time would make a stalling system look smooth,
+which the first version of our metric did. Also the largest single step (M8b) and the disagreement at a chunk switch
+(M8a).}
+
+\q{Couldn't smoothing just lag behind the policy and look smooth?}{Yes, which is why we added M12, the deviation from
+the plan: on every tick, the distance between what the arm was sent and what the policy asked for. The stack rule
+refuses a method that adds more than 1\degree{} of it, because the bench has no task success to show the cost of lag.}
+
+\q{Which smoothing worked? (setup v2, E3a)}{Each method did one job, the same on both tasks. Butterworth cut the jerk
+to 0.12--0.28 of \drtc{} alone for every policy, at 0.9--1.6\degree{} deviation, without changing stalls. Adaptive
+playback cut the stalls of the slow policies (\groot{} 64\,$\to$\,40\%, MolmoAct~2 55--57\,$\to$\,30--35\%, Diffusion
+48--53\,$\to$\,29--30\%) with zero deviation. Combined they gave both. The ramp helped where the arm restarts often
+(\groot's jerk to 0.18). Zero-lag helped the fast policies only; ensembling changed little.}
+
+\q{Why didn't RTC help?}{It made each request slower: \smolvla's stalls more than doubled (about 14\,$\to$\,36--38\%)
+and the smoother seams did not outweigh it. For \groot{} the jerk change was within the run-to-run spread. In the
+stack test (E3b) the stack \emph{without} RTC was better than with it on all four pairs: \smolvla's stalls stayed at
+\drtc's level (13--15\% instead of 31--33\%), and \groot's recovery from the latency spike on cube in box was 0.7~s
+instead of 2.3~s.}
+\push{RTC is designed for the case where inference is long relative to the chunk; here the network dominates the
+round trip, so delaying inference further costs more than the seam saves. The first RTC request also compiles the
+guided path and needs a warm-up.}
+
+\q{How was the final stack chosen?}{By a rule written before the bench ran, applied by a script: the stack is adaptive
+playback + resume ramp + one seam method (RTC or ensembling) + one jitter method (zero-lag or Butterworth). Per policy
+and task, a candidate is ruled out if it adds over 1\degree{} of deviation, or raises stalls or any recovery time by
+over 10\%, or recovers in fewer runs; of the rest, the lower relative jerk wins the pair; the method winning more pairs
+is chosen. Result: \R{v2/stack}.}
+\push{Both wins were thin: RTC won one pair and ensembling none; Butterworth won two of fourteen, zero-lag one; most
+pairs ruled out both. We report that honestly, and E3b shows RTC is the weak part. \todo{state here what was decided
+for E4: stack as frozen, or without RTC}}
+\trap{Do not hide that the rule chose RTC and E3b then showed it hurts. Pre-registration means the rule stands; the
+ablation is the evidence that corrects it.}
+
+% ------------------------------------------------------------------------------------------------------------------
+\section{Evaluation design and statistics}
+
+\q{Why both a robot and a bench?}{The robot gives task success but costs operator time, so only a few conditions and
+ten trials each. The bench (a replay robot that plays held-out recorded episodes as camera and joints, the same
+servers, the latency measured on the robot simulated on every reply) runs thousands of trials under every fault type,
+but nothing moves, so it has no task success. The robot answers \enquote{does the task succeed}, the bench
+\enquote{what does each fault do to timing and motion}.}
+
+\q{How is the bench realistic?}{Same code path: the same robot client, scheduler, smoothing and LeRobot policy server;
+only the camera and arm are replaced by recorded held-out episodes, and the network by a simulated 250~$\pm$~20~ms
+link, the network share measured on the robot. It reproduced the robot's failures (the shipped client ended 7--8 of 8
+runs under each single fault) and found three of our four fixes in minutes. A run whose loop drops below 27~Hz is not
+counted.}
+
+\q{What is a frozen plan, and why?}{Each study is a plan file (models, conditions, trials, success rule, time limit,
+comparisons, which are primary). Freezing pins every model to its exact Hub commit; servers only serve that commit.
+So a result can only be made one way and can always be traced to its raw trials, and no model can change mid-study.
+Plans may only grow (more trials, more models); anything else is a new plan.}
+
+\q{How do you avoid order effects on the robot?}{Rounds: each round runs every model under every condition once, in
+an order seeded by the plan's seed and the round number; layouts rotate across rounds. Drifts (light, motor
+temperature, operator fatigue) hit all conditions alike.}
+
+\q{Who judged success, and isn't that biased?}{The operator, by a success rule written in the plan before the first
+trial; the operator knows the condition. A trial ended by the system is labelled \texttt{fault} from the run's own
+record, whatever key was pressed. A setup mistake can void a trial with a reason, but voids are kept and listed, and
+never used for a policy failure. Remaining bias is a stated limitation.}
+
+\q{Why the fault shift?}{With fixed times every fault would hit the reach. Each trial's faults move by 0--4~s, seeded
+by the trial number only, so trial $k$ meets its faults at the same moments in every condition and policy (comparisons
+stay paired by trial) while faults also hit the grasp and the place.}
+
+\q{Which statistics, and why?}{Success: Wilson 95\% intervals (good at small $n$ and near 0 or 100\%); differences in
+success: Fisher's exact test. Other metrics: one value per trial, median and IQR, two-sided Mann--Whitney $U$ (no
+normality assumption; heavy tails). Comparisons only within one plan and the same policy.}
+
+\q{With so many conditions, aren't some results significant by chance?}{Yes, so each plan names its comparisons in
+advance and a few as primary; only those are tested, with the Holm correction over the plan's primary tests. Everything
+else is reported as exploratory with effect sizes and uncorrected $p$-values.}
+
+\q{Is ten (or eight) trials enough?}{For large effects only. Ten robot trials give wide intervals (\smolvla{} with
+\drtc: \R{main/smolvla/drtc/M1} with interval \R{main/smolvla/drtc/M1ci}). The shipped-client collapse (0 of 20) is
+far outside that, but smoothing's success gain is not significant. On the bench, eight runs per cell: the same cell of
+\groot{} gave jerk 178 in one plan and 219 in another, so we treat differences below about 20\% as noise. Robot plans
+can grow to twenty trials.}
+
+\q{Why is stall fraction a fair primary metric for E1 instead of success?}{The bench has no success, and against a
+patient client the question is no longer whether the run is ended but how long the arm stands still and how quickly
+it moves again after each fault (M11 recovery). Those are what \drtc's mechanisms change.}
+
+% ------------------------------------------------------------------------------------------------------------------
+\section{Results}
+
+\q{Summarise the first run.}{Sorting task, laptop + A100, 80 trials. Faults took the shipped client to
+\R{main/smolvla/faults/M1} and \R{main/groot/faults/M1} (it ended all 20 faulted trials). \drtc{} under the same faults:
+\R{main/smolvla/drtc/M1} and \R{main/groot/drtc/M1} (\R{main/smolvla/p/faults-drtc/M1} and
+\R{main/groot/p/faults-drtc/M1} against the faulted baseline), not significantly different from the fault-free
+baseline, every fault recovered. With smoothing \R{main/smolvla/smooth/M1} and \R{main/groot/smooth/M1}, jerk
+\R{main/smolvla/jerkratio}$\times$ and \R{main/groot/jerkratio}$\times$ lower.}
+
+\q{Why is \smolvla{} with \drtc{} (\R{main/smolvla/drtc/M1}) below its baseline (\R{main/smolvla/baseline/M1})?}{The
+interval is wide (\R{main/smolvla/drtc/M1ci}); the difference from the baseline is not significant. Faults still
+cost something: a stall in the middle of a grasp can move the cube. Smoothing brought it to
+\R{main/smolvla/smooth/M1}.}
+
+\q{Why does \groot{} stall so much even without faults?}{Its 16-action chunk (0.53~s) is barely longer than its
+0.45~s round trip, so the queue empties before the next chunk is ready: stall fraction \R{main/groot/baseline/M2} on
+the normal network. This is chunk length versus latency, not the faults. Adaptive playback cut it to
+\R{main/groot/smooth/M2}, at the cost of a slightly slower trial (\R{main/groot/drtc/M1t} vs \R{main/groot/smooth/M1t}).}
+
+\q{What did setup v2 show about \drtc{} against a patient client? (E1)}{On sorting, 2{,}912 bench runs: no
+difference without faults; under the fault mix \drtc{} cut the stall from \R{v2/sort_one/e1/mix/act/patient} to \R{v2/sort_one/e1/mix/act/drtc}\,\% for ACT and \R{v2/sort_one/e1/mix/smolvla/patient} to \R{v2/sort_one/e1/mix/smolvla/drtc}\,\% for \smolvla{}, and recovered from every fault for six of seven policies, while the patient client recovered \R{v2/sort_one/e1/mix/smolvla/patientrec} times (\smolvla). After an outage the patient client mostly never recovered (\R{v2/sort_one/e1/outage/smolvla/patientrec}): it re-sends once when the queue runs dry, and if that request is lost too it waits for the 10\,s startup deadline. \push{The honest negative: under a rising latency \drtc{} stalled more for every policy (\smolvla{} \R{v2/sort_one/e1/rise/smolvla/patient} vs \R{v2/sort_one/e1/rise/smolvla/drtc}\,\%), because the cooldown gives up replies that are only slow.} Cube in box is \todo{fill when bench\_v2\_drtc\_cubebox\_v1 finishes}.}
+
+\q{Which part of \drtc{} matters most? (E2)}{The cooldown, as expected before the data. Without it the stall rose
+by a median of \R{v2/sort_one/e2/a1_no_cooldown/mix/delta} points under the fault mix (\R{v2/sort_one/e2/a1_no_cooldown/mix/worse} policies), \R{v2/sort_one/e2/a1_no_cooldown/outage/delta} under outages. The estimator made no difference (\R{v2/sort_one/e2/a2_upstream_estimator/mix/delta}), the early trigger a little (\R{v2/sort_one/e2/a3_upstream_trigger/mix/delta}). \drtc's original $H/2$ cap raised the stall by \R{v2/sort_one/e2/a4_half_chunk_cap/none/delta} points even without faults: our first fix holds for all seven policies. The same cooldown is what hurts under a rising latency (\R{v2/sort_one/e2/a1_no_cooldown/rise/delta} points without it): mention it yourself.}
+
+\q{After a 1--1.5~s fault, the next chunk comes from an old observation. Is it not safer to pause than to execute
+stale actions?}{The cooldown sends a \emph{fresh} observation, so the first chunk after a fault is planned from the
+current scene; the aligned merge skips the steps the arm already executed while the request was in flight; and LeRobot
+refuses any chunk whose observation is older than 5~s. What \drtc{} never does is execute an old chunk after a long
+stall: it holds instead.}
+
+\q{Your simulator and bench measure stalls. Does less stalling mean more task success?}{Not necessarily, which is why
+the robot experiments measure success: in the first robot run \drtc{} brought success under faults back to the
+fault-free level for both policies. The bench and the simulator explain the mechanism; success is judged on the arm
+(E4), and possibly in simulation (LIBERO, proposed).}
+
+\q{When the cooldown fires, what happens to the request still running on the GPU?}{It keeps running: a forward pass
+cannot be cancelled. The replacement gets a BUSY reply, backs off one step and is sent again when the server is free,
+so a cooldown that fires too early wastes server time. That is exactly why the cooldown is never shorter than the
+measured latency and covers the slowest of the last ten replies (fixes 1--2), and why a rising latency still hurts.}
+
+\q{What did the final stack do? (E3b)}{Against \drtc{} alone it lowered the jerk 3--20$\times$ and the largest step
+2--6$\times$ for every policy, and cut the stalls of the slow policies (Diffusion 50\,$\to$\,27\%, MolmoAct~2
+57\,$\to$\,32\%, GR00T~N1.7 68\,$\to$\,49\% on sorting). Costs: 0.7--2.3\degree{} deviation from the plan, more stalls for
+\smolvla{} (because of RTC) and \pizerofive, and slower recovery for \pizerofive{} on sorting (1.0 to 2.2~s). Removing a part:
+without adaptive playback the stalls come back; without Butterworth the jerk is about twice as high; the ramp matters little;
+removing RTC lowered the stalls (\smolvla{} by 16--20 points, \groot{} by 3) at no cost in jerk.}
+
+\q{What did the Raspberry Pi test show?}{The Pi~5 holds the 30~Hz loop (\R{edge/hz}, no dropped frames), so the
+robot side fits on it. But the round trip roughly doubles (\R{edge/smolvla/rtt} and \R{edge/groot/rtt}) because each
+request crosses the hotspot WiFi to the laptop first; with the shipped client \groot's queue ran dry even without
+faults. The edge is exactly the regime \drtc{} and image compression are for; official Pi trials are future work.}
+
+\q{Which policy is best?}{Depends on the criterion. Offline on sorting \smolvla{} had the lowest held-out arm error
+(\R{offline/sortone/smolvla/M9arm}\degree), ACT was fastest (\R{offline/sortone/act/M10} per chunk) and smallest;
+\groot{} was the largest (\R{offline/sortone/groot/M10gb}). For remote inference the chunk length relative to the
+round trip decides how much it stalls: ACT and \smolvla{} barely stall, the 16-action GR00T models stall most.
+\todo{add the robot baselines when run}}
+
+% ------------------------------------------------------------------------------------------------------------------
+\section{Limitations and threats to validity}
+
+\q{What are the main limitations?}{\begin{itemize}[nosep]
+\item Small robot samples (10 per cell): only large success differences are significant.
+\item Robot \drtc{} experiments on one task and two policies; the bench covers two tasks and seven policies but has no
+  task success.
+\item The operator judges success and knows the condition (rule fixed in advance; fault labels from the record).
+\item Faults have fixed shapes with a seeded shift, not a recorded real network; the bench simulates latency.
+\item Shared GPU servers: inference times include other users' jobs.
+\item Uncompressed images: 2.9~MB per request is most of the round trip.
+\item Two trainings (\pizerofive, MolmoAct~2) stopped early for time.
+\end{itemize}}
+
+\q{Does the replay bench overstate or understate the problem?}{Its images do not react to the actions, so a policy
+cannot correct itself on the bench; we never read task outcome from it, only timing and motion, which do not depend on
+the scene reacting. The latency is the one measured on the robot. It reproduced the robot's failure pattern.}
+
+\q{Two bench runs shared the GPU at one point. Does that bias results?}{The stack evals (V4) ran in parallel with the
+\drtc{} evals on the same H200. Each eval runs one trial at a time and the GPU was idle between requests; the \drtc{}
+eval's throughput did not change (3.35 runs per minute before and during). Contention affects all conditions of an
+eval alike because trials are interleaved in rounds, and comparisons are only made within one eval.}
+
+\q{Could the results be specific to your WiFi?}{The mechanisms are general (a queue drained by playback and refilled
+over a link), and the bench sweeps the fault types rather than one network. The absolute numbers are specific; the
+ranking of schedulers under each fault type is what we claim.}
+
+\q{\pizerofive{} and MolmoAct~2 were not trained to the end. Is that a problem?}{For their task performance, possibly;
+for this project's questions, little: the bench measures timing and motion, which depend on chunk length and inference
+time, not on how well-trained the weights are. We kept the recipe's learning-rate schedule length so the stopped run is
+identical to the full one up to that step, and say so in the report.}
+
+% ------------------------------------------------------------------------------------------------------------------
+\section{Implementation and engineering}
+
+\q{What did you build besides \drtc?}{Recording and automatic trimming of datasets with a held-out split; one-command
+training with each author's recipe, logged to Weights \& Biases and Trackio; a compatibility layer for older
+checkpoints; the fault injector (drop, duplicate, reorder, spikes, latency windows, random loss, disconnects); the
+evaluation framework (frozen plans, seeded rounds, raw records, a shared results store, reports rebuilt from raw files);
+a Raspberry Pi setup; this report and the slides, built from the results. Over \R{software/tests} automated tests.}
+
+\q{What was the hardest bug?}{\groot{} never receiving a chunk under \drtc: the cooldown cap at half a 16-action chunk
+(0.27~s) was shorter than every round trip, so every request was given up and re-sent before its reply. It only shows
+with a slow link and a short chunk, which is why the replay bench with the measured latency became our main
+development tool.}
+
+\q{A method that looked good but failed?}{The soft stop: slowing the last actions before the queue ran dry. Alone it
+looked harmless, but by keeping the queue alive it let a reply from a 1.3~s old observation be accepted, and the next
+fresh chunk jumped (largest step 38--42\degree{} against 18\degree). We dropped it, and from then on tested every
+smoothing method alone before combining them.}
+
+\q{How reproducible is this?}{Every plan is frozen to exact model commits; every trial keeps its raw records, which are
+never edited; every table, figure and number in the report is rebuilt from them by one command; the training recipes are
+the authors' own, fixed in the repository; the bench runs unattended with one script.}
+
+% ------------------------------------------------------------------------------------------------------------------
+\section{Bigger picture and future work}
+
+\q{What would you do with three more months?}{Official edge trials on the Pi; compressing the images (most of the
+round trip); RTC for relative-action policies such as GR00T~N1.7 (re-anchoring the leftover actions to the new state);
+an on-robot fallback policy (ACT is small enough) that keeps the arm moving while the server is unreachable; robot
+plans grown to twenty trials and to the cube-in-box task.}
+
+\q{Would 5G or a wired link make this unnecessary?}{It would make faults rarer, not impossible, and a shorter round
+trip still drains the queue during a fault. \drtc's mechanisms cost almost nothing on a good network (the no-fault
+cells of E1 measure that cost), so they are cheap insurance.}
+
+\q{Why not run a smaller policy on the robot and avoid the network?}{That trades capability for reliability: the
+strongest policies on this arm in published SO-101 studies are the large VLAs (\pizerofive{} first). A small on-robot
+fallback combined with remote inference is in our future work.}
+
+\q{What is the one thing you want me to remember?}{Remote inference does not fail because the models are wrong but
+because the client gives up or waits for a reply that never comes. Asking early, estimating the latency properly and
+re-requesting with a fresh observation keeps the robot working through faults, and smoothing then makes the motion
+smooth, as long as you measure what it costs in deviation from the plan.}
+
+\end{document}

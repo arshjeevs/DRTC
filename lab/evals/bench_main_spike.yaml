@@ -1,0 +1,22 @@
+# Step 6 bench (lab/PLAN.md): the DRTC experiment's four conditions on the replay robot, fault: spike
+# (lab/experiments/bench_main/). sort_one, SmolVLA + GR00T N1.5, each of the 8 held-out episodes once. M2-M8 only.
+description: Bench, sort_one, fault spike - baseline, baseline + spike, DRTC + spike, DRTC + smoothing + spike (replay robot)
+success: n/a (replay robot)
+time_limit_s: 10
+trials: 8
+seed: 0
+models:
+  - smolvla_sort_one_v1_full
+  - groot_sort_one_v1_full
+conditions:
+  baseline: bench_main/baseline
+  baseline_fault: bench_main/baseline_spike
+  drtc_fault: bench_main/drtc_spike
+  drtc_smooth_fault: bench_main/drtc_smooth_spike
+video: false
+robot: replay
+
+# Written by `lab eval freeze`: the Hub commit each model is served at. Do not edit by hand.
+frozen:
+  smolvla_sort_one_v1_full: '246f7e54c3fe33c0f3ef66ded8c4da916995a399'
+  groot_sort_one_v1_full: '6b862e61ce462f063ffa5fda9af803e4143038f2'

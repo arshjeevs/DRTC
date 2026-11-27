@@ -1,0 +1,27 @@
+% Title page, as in the template: title, degree, guide, students, logo, department, institute, date.
+\begin{titlepage}
+\begin{center}
+\vspace*{0.2cm}
+{\fontsize{22}{27}\selectfont\bfseries \ReportTitle\par}
+\vspace{0.4cm}
+{\large\bfseries \ReportSubtitle\par}
+\vspace{1.0cm}
+{\itshape \ReportDegreeLine\par}
+\vspace{0.3cm}
+{\large\bfseries \ReportDegree\par}
+\vspace{1.0cm}
+{\fontsize{14}{17}\selectfont\bfseries \ReportGuideName\ (Project Guide)\par}
+{\itshape \ReportGuideTitle, \ReportDepartment\par}
+\vspace{0.9cm}
+{\itshape By\par}
+\vspace{0.3cm}
+\newcommand{\Student}[2]{{\bfseries #1} (Roll No.: #2)\par\vspace{2pt}}
+\ReportStudents{\Student}
+\vfill
+\includegraphics[height=4.2cm]{assets/nitc_logo.png}\par
+\vspace{0.8cm}
+{\fontsize{14}{17}\selectfont \ReportDepartment\par}
+{\fontsize{14}{17}\selectfont \MakeUppercase{\ReportInstitution}\par}
+{\fontsize{14}{17}\selectfont \ReportDate\par}
+\end{center}
+\end{titlepage}

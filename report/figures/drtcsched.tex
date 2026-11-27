@@ -1,0 +1,29 @@
+% D2.5 DRTC's scheduling: trigger, latency estimate, cooldown re-request, freshest reply wins.
+\input{figures/colors}
+\begin{tikzpicture}[font=\small, x=10mm, y=8mm]
+\node[anchor=east, font=\scriptsize\bfseries, text=robotline] at (-0.2,3) {robot};
+\node[anchor=east, font=\scriptsize\bfseries, text=serverline] at (-0.2,0) {server};
+\draw[robotline, thick] (0,3) -- (14.5,3); \draw[serverline, thick] (0,0) -- (14.5,0);
+% request 1: trigger at H - s_min actions left
+\draw[-{Latex[length=2mm]}, thick, ink] (1,3) -- (2.2,0);
+\node[font=\scriptsize, align=center, anchor=south] at (1,3.1) {trigger:\\[-2pt] $\le H-s_{\min}$ left};
+\draw[-{Latex[length=2mm]}, thick, greenline] (2.7,0) -- (3.9,3);
+\node[font=\scriptsize, text=greenline, anchor=south] at (3.9,3.1) {reply 1: merged};
+% latency estimate
+\draw[{Latex[length=1.5mm]}-{Latex[length=1.5mm]}, ink2] (1,4.55) -- node[above, font=\scriptsize]{measured round trip $\rightarrow$ latency estimate} (3.9,4.55);
+% request 2 lost
+\draw[-{Latex[length=2mm]}, thick, ink] (5.5,3) -- (6.7,0);
+\node[font=\scriptsize, anchor=south] at (5.5,3.1) {request 2};
+\draw[thick, serverline] (7.2,0) -- (7.9,1.6); \node[serverline, font=\bfseries] at (8.05,1.85) {$\times$};
+\node[font=\scriptsize, text=serverline, anchor=west] at (8.3,1.85) {reply lost};
+% cooldown
+\fill[faultc!40] (5.5,2.45) rectangle (9.6,2.85);
+\node[font=\scriptsize] at (7.55,2.65) {cooldown = mean + $k\cdot$deviation};
+% re-request with a fresh observation
+\draw[-{Latex[length=2mm]}, thick, ink] (9.6,3) -- (10.8,0);
+\node[font=\scriptsize, align=center, anchor=south] at (9.9,3.1) {cooldown over: re-request\\[-2pt] with a fresh observation};
+\draw[-{Latex[length=2mm]}, thick, greenline] (11.3,0) -- (12.5,3);
+\node[font=\scriptsize, text=greenline, anchor=south] at (12.9,3.1) {fresh reply: merged};
+\node[font=\scriptsize, text=ink2, align=left, anchor=north west] at (5.5,-0.35) {stale or duplicated replies are
+  ignored: the freshest observation wins (last-write-wins)};
+\end{tikzpicture}

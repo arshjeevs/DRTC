@@ -1,27 +1,65 @@
 #!/bin/bash
-# One-time Pi setup (safe to re-run): packages, /dev/video10 at boot, clock sync to laptop, venv.
-REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+# Raspberry Pi 5 (hostname raspberrypi): the robot computer of the edge setup (PLAN.md step 9). Run ON THE PI, once and
+# again after a lock change: `cd ~/drtc_major && lab/bin/pi-setup`. The arm's calibration comes from the laptop
+# (WORKFLOW.md, "The Raspberry Pi").
+#
+# - System parts the rig needs, set up only when one is missing (only then it asks for the sudo password): the phone
+#   camera's /dev/video10 (v4l2loopback) and adb, as on the laptop; the clock synced to the laptop (chrony: the one-way
+#   latency needs the two clocks to agree); ffmpeg, tmux.
+# - The environment: the lock without its CUDA stack (the Pi has no GPU; the lock's aarch64 torch wheel brings ~3 GB of
+#   CUDA libraries), then the CPU builds of the same versions: torch 2.14.1+cpu, torchvision 0.29.1+cpu.
+# - uv's managed Python 3.12 (the system one is 3.13, which the lock does not allow).
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+REPO="$PWD"
 LAPTOP_IP="${LAPTOP_IP:-10.42.0.1}"
-set -e
 
-sudo apt update
-sudo apt install -y adb ffmpeg v4l-utils tmux chrony v4l2loopback-dkms v4l2loopback-utils "linux-headers-$(uname -r)"
-
-echo v4l2loopback | sudo tee /etc/modules-load.d/v4l2loopback.conf >/dev/null
-echo 'options v4l2loopback devices=1 video_nr=10 card_label="PhoneCam" exclusive_caps=1' \
-    | sudo tee /etc/modprobe.d/v4l2loopback.conf >/dev/null
+# 1. System parts: only what is missing.
+need=()
+for p in adb ffmpeg v4l-utils tmux chrony v4l2loopback-dkms v4l2loopback-utils; do
+    dpkg -s "$p" >/dev/null 2>&1 || need+=("$p")
+done
+if [ ${#need[@]} -gt 0 ]; then
+    sudo apt update && sudo apt install -y "${need[@]}" "linux-headers-$(uname -r)"
+fi
+LOOP='options v4l2loopback devices=1 video_nr=10 card_label="PhoneCam" exclusive_caps=1'
+[ "$(cat /etc/modprobe.d/v4l2loopback.conf 2>/dev/null)" = "$LOOP" ] ||
+    echo "$LOOP" | sudo tee /etc/modprobe.d/v4l2loopback.conf >/dev/null
+grep -qx v4l2loopback /etc/modules-load.d/v4l2loopback.conf 2>/dev/null ||
+    echo v4l2loopback | sudo tee /etc/modules-load.d/v4l2loopback.conf >/dev/null
 [ -e /dev/video10 ] || sudo modprobe v4l2loopback
+CHRONY="server $LAPTOP_IP iburst minpoll 2 maxpoll 4
+makestep 1 -1"
+if [ "$(cat /etc/chrony/conf.d/lab.conf 2>/dev/null)" != "$CHRONY" ]; then
+    sudo mkdir -p /etc/chrony/conf.d
+    sudo sed -i -E 's/^(pool|server) /#&/' /etc/chrony/chrony.conf
+    printf "%s\n" "$CHRONY" | sudo tee /etc/chrony/conf.d/lab.conf >/dev/null
+    sudo systemctl restart chrony
+fi
 
-# The laptop is the only time source: one-way latency needs Pi-laptop agreement, not true UTC,
-# and this works with or without internet.
-sudo mkdir -p /etc/chrony/conf.d
-sudo sed -i -E 's/^(pool|server) /#&/' /etc/chrony/chrony.conf
-printf "server %s iburst minpoll 2 maxpoll 4\nmakestep 1 -1\n" "$LAPTOP_IP" \
-    | sudo tee /etc/chrony/conf.d/lab.conf >/dev/null
-sudo systemctl restart chrony
+# 2. The environment: the lock without its CUDA stack, then the CPU builds of the same torch versions.
+command -v uv >/dev/null || [ -x "$HOME/.local/bin/uv" ] || curl -LsSf https://astral.sh/uv/install.sh | sh
+export PATH="$REPO/.venv/bin:$HOME/.local/bin:$PATH"
+export UV_PYTHON_PREFERENCE=only-managed
+CUDA=$(grep -oE '^name = "(cuda-[a-z0-9-]+|nvidia-[a-z0-9-]+|triton)"' uv.lock | cut -d'"' -f2 | grep -v '^nvidia-ml-py$' |
+    sort -u | sed 's/^/--no-install-package /')
+# shellcheck disable=SC2086
+# --extra sim: the replay robot, for the no-arm check (`lab eval run <eval> --replay`).
+uv sync --frozen --extra sim --python 3.12 --no-install-package torch --no-install-package torchvision $CUDA
+uv pip install --python .venv/bin/python --index-url https://download.pytorch.org/whl/cpu \
+    --extra-index-url https://pypi.org/simple --index-strategy unsafe-best-match \
+    torch==2.14.1+cpu torchvision==0.29.1+cpu
+uv cache prune -q || true
 
-cd "$REPO_ROOT"
-command -v uv >/dev/null || { curl -LsSf https://astral.sh/uv/install.sh | sh; export PATH="$HOME/.local/bin:$PATH"; }
-[ -d .venv ] || uv venv --python 3.12
-uv pip install -e ".[async,feetech]"
-echo "Pi setup complete."
+# 3. Check: versions, the robot-side packages, the registry, the clock.
+.venv/bin/python - <<'PY'
+import av, cv2, lerobot, torch, torchvision, zenoh
+print(f"torch {torch.__version__} (CUDA: {torch.cuda.is_available()}), torchvision {torchvision.__version__}, "
+      f"lerobot {lerobot.__version__}, opencv {cv2.__version__}, av {av.__version__}")
+x = torch.randn(256, 256); print("matmul ok:", bool(torch.isfinite(x @ x).all()))
+PY
+.venv/bin/lab check
+chronyc tracking | grep -E "Reference ID|System time" || true
+[ -f "$HOME/.cache/huggingface/lerobot/calibration/robots/so101_follower/follower.json" ] ||
+    echo "No arm calibration yet: copy it from the laptop (WORKFLOW.md, \"The Raspberry Pi\")."
+echo "pi-setup: done. Use: cd $REPO && source .venv/bin/activate"

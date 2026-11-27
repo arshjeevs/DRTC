@@ -1,0 +1,15 @@
+\begin{tabular}{l l l l}
+\toprule
+Comparison & Metric & SmolVLA & GR00T N1.5 \\
+\midrule
+2 vs 1: faults vs.\ normal network & Success & 0\% vs.\ 90\%, $p<0.001$ & 0\% vs.\ 70\%, $p=0.003$ \\
+3 vs 2: DRTC vs.\ baseline, under faults & Success & 60\% vs.\ 0\%, $p=0.011$ & 80\% vs.\ 0\%, $p<0.001$ \\
+3 vs 1: DRTC under faults vs.\ normal network & Success & 60\% vs.\ 90\%, $p=0.303$ & 80\% vs.\ 70\%, $p=1.000$ \\
+4 vs 3: smoothing vs.\ DRTC alone & Success & 80\% vs.\ 60\%, $p=0.628$ & 100\% vs.\ 80\%, $p=0.474$ \\
+\addlinespace
+ & Jerk & 9.2 vs.\ 43.9, $p<0.001$ & 6.3 vs.\ 67.9, $p<0.001$ \\
+ & Largest step & 4.4$^\circ$ vs.\ 7.0$^\circ$, $p=0.002$ & 6.2$^\circ$ vs.\ 14.0$^\circ$, $p=0.001$ \\
+ & Stall fraction & 14.6\% vs.\ 11.4\%, $p=0.307$ & 23.8\% vs.\ 64.7\%, $p<0.001$ \\
+ & Longest stall & 0.74~s vs.\ 0.64~s, $p=0.288$ & 1.64~s vs.\ 2.78~s, $p=0.005$ \\
+\bottomrule
+\end{tabular}

@@ -1,0 +1,57 @@
+# Cube-in-box task. `revision` and `frames` pin the exact Hub version: a local copy that does not match
+# (e.g. a stale cache under a reused name) is refused by `lab check --data` and by every job.
+
+so101_cubebox_v1:
+  notes: Trimmed so101_cubebox_v1_raw (was so101_cubebox_v1_trim until 2026-11-18). 10-108 frames cut per episode.
+  repo: orangemoon599/so101_cubebox_v1
+  revision: 3ef1f445d952ae6b4a06e93b7818f053c9e5378e   # tag v3.0
+  rig: so101_v2
+  task: Pick up the green cube and put it inside the box.
+  fps: 30
+  episodes: 110
+  frames: 25067
+  use_degrees: false   # -100..100 (recorded with LeRobot 0.4.3)
+  parents: [so101_cubebox_v1_raw]
+  derivation:
+    kind: autotrim
+    params: {tool: lab/tools/autotrim.py (minor-final), move: 0.03, noise_mult: 2.0, pad_s: 0.1, min_keep_s: 1.0}
+  split: {held_out: 10, seed: 0}
+
+so101_cubebox_v1_raw:
+  notes: The untrimmed recording (was so101_cubebox_v1 until 2026-11-18). groot_cubebox_v1_lora_raw was trained on it.
+  repo: orangemoon599/so101_cubebox_v1_raw
+  revision: 408fa7e3939b35176b91de0dd999bac00e43f660   # tag v3.0
+  rig: so101_v2
+  task: Pick up the green cube and put it inside the box.
+  fps: 30
+  episodes: 110
+  frames: 29525
+  use_degrees: false   # -100..100 (recorded with LeRobot 0.4.3)
+  split: {held_out: 10, seed: 0}
+
+so101_cubebox_v0:
+  notes: Trimmed so101_cubebox_v0_raw (2026-11-19, lab trim with the v1 parameters). 0.4-3.4 s cut per episode, 19%.
+  repo: orangemoon599/so101_cubebox_v0
+  revision: 71d6ee7c96d791b51b1e52fec80ddcb4f3e8a31f   # tag v3.0
+  rig: so101_v1
+  task: Pick the green cube and place it in the box
+  fps: 30
+  episodes: 50
+  frames: 12102
+  use_degrees: false   # -100..100 (recorded with LeRobot 0.4.3)
+  parents: [so101_cubebox_v0_raw]
+  derivation:
+    kind: autotrim
+    params: {tool: drtc.data.trim, move: 0.03, noise_mult: 2.0, pad_s: 0.1, min_keep_s: 1.0}
+  split: {held_out: 5, seed: 0}   # 10% of 50, as v1 holds out 10 of 110
+
+so101_cubebox_v0_raw:
+  notes: Earlier setup of the same task, two scene cameras, untrimmed (was train_new_1 until 2026-11-18).
+  repo: orangemoon599/so101_cubebox_v0_raw
+  revision: 29fc52d7b48d40293a2722d83ce3139e4e2f5dcd   # tag v3.0
+  rig: so101_v1
+  task: Pick the green cube and place it in the box
+  fps: 30
+  episodes: 50
+  frames: 14975
+  use_degrees: false   # -100..100 (recorded with LeRobot 0.4.3)

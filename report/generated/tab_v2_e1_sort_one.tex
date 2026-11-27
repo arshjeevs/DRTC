@@ -1,0 +1,15 @@
+\begin{tabular}{l rrrrrrrrrrrrrr}
+\toprule
+Fault & \multicolumn{2}{c}{none} & \multicolumn{2}{c}{spike} & \multicolumn{2}{c}{drops} & \multicolumn{2}{c}{outage} & \multicolumn{2}{c}{mix} & \multicolumn{2}{c}{rise} & \multicolumn{2}{c}{loss} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-9}\cmidrule(lr){10-11}\cmidrule(lr){12-13}\cmidrule(lr){14-15}
+Policy & pat. & \drtc{} & pat. & \drtc{} & pat. & \drtc{} & pat. & \drtc{} & pat. & \drtc{} & pat. & \drtc{} & pat. & \drtc{} \\
+\midrule
+ACT & 0.2 & 0.2 & 9.3 & \textbf{0.3} & 0.4 & 0.2 & 2.0 & \textbf{0.3} & 50.4 & \textbf{3.3} & \textbf{6.1} & 19.7 & 0.2 & 0.2 \\
+Diffusion Policy & 32.4 & 32.1 & 40.0 & \textbf{38.2} & 69.6 & \textbf{36.6} & 61.6 & \textbf{40.9} & 77.9 & \textbf{48.8} & \textbf{41.9} & 55.5 & 51.6 & \textbf{35.8} \\
+GR00T N1.5 & 52.0 & \textbf{48.6} & 55.9 & \textbf{53.3} & 80.1 & \textbf{52.1} & 72.1 & \textbf{56.2} & 84.1 & \textbf{64.2} & \textbf{56.1} & 68.2 & 64.2 & \textbf{52.3} \\
+GR00T N1.7 & 55.8 & 55.6 & 56.9 & 57.8 & 81.8 & \textbf{59.4} & 75.9 & \textbf{60.3} & 83.9 & \textbf{68.1} & \textbf{59.9} & 69.4 & 71.8 & \textbf{59.4} \\
+MolmoAct 2 & \textbf{31.9} & 39.2 & \textbf{38.4} & 40.2 & 72.8 & \textbf{42.1} & 62.4 & \textbf{46.6} & 67.4 & \textbf{54.9} & \textbf{42.7} & 60.2 & \textbf{36.7} & 40.4 \\
+$\pi_{0.5}$ & 13.5 & 12.8 & 21.5 & 21.0 & 22.2 & 23.0 & 50.6 & \textbf{21.6} & 68.7 & \textbf{35.0} & \textbf{23.3} & 35.2 & 15.1 & 14.8 \\
+SmolVLA & 0.1 & 0.2 & 9.1 & \textbf{5.6} & 3.4 & 2.9 & 41.3 & \textbf{7.1} & 60.5 & \textbf{14.6} & \textbf{6.3} & 30.9 & 0.2 & 0.2 \\
+\bottomrule
+\end{tabular}

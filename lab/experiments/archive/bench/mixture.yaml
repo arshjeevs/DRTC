@@ -1,0 +1,8 @@
+description: Fault - one short window of each kind in sequence on the WiFi link
+model: act_sort_one_v1_full
+drop_obs:       [{start_s: 1.5, duration_s: 1.0}]
+drop_action:    [{start_s: 3.0, duration_s: 1.0}]
+dup_obs:        [{start_s: 4.5, duration_s: 1.0}]
+dup_action:     [{start_s: 6.0, duration_s: 1.0}]
+reorder_action: [{start_s: 7.5, duration_s: 1.5}]
+latency: {base_ms: 400, jitter_ms: 200, seed: 0}   # the measured WiFi link to the A100 (_wifi.md)

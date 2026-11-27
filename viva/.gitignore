@@ -1,0 +1,9 @@
+# LaTeX's temporary files and the built PDF (rebuild with `make`)
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.toc
+*.synctex.gz
+viva.pdf

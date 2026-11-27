@@ -1,0 +1,26 @@
+# THE headline eval (the user, 2026-11-20): "DRTC improves the normal stuff, and then smoothing helps".
+# One eval, so both comparisons are inside the same sessions (METRICS.md rule 5):
+#   claim 1: drtc        vs upstream  (DRTC against LeRobot's own remote inference)
+#   claim 2: drtc_smooth vs drtc      (smoothing method A on top of DRTC)
+# SmolVLA, Diffusion, GR00T N1.5 (the Phase 6 choice), the real network (laptop -> server over WiFi, raw images).
+# 20 trials per condition; rounds keep everything level, so stopping after round 10 gives 10 of each.
+description: Headline, sorting A - upstream vs DRTC vs DRTC + smoothing (SmolVLA, Diffusion, GR00T N1.5)
+success: The cube is fully inside the square of its colour and the gripper has let go of it, before the time limit.
+time_limit_s: 30
+trials: 20
+seed: 0
+models:
+  - smolvla_sort_one_v1_full
+  - diffusion_sort_one_v1_full
+  - groot_sort_one_v1_full
+conditions:
+  upstream: archive/robot/upstream          # the normal stuff: no DRTC
+  drtc: archive/replication/baseline        # DRTC (with today's fixes), as in sort_one_baseline_v2
+  drtc_smooth: archive/robot/drtc_smooth    # DRTC + smoothing A
+video: true
+
+# Written by `lab eval freeze`: the Hub commit each model is served at. Do not edit by hand.
+frozen:
+  smolvla_sort_one_v1_full: '246f7e54c3fe33c0f3ef66ded8c4da916995a399'
+  diffusion_sort_one_v1_full: '6e373e1c728c5affc32c505e4d5784f8b37d40e2'
+  groot_sort_one_v1_full: '6b862e61ce462f063ffa5fda9af803e4143038f2'

@@ -1,0 +1,109 @@
+#!/bin/bash
+# Run the setup v2 bench evals one after another on this GPU server (WORKFLOW.md, "Setup v2", V1 + V2 / V4).
+#
+#   lab/bin/bench-v2                    # the six V1 + V2 evals, short ones first
+#   lab/bin/bench-v2 bench_v2_stack_sort_one bench_v2_stack_cubebox_v1 bench_v2_stack_nortc_sort_one bench_v2_stack_nortc_cubebox_v1   # any evals, in this order (V4)
+#
+# Start it in tmux (tmux new -s bench), detach with Ctrl-b d. Per eval: start `lab eval serve`, wait for all servers,
+# a warm-up test round when the eval serves RTC (not counted), the official `lab eval run`, stop the servers.
+# Complete evals are skipped, so running it again continues where it stopped. If an eval is not complete after a run
+# (a server died and its runs were skipped), the servers are restarted and it tries again, up to 3 times.
+# Ctrl-C stops the run in progress (not counted) and the servers; `lab eval push <eval>` then pushes that session.
+# Logs: logs/bench_v2/ (summary.log = one line per step).
+set -u
+cd "$(dirname "$0")/../.." || exit 1
+[ -f .server.env ] && . ./.server.env
+LAB=.venv/bin/lab
+LOGS=logs/bench_v2
+mkdir -p "$LOGS"
+EVALS=("$@")
+[ ${#EVALS[@]} -eq 0 ] && EVALS=(bench_v2_smooth_rtc_sort_one bench_v2_smooth_rtc_cubebox_v1
+                                 bench_v2_smooth_sort_one bench_v2_smooth_cubebox_v1
+                                 bench_v2_drtc_sort_one bench_v2_drtc_cubebox_v1)
+ATTEMPTS=3
+SERVE_PID=""
+
+say() { echo "$(date '+%F %T') $*" | tee -a "$LOGS/summary.log"; }
+
+# The servers run in their own process group (setsid), so Ctrl-C in this window reaches only the runs, and stopping
+# the group stops `lab eval serve` and every model server it started.
+stop_servers() {
+  if [ -n "$SERVE_PID" ]; then
+    kill -TERM -- "-$SERVE_PID" 2>/dev/null
+    for _ in $(seq 60); do pgrep -g "$SERVE_PID" > /dev/null || break; sleep 1; done
+    pgrep -g "$SERVE_PID" > /dev/null && kill -KILL -- "-$SERVE_PID" 2>/dev/null
+    wait "$SERVE_PID" 2>/dev/null
+  fi
+  SERVE_PID=""
+}
+trap 'say "interrupted: stopping the servers"; stop_servers; exit 130' INT TERM
+
+# Start the eval's servers; 0 when all are ready, 1 when one failed.
+start_servers() {
+  local e=$1 log=$LOGS/$1.serve.log
+  : > "$log"
+  setsid "$LAB" eval serve "$e" >> "$log" 2>&1 &
+  SERVE_PID=$!
+  for _ in $(seq 1800); do   # up to 30 min (first downloads)
+    grep -q "^all [0-9]* ready" "$log" && return 0
+    kill -0 "$SERVE_PID" 2>/dev/null || return 1
+    sleep 1
+  done
+  return 1
+}
+
+# Trials for one warm-up round when the eval serves RTC (every RTC pair once, capped), else 0.
+warmup_trials() {
+  .venv/bin/python - "$1" <<'EOF'
+import sys
+from drtc.registry import Registry
+from drtc.evals import spec as S
+reg = Registry(); sp = S.load(reg, sys.argv[1])
+rtc = [m for m in sp.models if S.needs_rtc(reg, sp, m)]
+print(min(len(rtc) * len(sp.conditions), 16) if rtc else 0)
+EOF
+}
+
+complete() { "$LAB" eval status "$1" 2>/dev/null | grep -q "next: *complete"; }
+
+# Refuse to start official runs that would be refused anyway.
+if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+  echo "bench-v2: the git tree has uncommitted changes (official runs record the exact code): commit or stash first"
+  exit 1
+fi
+for e in "${EVALS[@]}"; do
+  "$LAB" eval status "$e" 2>/dev/null | grep -q "frozen: *yes" || {
+    echo "bench-v2: $e is not frozen (or unknown): freeze it on the laptop (WORKFLOW V0), push, git pull here"; exit 1; }
+done
+
+say "bench-v2 start ($(git log --oneline -1 | cut -c1-60)): ${EVALS[*]}"
+nvidia-smi --query-gpu=name,memory.used,memory.total --format=csv,noheader | sed 's/^/  GPU: /'
+for e in "${EVALS[@]}"; do
+  for attempt in $(seq $ATTEMPTS); do
+    if complete "$e"; then say "$e: complete"; break; fi
+    say "$e: attempt $attempt: starting the servers"
+    if ! start_servers "$e"; then
+      say "$e: the servers did not start; last lines of $LOGS/$e.serve.log:"
+      tail -8 "$LOGS/$e.serve.log" | tee -a "$LOGS/summary.log"
+      stop_servers
+      continue
+    fi
+    say "$e: $(grep -m1 '^all [0-9]* ready' "$LOGS/$e.serve.log")"
+    n=$(warmup_trials "$e")
+    if [ "${n:-0}" -gt 0 ]; then
+      say "$e: RTC warm-up, $n test trials (results/scratch, not counted)"
+      "$LAB" eval run "$e" --server local --test --max-trials "$n" > "$LOGS/$e.warmup.log" 2>&1
+    fi
+    say "$e: official run"
+    "$LAB" eval run "$e" --server local 2>&1 | tee -a "$LOGS/$e.run.log" | grep --line-buffered -E "^(round|=== Round|  t[0-9]+:|session|pushed|WARNING|the eval)"
+    stop_servers
+    "$LAB" eval status "$e" 2>/dev/null | grep -q "NOT PUSHED" && { say "$e: pushing"; "$LAB" eval push "$e" >> "$LOGS/$e.run.log" 2>&1; }
+  done
+  if complete "$e"; then
+    say "$e: DONE"
+  else
+    say "$e: NOT complete after $ATTEMPTS attempts: check $LOGS/$e.run.log and logs/serve/$e/; going on with the next eval"
+  fi
+done
+say "bench-v2 finished"
+for e in "${EVALS[@]}"; do "$LAB" eval status "$e" 2>/dev/null | grep -E "^  done:" | sed "s/^/  $e /"; done | tee -a "$LOGS/summary.log"

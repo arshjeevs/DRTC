@@ -1,0 +1,171 @@
+\chapter{Policies and Training}\label{ch:policies}
+
+\section{Introduction}
+To cover small task-specific models through large VLAs, this chapter first shortlists seven policies from published SO-101 studies and retires five others. It then adopts each policy's published training recipe unchanged so that differences arise from the models rather than tuning. Next, it outlines the training infrastructure and pipeline, from dataset preparation to Hub checkpointing (Figure~\ref{fig:trainpipe}). It documents the completed runs across tasks with training loss curves (Figure~\ref{fig:losscurves}) and model size versus inference time (Figure~\ref{fig:sizespeed}). Finally, it evaluates held-out action error and inference cost offline on a shared GPU (Figure~\ref{fig:offline}).
+
+\section{Choosing the policies}\label{sec:shortlist}
+
+The policies were chosen from published results on the same arm before any training, to span small task-specific
+models and large VLAs. The strongest evidence came from three SO-101 studies. In ArmnetBench~\cite{armnetbench}
+(twelve tasks, 50 demonstrations each, 2{,}518 real rollouts), the overall success was \pizerofive{}~47.6\%,
+$\pi_0$~35.1\%, GR00T~N1.7~29.4\%, Diffusion~Policy~26.7\%, ACT~19.2\%, MolmoAct~2~18.9\% and \smolvla{}~15.0\%. A
+failure-and-recovery benchmark~\cite{so101failure} (four tasks, 100 demonstrations each) found \pizerofive{}~56\%,
+ACT~34\% and \smolvla{}~33\%. A study of whether validation loss predicts robot success~\cite{valloss2026} found
+\pizerofive{} at 73\% and \smolvla{} at 38\% with 200 demonstrations, and showed that trimming the idle start of episodes
+removes most \enquote{never started} failures, and that held-out loss is a weak guide for flow and diffusion models,
+whose loss can rise while their action error falls.
+
+From this evidence seven policies were kept (Table~\ref{tab:policies}): \pizerofive, the strongest; GR00T~N1.7, with
+GR00T~N1.5 for continuity with the first experiments; MolmoAct~2, pretrained on community SO-100/101 data; \smolvla,
+small and fast; Diffusion~Policy, the strongest small model; and ACT, the smallest and fastest, which can run on the
+robot computer itself. Five candidates were retired: $\pi_0$ (superseded by \pizerofive), $\pi_0$-FAST
+(autoregressive action tokens, slow to serve), X-VLA (trains in LeRobot~0.7 but its policy server cannot serve it),
+and DOT and SFP (not in LeRobot; they would have needed their own plugins).
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \begin{tabularx}{\textwidth}{@{}l >{\raggedright\arraybackslash}X r c c c@{}}
+    \toprule
+    Policy & Kind & Chunk & Actions & Language & RTC \\
+    \midrule
+    ACT~\cite{zhao2023act} & transformer CVAE, ResNet backbone, 0.05B & 100 & absolute & no & no \\
+    Diffusion Policy~\cite{chi2023diffusion} & U-Net diffusion, ResNet-18, 0.27B & 48 (24) & absolute & no & no \\
+    \smolvla~\cite{shukor2025smolvla} & small VLM + flow-matching action expert, 0.45B & 50 & absolute & yes & yes \\
+    GR00T N1.5~\cite{nvidia2025gr00t} & VLM + diffusion transformer, 2.7B & 16 & absolute & yes & yes \\
+    GR00T N1.7~\cite{nvidia2025gr00t} & VLM + diffusion transformer, 3.1B & 16 & relative arm & yes & no$^{a}$ \\
+    \pizerofive~\cite{pi2025pi05} & VLM + flow-matching expert, 4.1B & 50 & relative & yes & yes \\
+    MolmoAct 2~\cite{molmoact2} & VLM with action reasoning + flow-matching expert, 5.6B & 30 & absolute & yes & yes \\
+    \bottomrule
+  \end{tabularx}
+  \par\smallskip\raggedright\footnotesize $^{a}$ LeRobot turns the RTC prefix off for relative-action GR00T~N1.7
+  models: the leftover actions of the previous chunk are tied to the old observation's state.
+  \caption{The seven policies. Chunk: actions per inference (executed actions in brackets where fewer are executed).
+           Actions: absolute joint targets, or relative to the current state. RTC: guided real-time chunking in our
+           setup.}\label{tab:policies}
+\end{table}
+
+\section{Original recipes}\label{sec:recipes}
+
+Each policy is trained with its authors' published recipe, unchanged (Table~\ref{tab:recipes};
+Appendix~\ref{app:recipes} has every setting), so that differences between policies come from the models and not
+from our tuning. Settings that only change speed (compilation, data-loading workers, frame caches) are kept apart from
+the recipe and never change what is learnt.
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \begin{tabularx}{\textwidth}{l X l}
+    \toprule
+    Policy & Recipe (source) and what is trained & Steps $\times$ batch \\
+    \midrule
+    ACT & Zhao et al.~\cite{zhao2023act}: full model & 100k $\times$ 8 \\
+    Diffusion Policy & Chi et al.~\cite{chi2023diffusion}, real-robot configuration: full model, ResNet-18 from scratch & 600 epochs $\times$ 64 \\
+    \smolvla & the authors~\cite{shukor2025smolvla}: action expert only, VLM frozen & 20k $\times$ 64 \\
+    GR00T N1.5 & NVIDIA's SO-101 recipe: projector and diffusion transformer; LLM and vision frozen & 10k $\times$ 32 \\
+    GR00T N1.7 & NVIDIA / LeRobot SO-101 recipe: projector, DiT and VLLN; relative arm actions & 20k $\times$ 64 \\
+    \pizerofive & openpi \texttt{pi05\_aloha\_pen\_uncap}: full fine-tune, relative joints & 20k $\times$ 64$^{b}$ \\
+    MolmoAct 2 & the authors~\cite{molmoact2}: LoRA (rank 64) on the VLM; connector and action expert trained & 50k $\times$ 16$^{b}$ \\
+    \bottomrule
+  \end{tabularx}
+  \par\smallskip\raggedright\footnotesize $^{b}$ Stopped early for time: \pizerofive{} at 15k and MolmoAct~2 at 30k steps. The
+  learning-rate schedule keeps the recipe's length, so the stopped run is the recipe's run up to that step.
+  \caption{Training recipes.}\label{tab:recipes}
+\end{table}
+
+\section{Training infrastructure}\label{sec:training-infra}
+
+\paragraph{One command per run.} A training run is started with the model's name. The command resolves the recipe and
+the pinned dataset, builds LeRobot's training command, refuses to start if a run of that model already exists (it must
+be resumed instead), and at the end pushes the model to the Hub. A clean stop (from another terminal or with Ctrl-C)
+saves a checkpoint, pushes it and exits; a stopped run continues from its last checkpoint.
+
+\paragraph{Preparing a dataset.} Before the first run on a dataset revision, a preparation step downloads it once and
+computes what the recipes need: for the relative-action policies (GR00T~N1.7 and \pizerofive) the statistics of the
+actions relative to the state. Preparing once avoids several parallel runs preparing the same copy at the same time.
+
+\paragraph{Logging.} Every run on every server logs to Weights~\&~Biases~\cite{wandb} and to LeRobot's local Trackio
+database with the same run name, configuration and metrics; training refuses to start without it, so no run is
+untracked. The logged curves are the training loss, the learning rate and the held-out loss.
+
+\paragraph{Sharing the servers.} Several runs can share one GPU. A per-machine CPU budget divides the data-loading
+workers between them, and a small job queue lets the laptop queue a run on a server; a worker there starts queued
+runs when the GPU has room.
+
+\paragraph{Speed.} Training speed was measured per policy before the full runs. Data loading was not the limit: with
+uint8 images LeRobot~0.7 loaded \R{train/samples_per_s} samples per second at batch 64 from the cube-in-box videos.
+Compiling \smolvla{} cut its H200 run from \R{train/smolvla/h_before} to \R{train/smolvla/h_after}; \pizerofive{}
+does not fit a compiled run at batch 64 even on the H200 and takes about a day.
+
+\paragraph{Checkpoints.} Each run saves checkpoints at the recipe's interval and measures the held-out loss about 20
+times. The Hub repository's root holds the checkpoint with the lowest held-out loss, which is the one served to the
+robot; the last checkpoint, with its training state, is kept as well. Because held-out loss is a weak guide for flow
+and diffusion models~\cite{valloss2026}, the offline evaluation reports the action error of both
+(Section~\ref{sec:offline}).
+
+\diagram{trainpipe}{The training pipeline, from a recipe to a model on the Hub.}{fig:trainpipe}
+
+\section{What was trained}\label{sec:trained}
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \begin{tabular}{l c c c}
+    \toprule
+    Policy & Cube in box v0 & Cube in box v1 & Sorting \\
+    \midrule
+    \smolvla & trained & trained & trained \\
+    GR00T N1.5 & trained & trained & trained \\
+    GR00T N1.7 & -- & trained & trained \\
+    ACT & -- & trained & trained \\
+    Diffusion Policy & -- & trained & trained \\
+    \pizerofive & -- & trained$^{b}$ & trained$^{b}$ \\
+    MolmoAct 2 & -- & trained$^{b}$ & trained$^{b}$ \\
+    \bottomrule
+  \end{tabular}
+  \caption{Training status (trained: on the Hub; $^{b}$ stopped early, Table~\ref{tab:recipes}).}\label{tab:training}
+\end{table}
+
+Table~\ref{tab:training} gives the state of the trainings: all seven policies are trained on both tasks. The
+cube-in-box v0 dataset was used only for the first two policies. The runs of two policies were stopped before the end of their
+recipe to fit the project's time: \pizerofive{} after 15k of its 20k steps and MolmoAct~2 after 30k of its 50k. A
+run is stopped by a step limit set in the recipe, which saves, pushes and ends the run at that step; the number of
+steps that sizes the learning-rate schedule is left at the recipe's value, so the stopped run is identical to the
+full one up to that step. Neither run logged a held-out loss, so the checkpoint served is the last one.
+
+\chart{fig_losscurves}{Training loss of the seven policies on both tasks, from the Weights \& Biases runs (smoothed). Each policy has its own training objective, so the curves compare in shape, not in level; \pizerofive{} and MolmoAct~2 end where they were stopped.}{fig:losscurves}
+
+\chart{fig_sizespeed}{Model size against the server's inference time per chunk (median over the robot-baseline trials of both tasks, H200).}{fig:sizespeed}
+
+\section{Offline evaluation}\label{sec:offline}
+
+Table~\ref{tab:offline} and Figure~\ref{fig:offline} give the held-out action error (M9) and the inference cost (M10)
+of the trained policies, measured on the \R{offline/gpu} while training jobs shared it, which is how a shared server
+is used in practice. On sorting, \smolvla{} had the lowest arm error (\R{offline/sortone/smolvla/M9arm}\degree),
+followed by Diffusion Policy (\R{offline/sortone/diffusion/M9arm}\degree), \groot{} (\R{offline/sortone/groot/M9arm}\degree)
+and ACT (\R{offline/sortone/act/M9arm}\degree). ACT was the fastest (\R{offline/sortone/act/M10} per chunk,
+\R{offline/sortone/act/M10gb}), \groot{} the largest (\R{offline/sortone/groot/M10gb}). For two policies the last
+checkpoint had a lower held-out error than the one selected by held-out loss (Table~\ref{tab:offline}), so the two
+criteria do not always agree. On cube in box v1 the order of speed is the same, ACT being the fastest. GR00T~N1.7,
+\pizerofive{} and MolmoAct~2 are trained; their offline evaluation is added when it has run.
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \begin{adjustbox}{max width=\textwidth}
+  \gentable{tab_offline}
+  \end{adjustbox}
+  \caption{Offline evaluation: held-out action error of the served and the last checkpoint (sorting in degrees; cube in
+           box in LeRobot's normalised units), and inference time and peak GPU memory over 200 requests.}\label{tab:offline}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \genfigure{fig_offline}
+  \caption{Offline evaluation: held-out arm error on sorting (top) and inference time per chunk, median to 95th
+           percentile (bottom).}
+  \label{fig:offline}
+\end{figure}
+
+\section{Summary}
+This chapter chose seven policies from SO-101 studies (ACT, Diffusion Policy, \smolvla{}, GR00T~N1.5, GR00T~N1.7, \pizerofive{}, and MolmoAct~2) and retired five. Each followed its authors' published recipe unchanged so differences come from the models rather than tuning. A single-command infrastructure managed dataset preparation, Weights~\&~Biases and Trackio logging, GPU sharing, and Hub checkpointing. All seven were trained on cube in box v1 and sorting, with \pizerofive{} and MolmoAct~2 stopped at 15k and 30k steps. Offline on a shared GPU, \smolvla{} had the lowest sorting arm error, followed by Diffusion Policy, \groot{}, and ACT; ACT was fastest and \groot{} used the most memory. Two policies' last checkpoints had lower held-out error than their lowest-loss checkpoints, while GR00T~N1.7, \pizerofive{}, and MolmoAct~2 await offline evaluation.

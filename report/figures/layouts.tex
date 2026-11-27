@@ -1,0 +1,25 @@
+% D4.2 The task layouts, schematic top views (not to scale).
+\input{figures/colors}
+\definecolor{cubered}{HTML}{D64545}\definecolor{cubeblue}{HTML}{2A78D6}\definecolor{cubegreen}{HTML}{2F9E58}
+\begin{tikzpicture}[font=\small, x=9mm, y=9mm]
+\newcommand{\tasktable}[2]{\draw[ink2, thick, rounded corners=3pt] (#1,0) rectangle ++(5,4.2);
+  \fill[ink2!25] (#1+2.1,-0.15) rectangle ++(0.8,0.55); \node[font=\scriptsize, text=ink2] at (#1+2.5,-0.45) {arm base};
+  \node[font=\small\bfseries] at (#1+2.5,4.6) {#2};}
+% sorting, layout A
+\tasktable{0}{Sorting, layout A}
+\draw[cubered, very thick, fill=cubered!12] (0.5,2.6) rectangle ++(1.2,1.2); \node[font=\scriptsize, text=cubered] at (1.1,2.35) {red square};
+\draw[cubeblue, very thick, fill=cubeblue!12] (3.3,2.6) rectangle ++(1.2,1.2); \node[font=\scriptsize, text=cubeblue] at (3.9,2.35) {blue square};
+\draw[ink2, densely dashed] (2.2,1.1) rectangle ++(0.6,0.6); \fill[cubered] (2.3,1.2) rectangle ++(0.4,0.4);
+\node[font=\scriptsize, align=center] at (2.5,0.75) {cube: red or blue,\\[-2pt] taped mark};
+% sorting, layout B (squares swapped)
+\tasktable{6.2}{Sorting, layout B}
+\draw[cubeblue, very thick, fill=cubeblue!12] (6.7,2.6) rectangle ++(1.2,1.2); \node[font=\scriptsize, text=cubeblue] at (7.3,2.35) {blue square};
+\draw[cubered, very thick, fill=cubered!12] (9.5,2.6) rectangle ++(1.2,1.2); \node[font=\scriptsize, text=cubered] at (10.1,2.35) {red square};
+\draw[ink2, densely dashed] (8.4,1.1) rectangle ++(0.6,0.6); \fill[cubeblue] (8.5,1.2) rectangle ++(0.4,0.4);
+\node[font=\scriptsize, align=center] at (8.7,0.75) {same mark};
+% cube in box
+\tasktable{12.4}{Cube in box}
+\draw[ink, very thick, fill=netfill] (15.3,2.4) rectangle ++(1.6,1.4); \node[font=\scriptsize] at (16.1,3.1) {box};
+\draw[ink2, densely dashed] (13.7,1.6) rectangle ++(0.6,0.6); \fill[cubegreen] (13.8,1.7) rectangle ++(0.4,0.4);
+\node[font=\scriptsize, align=center] at (14.1,0.75) {green cube on its\\[-2pt] taped position};
+\end{tikzpicture}

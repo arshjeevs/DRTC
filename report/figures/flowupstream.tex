@@ -1,0 +1,29 @@
+% D6.2 LeRobot's client: what happens when a reply is late or lost, as shipped and patient.
+\input{figures/colors}
+\begin{tikzpicture}[font=\footnotesize, node distance=6mm and 8mm,
+  st/.style={draw=robotline, thick, rounded corners=3pt, fill=white, align=center, text width=36mm, minimum height=10mm},
+  dec/.style={draw=ink2, thick, diamond, aspect=2.4, fill=netfill, align=center, inner sep=1pt, text width=22mm},
+  bad/.style={draw=serverline, thick, rounded corners=3pt, fill=serverfill, align=center, text width=36mm,
+              minimum height=10mm},
+  arr/.style={-{Latex[length=2mm]}, thick, ink2}, lab/.style={font=\scriptsize, text=ink2}]
+\node[st] (req) {queued playback at or below the refill time (0.5~s) or one turnaround: send a request};
+\node[dec, below=of req] (rep) {reply arrived?};
+\node[st, right=12mm of rep] (merge) {merge the chunk; keep executing};
+\node[dec, below=of rep] (dry) {queue empty?};
+\node[st, right=12mm of dry] (wait) {keep executing the queue and check again};
+\draw[arr] (req) -- (rep); \draw[arr] (rep) -- node[lab, above]{yes} (merge);
+\draw[arr] (rep) -- node[lab, left]{not yet} (dry); \draw[arr] (dry) -- node[lab, above]{no} (wait);
+\draw[arr] (merge.north) |- (req.east);
+% the two settings
+\node[bad, below=12mm of dry, xshift=-25mm] (ship) {\textbf{as shipped:} hold the arm; no action for 1~s (the
+  starvation grace) ends the run; a request unanswered for 5~s also ends it};
+\node[st, below=12mm of dry, xshift=25mm] (fresh) {\textbf{patient} (both limits = the whole trial): hold the arm;
+  forget the request in flight; send one fresh request};
+\node[dec, below=of fresh] (lost) {that reply arrives?};
+\node[st, right=8mm of lost, text width=20mm] (resume) {resume};
+\node[bad, below=of lost] (end) {nothing more is sent; LeRobot's 10~s start-up deadline ends the run};
+\draw[arr] (dry.south) -- node[lab, right, pos=0.4]{yes} ++(0,-5mm) -| (ship.north);
+\draw[arr] (dry.south) ++(0,-5mm) -| (fresh.north);
+\draw[arr] (fresh) -- (lost); \draw[arr] (lost) -- node[lab, above]{yes} (resume);
+\draw[arr] (lost) -- node[lab, left]{no (lost)} (end);
+\end{tikzpicture}

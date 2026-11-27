@@ -1,0 +1,19 @@
+% The whole project: record -> train -> evaluate (three ways) -> report, and what carries the work between stages.
+\input{figures/colors}
+\begin{tikzpicture}[font=\small, node distance=5mm and 7mm,
+  st/.style={draw=#1, thick, rounded corners=2pt, fill=white, align=center, minimum width=29mm, minimum height=13mm,
+             inner sep=3pt},
+  arr/.style={-{Latex[length=2.2mm]}, thick, ink2}]
+\node[st=robotline] (rec) {\textbf{Record}\\ leader arm, cameras\\ trim, review};
+\node[st=serverline, right=of rec] (tr) {\textbf{Train}\\ 7 policies,\\ original recipes};
+\node[st=greenline, right=of tr, yshift=17mm] (off) {\textbf{Offline}\\ held-out error,\\ inference cost};
+\node[st=greenline, right=of tr] (rob) {\textbf{Robot}\\ trials, success,\\ the conditions};
+\node[st=greenline, right=of tr, yshift=-17mm] (ben) {\textbf{Bench}\\ replay robot,\\ every fault};
+\node[st=purpleline, right=of rob] (rep) {\textbf{Report}\\ tables, figures\\ from raw files};
+\draw[arr] (rec) -- (tr); \draw[arr] (tr) -- (rob); \draw[arr] (tr.east) -- ++(2mm,0) |- (off.west);
+\draw[arr] (tr.east) -- ++(2mm,0) |- (ben.west);
+\draw[arr] (rob) -- (rep); \draw[arr] (off.east) -- ++(2mm,0) |- (rep.west); \draw[arr] (ben.east) -- ++(2mm,0) |- (rep.west);
+\node[below=4mm of rec, font=\scriptsize, text=ink2, align=center] {datasets on the Hub\\ \texttt{recorded.yaml} in git};
+\node[below=4mm of tr, font=\scriptsize, text=ink2, align=center] {models on the Hub\\ (best and final checkpoint)};
+\node[below=2mm of ben, font=\scriptsize, text=ink2, align=center] {sessions in the\\ results store};
+\end{tikzpicture}

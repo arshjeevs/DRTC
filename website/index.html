@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Reliable remote inference for low-cost robot arms</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+:root {
+  --bg: #F6F5F1; --panel: #FCFBF8; --ink: #15191F; --muted: #5E636D; --grid: #DEDBD2;
+  --accent: #1C5CAB; --accent-soft: #D6E2F2; --alert: #EB6834; --alert-soft: #FBE1D6; --good: #2E7D4F;
+  --fault: rgba(235, 104, 52, 0.12);
+  --display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --text: "Inter", "Segoe UI", system-ui, sans-serif;
+  --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #15191F; --panel: #1C2128; --ink: #F1F0EC; --muted: #A9AEB8; --grid: #2E343D;
+  --accent: #6DA7EC; --accent-soft: #233650; --alert: #F08A5D; --alert-soft: #43291F; --good: #5DBB85;
+  --fault: rgba(240, 138, 93, 0.14); color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #15191F; --panel: #1C2128; --ink: #F1F0EC; --muted: #A9AEB8; --grid: #2E343D;
+  --accent: #6DA7EC; --accent-soft: #233650; --alert: #F08A5D; --alert-soft: #43291F; --good: #5DBB85;
+  --fault: rgba(240, 138, 93, 0.14); color-scheme: dark; }
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.6 var(--text); margin: 0; }
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:hover { text-decoration-thickness: 2px; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.wrap {
+  max-width: 980px;
+  margin: 0 auto;
+  padding-block: 32px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid;
+  gap: 36px;
+}
+
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; color: var(--ink); }
+h1 { font-size: clamp(28px, 4.2vw, 42px); font-weight: 700; letter-spacing: -0.015em; line-height: 1.12; }
+h2 { font-size: clamp(20px, 2.5vw, 24px); font-weight: 700; letter-spacing: -0.01em; }
+h3 { font-size: 16px; font-weight: 700; }
+p { margin: 0; }
+
+/* Header */
+header { display: grid; gap: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--grid); }
+.eyebrow { font: 600 12px/1 var(--text); letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+.subtitle { font-size: 17px; color: var(--muted); max-width: 66ch; line-height: 1.45; }
+.authors { font-size: 14px; color: var(--muted); }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; padding-top: 4px; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--panel); color: var(--ink); border: 1px solid var(--grid); border-radius: 6px;
+  padding: 9px 14px; font: 500 14px/1.2 var(--text); text-decoration: none;
+}
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+:root[data-theme="dark"] .btn.primary { color: #0E1116; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn.primary { color: #0E1116; } }
+.btn.inject { border-color: var(--alert); color: var(--alert); }
+
+/* Sections & Panels */
+main { display: grid; gap: 36px; min-width: 0; }
+section { display: grid; gap: 14px; min-width: 0; }
+.prose { display: grid; gap: 12px; max-width: 74ch; color: var(--ink); }
+.muted { color: var(--muted); }
+
+.panel {
+  background: var(--panel); border: 1px solid var(--grid); border-radius: 10px;
+  padding: 16px 18px; display: grid; gap: 8px; min-width: 0;
+}
+
+/* Video */
+.video-box {
+  background: var(--panel); border: 1px solid var(--grid); border-radius: 10px;
+  padding: 12px; display: grid; gap: 10px;
+}
+video {
+  width: 100%; max-width: 100%; height: auto; display: block;
+  border-radius: 6px; background: #0E1116;
+}
+.caption { font-size: 13.5px; color: var(--muted); line-height: 1.5; }
+
+/* Four-item grid */
+.grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.card-tag {
+  font: 600 11px/1 var(--text); letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--accent);
+}
+.panel p { font-size: 14px; color: var(--muted); }
+
+/* Results table & figures */
+.tbl-wrap {
+  background: var(--panel); border: 1px solid var(--grid); border-radius: 10px;
+  padding: 12px 16px; overflow-x: auto; min-width: 0;
+}
+table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 480px; }
+th, td {
+  padding: 8px 10px; border-bottom: 1px solid var(--grid);
+  text-align: left; font-variant-numeric: tabular-nums;
+}
+tr:last-child td { border-bottom: 0; }
+th { font-weight: 600; color: var(--muted); font-size: 13px; }
+
+.figures { display: grid; gap: 16px; }
+figure {
+  margin: 0; background: var(--panel); border: 1px solid var(--grid); border-radius: 10px;
+  padding: 14px 16px; display: grid; gap: 10px; min-width: 0;
+}
+figure img {
+  width: 100%; max-width: 100%; height: auto; display: block;
+  border-radius: 6px; background: #fff;
+}
+figcaption { font-size: 13.5px; color: var(--muted); line-height: 1.5; }
+figcaption strong { color: var(--ink); font-weight: 600; }
+
+.callout {
+  background: var(--alert-soft); border: 1px solid var(--alert); border-radius: 10px;
+  padding: 14px 16px; display: grid; gap: 6px;
+}
+.callout .card-tag { color: var(--alert); }
+.callout p { font-size: 14px; color: var(--ink); }
+
+/* Code blocks */
+pre {
+  margin: 0; background: var(--panel); border: 1px solid var(--grid); border-radius: 10px;
+  padding: 14px 16px; overflow-x: auto; font: 400 13px/1.55 var(--mono); color: var(--ink);
+  min-width: 0;
+}
+code { font-family: var(--mono); font-size: 0.92em; }
+p code, li code {
+  background: var(--panel); border: 1px solid var(--grid); border-radius: 4px;
+  padding: 1px 5px;
+}
+
+/* Try it */
+.try-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.try-card { justify-items: start; align-content: start; }
+
+/* Credits & footer */
+.credits { margin: 0; padding-left: 18px; display: grid; gap: 8px; max-width: 74ch; }
+.credits li { color: var(--muted); font-size: 14px; }
+.credits strong { color: var(--ink); }
+
+footer {
+  border-top: 1px solid var(--grid); padding-top: 18px;
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px 20px;
+  font-size: 13px; color: var(--muted);
+}
+.footer-links { display: flex; flex-wrap: wrap; gap: 14px; }
+
+@media (max-width: 680px) {
+  .wrap { padding-block: 22px 40px; gap: 28px; }
+  main { gap: 28px; }
+  .grid-2, .try-grid { grid-template-columns: minmax(0, 1fr); }
+  .actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">SO-101 · LeRobot 0.7 · Remote Policy Inference</div>
+    <h1>Reliable remote inference for low-cost robot arms</h1>
+    <p class="subtitle">Evaluating Distributed Real-Time Chunking (DRTC) and motion smoothing on an SO-101 arm and a seven-policy replay bench under network faults.</p>
+    <p class="authors">Author names to be added</p>
+    <div class="actions">
+      <a class="btn primary" href="paper.pdf">Paper</a>
+      <a class="btn" href="report.pdf">Report</a>
+      <a class="btn" href="https://github.com/OWNER/REPO">Code</a>
+      <a class="btn inject" href="simulator.html">Try the simulator</a>
+    </div>
+  </header>
+
+  <main>
+    <section aria-label="Project video">
+      <div class="video-box">
+        <video controls preload="metadata">
+          <source src="video/drtc_video.mp4" type="video/mp4">
+          <p>Your browser cannot play HTML5 video. <a href="video/drtc_video.mp4">Download the 2-minute project video (MP4)</a>.</p>
+        </video>
+        <p class="caption">2-minute project video: remote inference under network faults on the SO-101 arm and the replay bench.</p>
+      </div>
+    </section>
+
+    <section id="abstract">
+      <h2>Abstract</h2>
+      <div class="panel">
+        <p style="color: var(--ink); font-size: 15px;">Large vision-language-action and action-chunking policies often require GPU servers, forcing low-cost robots such as the SO-101 arm to rely on remote inference over wireless links. When network replies are delayed or lost, the client shipped with LeRobot 0.7 ends runs after one second of queue starvation and replaces a lost request only once its queue has run dry. We port Distributed Real-Time Chunking (DRTC) into LeRobot 0.7 with four fixes discovered under slow links and short chunks, implement six smoothing methods and six injectable network fault types, and build a replay bench to evaluate seven policies across two manipulation tasks. In a first robot study on sorting (80 trials), faults reduced shipped-client success to 0% for both SmolVLA and GR00T N1.5, whereas DRTC achieved 60% (SmolVLA) and 80% (GR00T N1.5). Against a patient baseline on the bench across seven policies, DRTC's cooldown re-request drives recovery from drops and outages, though it stalls more under rising latency, and smoothing cuts jerk 3–20×.</p>
+      </div>
+    </section>
+
+    <section id="problem">
+      <h2>The problem</h2>
+      <div class="prose">
+        <p>Large robot policies—vision-language-action models of 0.45 to 3.4 billion parameters—need a GPU server and are too big for the laptop or Raspberry Pi that drives a low-cost arm like the SO-101. In remote inference, the robot computer sends camera images and joint positions over the network and plays back chunks of future actions at 30 actions per second so execution can overlap with server inference.</p>
+        <p>Wireless links suffer latency spikes, dropped replies, and brief outages, which drain the robot's action queue and stall the arm. LeRobot 0.7's shipped client ends a run after one second without actions and replaces a lost request only once its queue has run dry, so a single short fault can end the task. Distributed Real-Time Chunking (DRTC) addresses this with early requests, RTT estimation, and cooldown re-requests, and we evaluate it against LeRobot's own client under controlled faults, take it apart to see which parts matter, and pair it with motion smoothing.</p>
+      </div>
+    </section>
+
+    <section id="built">
+      <h2>What we built</h2>
+      <div class="grid-2">
+        <article class="panel">
+          <div class="card-tag">1 · Client scheduling</div>
+          <h3>DRTC on LeRobot 0.7 with four fixes</h3>
+          <p>Ported DRTC's early trigger, Jacobson–Karels latency estimator, and cooldown re-request inside LeRobot 0.7's runtime with all safety checks, adding four fixes found on slow links and short chunks: removing the half-chunk cooldown cap, flooring the cooldown by recent replies to stop re-request storms, allowing a 10 s initial reply wait, and capping RTC delay.</p>
+        </article>
+        <article class="panel">
+          <div class="card-tag">2 · Testing infrastructure</div>
+          <h3>Network fault injection and a replay bench</h3>
+          <p>Added deterministic, trial-shifted injection of six fault types directly in the client transport, paired with a replay-robot plugin that streams held-out episodes over simulated 250–270 ms WiFi latency so all seven policies run cleanly on one machine.</p>
+        </article>
+        <article class="panel">
+          <div class="card-tag">3 · Motion quality</div>
+          <h3>Six smoothing methods</h3>
+          <p>Implemented a causal Butterworth filter, zero-lag queue smoothing, guided Real-Time Chunking (RTC), temporal ensembling, adaptive playback, and a minimum-jerk resume ramp, tested individually and combined using a pre-registered lag-guarded selection rule.</p>
+        </article>
+        <article class="panel">
+          <div class="card-tag">4 · Reproducible science</div>
+          <h3>Evaluation framework rebuilt from raw records</h3>
+          <p>Built an experiment registry pinning rigs, datasets, recipes, model commits, and frozen plans, running trials in seeded rounds and rebuilding every metric, table, and figure directly from the raw trial records.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="results">
+      <h2>Results</h2>
+      <p class="muted">First robot run on the sorting task (80 trials) under a mix of a 1 s latency spike, 1 s of lost replies, and a 1.5 s outage, followed by seven-policy replay-bench studies (setup v2):</p>
+
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Condition (first robot run, sorting)</th>
+              <th>SmolVLA</th>
+              <th>GR00T N1.5</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Normal network, LeRobot as shipped</td>
+              <td>90%</td>
+              <td>70%</td>
+            </tr>
+            <tr>
+              <td>Faults, LeRobot as shipped</td>
+              <td>0% (client ended every run)</td>
+              <td>0% (client ended every run)</td>
+            </tr>
+            <tr>
+              <td>Faults, DRTC</td>
+              <td>60%</td>
+              <td>80%</td>
+            </tr>
+            <tr>
+              <td>Faults, DRTC + smoothing</td>
+              <td>80% (4.8× less jerk)</td>
+              <td>100% (10.8× less jerk)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout">
+        <div class="card-tag">Honest negatives</div>
+        <p><strong>Rising latency:</strong> When every reply slowed by 0.4 s for 5 s, DRTC stalled more than a patient LeRobot client on every policy because its cooldown tracks recent faster replies and aborts valid slower ones. <strong>Slow-link RTC:</strong> Guided Real-Time Chunking (RTC) hurt on our network-dominated link—roughly doubling SmolVLA's stalls—because the extra inference time cost more stalls than smoother seams saved.</p>
+      </div>
+
+      <div class="figures">
+        <figure>
+          <img src="figures/fig_main_success.png" loading="lazy" alt="Bar chart of task success on the sorting task across four conditions for SmolVLA and GR00T N1.5 with Wilson 95% confidence intervals.">
+          <figcaption><strong>First robot run — task success:</strong> Sorting success per condition (10 trials per bar, Wilson 95% intervals): faults dropped the shipped client to 0%, while DRTC restored success to 60% (SmolVLA) and 80% (GR00T N1.5) and DRTC with smoothing reached 80% and 100%.</figcaption>
+        </figure>
+
+        <figure>
+          <img src="figures/fig_main_timeline.png" loading="lazy" alt="Joint position timelines for one median-jerk SmolVLA trial in each of the four conditions, showing fault windows, stalls, and fault termination.">
+          <figcaption><strong>First robot run — behaviour over time:</strong> Commanded position of the most-moving arm joint in one median-jerk SmolVLA trial per condition: the shipped client ends at the first spike, DRTC holds through every fault and resumes, and smoothing removes the jumps at chunk switches.</figcaption>
+        </figure>
+
+        <figure>
+          <img src="figures/fig_bench.png" loading="lazy" alt="Replay-bench plots comparing runs ended by a fault and median jerk across spike, drops, outage, and mix faults.">
+          <figcaption><strong>First benches — each fault on its own:</strong> Replay-robot runs per fault type (8 runs per cell, 250 ms ± 20 ms simulated latency): every fault alone caused the shipped client to end all SmolVLA runs, whereas DRTC ended none and smoothing lowered jerk under every fault type.</figcaption>
+        </figure>
+
+        <figure>
+          <img src="figures/fig_v2_e1_sort_one.png" loading="lazy" alt="Slope chart comparing median stall fraction across seven policies for patient upstream in orange and DRTC in green across fault types on sorting.">
+          <figcaption><strong>Setup v2 (E1) — DRTC vs. patient upstream:</strong> Median stall fraction across seven policies on sorting for patient upstream (orange) and DRTC (green): DRTC cuts stalls under drops, outages, and the mix, but stalls more than patient upstream on every policy when latency rises.</figcaption>
+        </figure>
+
+        <figure>
+          <img src="figures/fig_v2_stack.png" loading="lazy" alt="Comparison of median stall fraction under the fault mix for DRTC alone in grey and DRTC with the smoothing stack in orange, with jerk reduction factors on the right.">
+          <figcaption><strong>Setup v2 (E3b) — smoothing stack:</strong> Median stall fraction under the fault mix for DRTC alone (grey) versus the smoothing stack (orange) with jerk reduction factors on the right: the stack cuts jerk 3–20× and reduces slow-policy stalls, while guided RTC roughly doubles SmolVLA's stalls on this slow link.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section id="try-it">
+      <h2>Try it</h2>
+      <div class="try-grid">
+        <div class="panel try-card">
+          <div class="card-tag">In the browser</div>
+          <h3>DRTC Fault Simulator</h3>
+          <p>Compare LeRobot as shipped, patient LeRobot, and DRTC side by side under scheduled or live-injected faults, and toggle DRTC's three parts.</p>
+          <a class="btn primary" href="simulator.html">Open DRTC Fault Simulator</a>
+        </div>
+        <div class="panel try-card">
+          <div class="card-tag">Local GPU + replay robot</div>
+          <h3>Live interactive console</h3>
+          <pre><code>.venv/bin/lab demo</code></pre>
+          <p><code>lab demo</code> runs the real LeRobot and DRTC clients against SmolVLA on a local GPU with the replay robot as the arm and opens a browser console at <code>http://127.0.0.1:8765</code> where you trigger faults live.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="reproduce">
+      <h2>Reproduce</h2>
+      <p class="muted">Every official trial is stored raw in a results store on the Hugging Face Hub, and reports are rebuilt from it:</p>
+      <pre><code>.venv/bin/lab eval report sort_one_drtc_main --pull     # one evaluation's tables and statistics
+make -C report                                          # the report: numbers, tables, figures, PDF
+.venv/bin/python presentation/build.py                  # the slides
+.venv/bin/python presentation/video.py                  # the project video</code></pre>
+    </section>
+
+    <section id="credits">
+      <h2>Credits</h2>
+      <ul class="credits">
+        <li><strong>DRTC</strong> is Jack Vial's method (<a href="https://jackvial.com/posts/distributed-real-time-chunking.html">technical write-up</a>); this repository started from his code, and our implementation on LeRobot 0.7, the fixes, the smoothing study, and the evaluation are new.</li>
+        <li><strong>LeRobot</strong> (Hugging Face) provides the robot drivers, training, the policies, and the remote-inference runtime.</li>
+        <li><strong>Policies</strong> are their authors': ACT, Diffusion Policy, SmolVLA, GR00T N1.5 and N1.7, π0.5, and MolmoAct 2, each trained with its published recipe.</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    <span>Licensed under the Apache License 2.0.</span>
+    <div class="footer-links">
+      <a href="paper.pdf">Paper</a>
+      <a href="report.pdf">Report</a>
+      <a href="simulator.html">Simulator</a>
+      <a href="https://github.com/OWNER/REPO">GitHub</a>
+    </div>
+  </footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,4 @@
+#!/bin/bash
+# Old name kept for compatibility: lab results (lab results -h)
+source "$(dirname "$0")/../_env"
+exec "$LAB" results "$@"

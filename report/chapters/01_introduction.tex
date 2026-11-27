@@ -1,0 +1,108 @@
+\chapter{Introduction}\label{ch:intro}
+
+\section{General overview}\label{sec:overview}
+
+This project is about running learned robot policies on a low-cost arm when the policy lives on a different computer.
+The arm is an SO-101, an open-source six-joint arm built from hobby servos. It is driven by a small robot computer
+(in the official trials a Raspberry~Pi~5) that reads two cameras and the arm's joint positions thirty times a second.
+The policies that decide what the arm should do are trained neural networks, from small task-specific models to
+vision-language-action (VLA) models with several billion parameters, and they run on a GPU server reached over the
+network. Every action the arm takes therefore depends on that network.
+
+Figure~\ref{fig:projectflow} shows the work as one flow. We built the hardware setup and a software platform on the
+open LeRobot library; recorded demonstrations of two tasks by teleoperation and turned them into versioned datasets;
+trained seven policies with their authors' own recipes on two shared GPU servers; served them to the robot through
+LeRobot's remote-inference runtime, to which we added the scheduling of Distributed Real-Time Chunking (\drtc), six
+smoothing methods and a network fault injector; and evaluated everything with a framework that fixes each experiment
+before it runs and rebuilds every result from the raw records of its trials. The robot baselines of all seven policies
+on both tasks, run from the Raspberry~Pi, are the first results; the robot experiment that tests \drtc{} under
+controlled network faults completes the report.
+
+\diagram{projectflow}{The project in one flow, from the hardware to the results.}{fig:projectflow}
+
+\section{Motivation}
+
+Robots can now learn manipulation skills from a few dozen human demonstrations. Early policies of this kind, such as
+Action Chunking with Transformers (ACT)~\cite{zhao2023act} and Diffusion Policy~\cite{chi2023diffusion}, are small
+networks trained for one task. Vision-language-action (VLA) models extend them with a pretrained vision-language
+backbone that reads camera images, the robot's joint state and a written instruction, and outputs actions; examples
+are \smolvla~\cite{shukor2025smolvla}, the GR00T family~\cite{nvidia2025gr00t}, \pizerofive~\cite{pi2025pi05} and
+MolmoAct~2~\cite{molmoact2}. These models have from about half a billion to several billion parameters and need a GPU.
+
+A low-cost arm, however, is driven by a small computer: a laptop or a single-board computer such as a Raspberry Pi.
+The practical arrangement is \emph{remote inference}: the robot computer sends each observation over the network to a
+GPU server, and the server replies with a \emph{chunk} of future actions that the robot executes at its control rate
+(30~actions per second here). Because one reply carries many actions, the robot can keep moving while the next request
+is in flight, which is what makes remote inference workable at all~\cite{shukor2025smolvla}.
+
+The network is the weak point. WiFi links show latency spikes, lose messages and drop out for short periods. When a
+reply is late or lost, the robot's queue of actions empties and the arm stops. The remote-inference client shipped with
+LeRobot~0.7~\cite{lerobot}, the open robot-learning library this project builds on, ends a run after one second without
+actions and never replaces a lost reply, so a short fault ends or stalls the task.
+
+\diagram{problem}{The problem: a network fault empties the robot's action queue and the arm stops.}{fig:problem}
+
+Distributed Real-Time Chunking (\drtc)~\cite{vial2026drtc} is a recent scheduling method for exactly this setting: it
+requests the next chunk early, estimates the latency the way TCP estimates round-trip times, and re-requests with a
+fresh observation when a reply is overdue. It has not, to our knowledge, been evaluated independently against
+LeRobot's client on task success under controlled network faults, nor taken apart to show which of its parts matter.
+
+\section{Problem statement}
+
+How much do network faults lower the task success of remote inference on a low-cost robot arm, how much of it can
+\drtc{} recover compared with a client that simply waits, which of its parts are responsible, and how can the robot's
+motion be kept smooth without lowering success?
+
+\section{Objectives}
+
+\begin{enumerate}[label=O\arabic*.]
+\item Build a platform for recording, training, serving and evaluating robot policies on a low-cost SO-101 arm, with
+      the robot computer and the GPU server on different machines.
+\item Record and trim datasets for two tasks, and train seven policies with their authors' recipes; report their
+      offline error, inference cost and baseline success.
+\item Port \drtc{} to LeRobot~0.7, and measure under controlled network faults whether it recovers task success and the
+      motion, against both the client as shipped and a patient client with the same limits.
+\item Take \drtc{} apart (cooldown, latency estimate, trigger, our fixes) and measure each part's effect.
+\item Implement smoothing methods for remote inference, test each alone, and choose and test a combination by a rule
+      fixed in advance.
+\item Make every measurement repeatable and statistically sound: plans frozen before the first trial, seeded rounds,
+      the raw record of every trial, reports rebuilt from it, and tests named in advance.
+\item Show that a Raspberry Pi can serve as the robot computer.
+\end{enumerate}
+
+\section{Contributions}
+
+\begin{enumerate}
+\item \textbf{A platform} on LeRobot~0.7: a registry of rigs, datasets, recipes, models, conditions and plans, one
+      command for every step, two plugins (GR00T~N1.5 and a replay robot), and a workflow across a laptop, a Raspberry Pi
+      and two shared GPU servers (Chapter~\ref{ch:platform}).
+\item \textbf{Data and policies}: three datasets with automatic trimming and editing tools, and seven policies trained
+      with their original recipes, chosen from published SO-101 evidence (Chapters~\ref{ch:data}
+      and~\ref{ch:policies}).
+\item \textbf{\drtc{} on LeRobot~0.7}, inside the shipped runtime with all its checks, with four fixes for failures
+      that appeared with slow links and short chunks (Section~\ref{sec:drtc}).
+\item \textbf{Six smoothing methods} for remote inference (a Butterworth filter, zero-lag smoothing of the queue, RTC,
+      temporal ensembling, adaptive playback and a resume ramp) and a rule for combining them that guards against lag
+      (Sections~\ref{sec:smoothing} and~\ref{sec:stackrule}).
+\item \textbf{Network fault injection} with seven fault types and a seeded per-trial shift (Section~\ref{sec:faults}).
+\item \textbf{An evaluation framework}: offline, robot and bench evaluations; frozen plans that only grow; seeded
+      rounds; raw records and a shared results store; metrics including recovery time and deviation from the policy's
+      plan; and primary comparisons tested with the Holm correction (Chapter~\ref{ch:evaluation}).
+\item \textbf{Experiments}: the offline evaluation of the seven trained policies, their baselines on the robot on
+      both tasks, the bench and robot experiments of setup~v2 with \drtc{} under controlled network faults, and the
+      Raspberry Pi as the robot computer (Chapters~\ref{ch:design}--\ref{ch:edge}).
+\end{enumerate}
+
+\section{Organisation of the report}
+
+Chapter~\ref{ch:background} introduces action-chunking policies, remote inference, real-time chunking, \drtc{} and
+command smoothing. Chapter~\ref{ch:platform} describes the hardware and the software platform,
+Chapter~\ref{ch:data} the tasks and datasets, and Chapter~\ref{ch:policies} the choice and training of the policies.
+Chapter~\ref{ch:control} describes the clients, our \drtc{} implementation, the smoothing methods and the fault
+injection, and Chapter~\ref{ch:evaluation} the evaluation framework. Chapter~\ref{ch:design} gives the experimental
+design, Chapter~\ref{ch:results} the results and Chapter~\ref{ch:edge} the Raspberry Pi. Chapter~\ref{ch:discussion}
+discusses the results and their limitations, and Chapter~\ref{ch:conclusion} concludes. The appendices list the training
+recipes, the full metric definitions, every condition and plan, and how to reproduce the results.
+
+\section{Summary}
+This chapter introduced the remote-inference problem for a low-cost SO-101 robot arm executing action chunks at 30~actions per second from a GPU server under network faults. It motivated evaluating Distributed Real-Time Chunking (\drtc{}) against the shipped LeRobot~0.7 client and a patient client, and stated the research questions on task success, \drtc{}'s parts and motion smoothness. Seven objectives were set out across platform construction, datasets and seven policies, porting and dissecting \drtc{}, smoothing, repeatable measurement and using a Raspberry Pi as the robot computer. The chapter then summarised seven contributions: the LeRobot~0.7 platform, three datasets, \drtc{} with four fixes, six smoothing methods, seven fault types, the evaluation framework and the experiments. Finally, it outlined the remaining chapters and appendices.

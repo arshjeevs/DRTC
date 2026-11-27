@@ -1,0 +1,5 @@
+# DRTC + smoothing method A (sort_one_drtc, condition `drtc_smooth`): DRTC's defaults (as replication/baseline)
+# plus adaptive playback (drtc.control.playback: min rate 0.5, margin 4 steps, slew 0.05).
+description: DRTC + smoothing A (adaptive playback)
+model: smolvla_sort_one_v1_full
+playback_mode: adaptive

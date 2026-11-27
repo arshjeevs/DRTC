@@ -1,0 +1,13 @@
+# Training recipes. `source`: who made this work and where it comes from.
+
+sfp_full:
+  policy: sfp
+  finetune: full
+  train: {epochs: 100, batch_size: 64, save_freq: 10000}
+  flags:
+    policy.resize_shape: [240, 320]
+    policy.crop_shape: [216, 288]
+    policy.n_obs_steps: 2
+    policy.horizon: 33
+    policy.n_action_steps: 16
+  serve: {rtc_enabled: false, num_flow_matching_steps: null, actions_per_chunk: 16, s_min: 8}

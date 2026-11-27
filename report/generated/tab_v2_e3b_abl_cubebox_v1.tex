@@ -1,0 +1,19 @@
+\begin{tabular}{l l cr cr r}
+\toprule
+ & & \multicolumn{2}{c}{Jerk without it} & \multicolumn{2}{c}{Stall without it} & Recovery \\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}
+Part removed & Policies & higher & $\times$ (median) & higher & $\Delta$ pp (median) & $\Delta$ s (median) \\
+\midrule
+adaptive playback & RTC (2) & 1/2 & 1.21 & 2/2 & 10.9 & -0.03 \\
+ & ensembling (5) & 4/5 & 1.44 & 4/5 & 15.8 & 0.00 \\
+\addlinespace
+RTC / ensembling & RTC (2) & 1/2 & 1.01 & 0/2 & -9.7 & -0.13 \\
+ & ensembling (5) & 5/5 & 1.28 & 3/5 & 0.7 & 0.00 \\
+\addlinespace
+Butterworth & RTC (2) & 2/2 & 1.69 & 1/2 & 0.4 & -0.01 \\
+ & ensembling (5) & 5/5 & 2.18 & 4/5 & 4.2 & 0.02 \\
+\addlinespace
+resume ramp & RTC (2) & 1/2 & 0.96 & 2/2 & 1.6 & 0.02 \\
+ & ensembling (5) & 4/5 & 1.09 & 3/5 & 1.6 & -0.04 \\
+\bottomrule
+\end{tabular}

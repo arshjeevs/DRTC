@@ -1,0 +1,17 @@
+% D7.3 The rule fixed before the bench that chooses the smoothing stack.
+\input{figures/colors}
+\begin{tikzpicture}[font=\footnotesize, node distance=5mm and 8mm,
+  st/.style={draw=greenline, thick, rounded corners=3pt, fill=white, align=center, text width=40mm, minimum height=10mm},
+  dec/.style={draw=ink2, thick, diamond, aspect=2.6, fill=netfill, align=center, inner sep=1pt, text width=34mm},
+  rej/.style={draw=serverline, thick, rounded corners=3pt, fill=serverfill, align=center, text width=30mm},
+  arr/.style={-{Latex[length=2mm]}, thick, ink2}, lab/.style={font=\scriptsize, text=ink2}]
+\node[st] (cand) {for each policy and dataset: each candidate against \drtc{} alone, under the mix};
+\node[dec, below=of cand] (guard) {deviation +1\degree{} or less; stall and recovery +10\% or less; recovers as often?};
+\node[rej, right=of guard] (out) {ruled out for this pair};
+\node[st, below=of guard] (win) {lowest jerk relative to its reference wins the pair (tie: lowest largest step)};
+\node[st, below=of win] (count) {the candidate winning most pairs is chosen};
+\node[st, below=of count, draw=purpleline] (stack) {\textbf{stack} = adaptive playback + resume ramp + the chosen seam
+  method (RTC or ensembling) + the chosen jitter method (Butterworth or zero-lag)};
+\draw[arr] (cand) -- (guard); \draw[arr] (guard) -- node[lab, above]{no} (out);
+\draw[arr] (guard) -- node[lab, left]{yes} (win); \draw[arr] (win) -- (count); \draw[arr] (count) -- (stack);
+\end{tikzpicture}

@@ -1,0 +1,17 @@
+% Machines and the three places that carry work between them.
+\input{figures/colors}
+\begin{tikzpicture}[font=\small, node distance=6mm and 9mm,
+  m/.style={draw=#1, thick, rounded corners=2pt, fill=white, align=center, minimum width=30mm, minimum height=13mm},
+  s/.style={draw=ink2, thick, rounded corners=2pt, fill=netfill, align=center, minimum width=34mm, minimum height=11mm},
+  arr/.style={{Latex[length=2mm]}-{Latex[length=2mm]}, thick, ink2}]
+\node[m=robotline] (lap) {\textbf{Laptop}\\ recording, robot computer\\ RTX 4060 8 GB};
+\node[m=robotline, below=of lap] (pi) {\textbf{Raspberry Pi 5}\\ edge robot computer};
+\node[s, right=18mm of lap, yshift=10mm] (git) {\textbf{git} (this repository)\\ registry, eval plans};
+\node[s, below=of git] (hub) {\textbf{Hugging Face Hub}\\ datasets, models};
+\node[s, below=of hub] (res) {\textbf{Results store}\\ (private Hub dataset)};
+\node[m=serverline, right=18mm of git, yshift=-6mm] (a100) {\textbf{A100} 80 GB\\ train, serve, bench};
+\node[m=serverline, below=of a100] (h200) {\textbf{H200} 141 GB\\ train, serve, bench\\ (container)};
+\foreach \a in {lap,pi} { \draw[arr] (\a.east) -- (git.west); \draw[arr] (\a.east) -- (hub.west); \draw[arr] (\a.east) -- (res.west); }
+\foreach \b in {a100,h200} { \draw[arr] (\b.west) -- (git.east); \draw[arr] (\b.west) -- (hub.east); \draw[arr] (\b.west) -- (res.east); }
+\draw[-{Latex[length=2mm]}, thick, densely dashed, robotline] (lap.north) to[bend left=25] node[above, font=\scriptsize]{observations / chunks (SSH tunnel)} (a100.north);
+\end{tikzpicture}
