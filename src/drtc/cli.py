@@ -237,6 +237,10 @@ def main(argv: list[str] | None = None) -> None:
         from drtc.demo.console import main as demo_main
 
         sys.exit(demo_main(argv[1:]))
+    if argv and argv[0] == "explore":  # the results explorer (panel)
+        from drtc.explorer.server import main as explore_main
+
+        sys.exit(explore_main(argv[1:]))
     if argv and argv[0] == "run":
         from drtc.control.run import main as run_main
 

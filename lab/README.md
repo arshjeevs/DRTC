@@ -22,6 +22,7 @@ Our layer on top of LeRobot 0.7 (pinned in `pyproject.toml`). The minor's setup 
 evaluation, report) explained.
 
 **Details** in [docs/](docs/): [EVALUATION.md](docs/EVALUATION.md) (how results are made and stored),
+[EXPLORER.md](docs/EXPLORER.md) (`lab explore`: the results and trial videos for the panel),
 [DATA.md](docs/DATA.md) (recording and editing datasets), [TRAIN.md](docs/TRAIN.md) (training),
 [SERVERS.md](docs/SERVERS.md) (the A100 and H200: logins, setup, rules), [SETUP-LAPTOP.md](docs/SETUP-LAPTOP.md) (a
 second robot laptop), [history/](docs/history/) (earlier plans, the research proposal, the minor's H200 setup, the
@@ -62,6 +63,7 @@ Install: laptop `uv sync --extra gpu --extra sim` (and `uv pip install matplotli
 | `lab submit <model> --host h200`, `lab worker`, `lab jobs` | queue jobs pinned to a pushed commit; run them when the GPU has room |
 | `lab serve <model>` | serve a model with LeRobot 0.7's policy server (deployment from the registry) |
 | `lab eval list\|check\|freeze\|serve\|servers\|run\|void\|status\|push\|pull\|report\|offline` | official evaluations, the bench and the offline evaluation ([WORKFLOW.md](WORKFLOW.md) parts 2-3, [docs/EVALUATION.md](docs/EVALUATION.md)); `lab eval serve --for-pi` on the laptop serves the Pi |
+| `lab explore [--port 8770] [--host 0.0.0.0]` | the results explorer: E4 and the baselines, every trial's videos and timeline, in the browser ([docs/EXPLORER.md](docs/EXPLORER.md)) |
 | `lab run <experiment> [--model M] [--robot rig\|replay]` | one test run (drtc engine: DRTC scheduling, cooldown re-request, faults, smoothing), in results/scratch |
 | `python -m drtc.evals.stack` | the final smoothing stack from the E3a bench (the fixed rule) |
 | `lab results [--experiment E]` | stalls, chunks, turnaround, faults, recoveries per run |
