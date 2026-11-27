@@ -62,3 +62,15 @@ def test_outcome_of():
     assert D.outcome_of({"label": "f", "outcome": "exit 1", "first_action_s": 0.7}, True) == "fault"
     assert D.outcome_of({"label": "time_limit", "outcome": "completed"}, True) == "time_limit"
     assert D.outcome_of({"label": "s"}, False) == "not_counted"
+
+
+def test_selection_round_trip(tmp_path):
+    f = tmp_path / "videos.yaml"
+    assert D.load_selection(f) is None  # nothing saved: every trial is shown
+    known = {("e4", "s/c/m/t01"), ("e4", "s/c/m/t02"), ("base", "s/b/m/t01")}
+    saved = D.save_selection({"e4": ["s/c/m/t02", "s/c/m/t01", "s/c/m/t02", "bogus"], "base": [], "other": ["x"]},
+                             known, f)
+    assert saved == {"e4": ["s/c/m/t02", "s/c/m/t01"]}  # order kept, duplicates, unknown ids and empty evals dropped
+    assert D.load_selection(f) == saved
+    assert f.read_text().startswith("# Written by `lab explore`")
+    assert D.save_selection({}, known, f) == {} and D.load_selection(f) == {}  # an empty choice shows nothing

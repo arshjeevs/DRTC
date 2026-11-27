@@ -6,6 +6,15 @@
 let B = null, E = null, T = null, D = null;  // bundle, eval, trial row, trial detail
 const F = { conditions: new Set(), models: new Set(), outcomes: new Set(), videoOnly: false };
 let videos = [], joint = null, rate = 1, playing = false, clockT = 0, virtualStart = null, raf = null;
+// The chosen videos: once a choice is saved (lab/explorer/videos.yaml), only those trials are shown.
+let SEL = null;    // the saved choice, eval -> [trial ids]; null = nothing saved yet (every trial is shown)
+let EDIT = false;  // choosing videos
+let DRAFT = {};    // eval -> Set of trial ids while choosing
+const showingChosen = () => !EDIT && SEL !== null;
+const chosen = (t) => !!SEL?.[E.name]?.includes(t.id);
+const drafted = (t) => !!DRAFT[E.name]?.has(t.id);
+const draftCount = () => Object.values(DRAFT).reduce((n, x) => n + x.size, 0);
+const evalsShown = () => B.evals.filter((e) => !e.missing && (!showingChosen() || (SEL[e.name] || []).length));
 
 const EVENT_TEXT = {
   spike: "Latency spike starts", drop_action: "A reply is lost", disconnect_obs: "Link down: a request is lost",
@@ -19,6 +28,11 @@ document.getElementById("top").replaceWith(topbar("trials"));
 
 loadData().then((b) => {
   B = b;
+  SEL = b.selection;
+  if (b.editable) {
+    const btn = el("button", { class: "iconbtn", id: "choosebtn", type: "button", onclick: startChoosing, text: "☆ Choose videos" });
+    document.querySelector(".topbar .spacer").after(btn);
+  }
   fromHash();
 }).catch((err) => {
   document.getElementById("side").replaceChildren(el("div", { class: "panel empty", text: `Could not read the results: ${err.message}` }));
@@ -35,12 +49,14 @@ function writeHash() {
 
 function fromHash() {
   const h = hash.get();
-  E = B.evals.find((e) => e.name === h.eval && !e.missing) || B.evals.find((e) => !e.missing);
+  const shown = evalsShown();
+  if (!shown.length) return nothingChosen();
+  E = shown.find((e) => e.name === h.eval) || shown[0];
   F.conditions = new Set((h.condition || "").split(",").filter((c) => E.cond[c]));
   F.models = new Set((h.model || "").split(",").filter((m) => E.model[m]));
   F.outcomes = new Set((h.outcome || "").split(",").filter((o) => OUTCOMES[o]));
   F.videoOnly = h.video === "1";
-  const t = E.trials.find((x) => x.id === h.id);
+  const t = E.trials.find((x) => x.id === h.id && matches(x));
   renderSide();
   openTrial(t || ordered().find((x) => x.cameras.length) || ordered()[0] || null, false);
 }
@@ -50,16 +66,20 @@ const condOrder = () => E.conditions.map((c) => c.id);
 function visibleCond(c) { return !F.conditions.size || F.conditions.has(c); }
 function visibleModel(m) { return !F.models.size || F.models.has(m); }
 function matches(t) {
+  if (showingChosen() && !chosen(t)) return false;
   return visibleCond(t.condition) && visibleModel(t.model) && (!F.outcomes.size || F.outcomes.has(t.outcome)) &&
     (!F.videoOnly || t.cameras.length);
 }
-function ordered() {
-  const ci = Object.fromEntries(condOrder().map((c, i) => [c, i]));
-  const mi = Object.fromEntries(E.models.map((m, i) => [m.id, i]));
-  return E.trials.filter(matches).sort((a, b) => (mi[a.model] - mi[b.model]) || (ci[a.condition] - ci[b.condition]) ||
+function ordered() { return sortTrials(E, E.trials.filter(matches)); }
+function sortTrials(ev, list) {
+  const ci = Object.fromEntries(ev.conditions.map((c, i) => [c.id, i]));
+  const mi = Object.fromEntries(ev.models.map((m, i) => [m.id, i]));
+  return list.sort((a, b) => (mi[a.model] - mi[b.model]) || (ci[a.condition] - ci[b.condition]) ||
     (a.trial - b.trial) || a.session.localeCompare(b.session));
 }
 
+// in the chosen-videos view, a filter only offers what some chosen trial has
+function offered(key, v) { return !showingChosen() || E.trials.some((t) => t[key] === v && chosen(t)); }
 function toggle(set, v) { if (set.has(v)) set.delete(v); else set.add(v); }
 
 function renderSide() {
@@ -67,45 +87,48 @@ function renderSide() {
   const evalSel = el("select", { class: "input", "aria-label": "Evaluation", onchange: (e) => {
     E = B.evals.find((x) => x.name === e.target.value); F.conditions.clear(); F.models.clear(); F.outcomes.clear();
     renderSide(); openTrial(ordered().find((x) => x.cameras.length) || ordered()[0], true);
-  } }, B.evals.filter((e) => !e.missing).map((e) => el("option", { value: e.name, selected: e.name === E.name ? true : null, text: `${e.title} (${e.tag})` })));
+  } }, evalsShown().map((e) => el("option", { value: e.name, selected: e.name === E.name ? true : null, text: `${e.title} (${e.tag})` })));
   const chipRow = (items, set, label) => el("div", { class: "row" }, items.map(([id, text, cls]) =>
     el("button", { class: `chip ${cls || ""}`, type: "button", "aria-pressed": set.has(id) ? "true" : "false",
       onclick: () => { toggle(set, id); renderSide(); refreshCurrent(); } }, cls ? el("span", { class: "sw" }) : null, text)));
   const filters = el("div", { class: "panel filters" },
     el("label", { class: "t", text: "Evaluation" }), evalSel,
     E.conditions.length > 1 ? [el("label", { class: "t", text: "Condition" }),
-      chipRow(E.conditions.map((c) => [c.id, c.short, `s${c.slot}`]), F.conditions)] : null,
-    el("label", { class: "t", text: "Policy" }), chipRow(E.models.map((m) => [m.id, m.name]), F.models),
+      chipRow(E.conditions.filter((c) => offered("condition", c.id)).map((c) => [c.id, c.short, `s${c.slot}`]), F.conditions)] : null,
+    el("label", { class: "t", text: "Policy" }), chipRow(E.models.filter((m) => offered("model", m.id)).map((m) => [m.id, m.name]), F.models),
     el("label", { class: "t", text: "Ending" }), chipRow(["success", "failed", "time_limit", "fault", "not_counted"]
-      .filter((o) => E.trials.some((t) => t.outcome === o)).map((o) => [o, `${OUTCOMES[o].icon} ${OUTCOMES[o].short || OUTCOMES[o].label}`]), F.outcomes),
-    el("div", { class: "row" }, el("button", { class: "chip", type: "button", "aria-pressed": F.videoOnly ? "true" : "false",
+      .filter((o) => E.trials.some((t) => t.outcome === o && (!showingChosen() || chosen(t)))).map((o) => [o, `${OUTCOMES[o].icon} ${OUTCOMES[o].short || OUTCOMES[o].label}`]), F.outcomes),
+    el("div", { class: "row" }, showingChosen() ? null : el("button", { class: "chip", type: "button", "aria-pressed": F.videoOnly ? "true" : "false",
       onclick: () => { F.videoOnly = !F.videoOnly; renderSide(); refreshCurrent(); }, text: "With video only" }),
     (F.conditions.size || F.models.size || F.outcomes.size || F.videoOnly) ? el("button", { class: "chip", type: "button",
       onclick: () => { F.conditions.clear(); F.models.clear(); F.outcomes.clear(); F.videoOnly = false; renderSide(); refreshCurrent(); }, text: "Clear filters" }) : null));
 
   const n = ordered().length;
   const matrix = el("div", { class: "panel matrix" },
-    el("div", { class: "section-head" }, el("h3", { text: `Trials (${n} shown)` }),
+    el("div", { class: "section-head" }, el("h3", { text: showingChosen() ? `Chosen videos (${n} shown)` : `Trials (${n} shown)` }),
       el("span", { class: "small muted" }, el("kbd", { text: "←" }), " ", el("kbd", { text: "→" }), " previous / next")),
-    E.models.filter((m) => visibleModel(m.id)).map((m) => el("div", { class: "mrow" },
+    E.models.filter((m) => visibleModel(m.id) && (!showingChosen() || E.trials.some((t) => t.model === m.id && matches(t)))).map((m) => el("div", { class: "mrow" },
       el("div", { class: "name", text: m.name }),
       el("div", { class: "cells" }, E.conditions.filter((c) => visibleCond(c.id)).map((c) => {
-        const ts = E.trials.filter((t) => t.model === m.id && t.condition === c.id).sort((a, b) => a.trial - b.trial || a.session.localeCompare(b.session));
+        const all = E.trials.filter((t) => t.model === m.id && t.condition === c.id).sort((a, b) => a.trial - b.trial || a.session.localeCompare(b.session));
+        const ts = showingChosen() ? all.filter(matches) : all;
+        if (!ts.length) return null;
         return el("div", { class: "cell" },
-          el("span", { class: `cl s${c.slot}`, title: c.label }, el("span", { class: "sw" }), `${E.conditions.length > 1 ? MATRIX_NAME[c.slot] + " " : ""}${ts.filter((t) => t.outcome === "success").length}/${ts.filter((t) => t.valid).length}`),
+          el("span", { class: `cl s${c.slot}`, title: c.label }, el("span", { class: "sw" }), `${E.conditions.length > 1 ? MATRIX_NAME[c.slot] + " " : ""}${all.filter((t) => t.outcome === "success").length}/${all.filter((t) => t.valid).length}`),
           el("div", { class: "sq" }, ts.map((t) => {
-            const b = el("button", { type: "button", class: `${t.outcome}${t.cameras.length ? "" : " novideo"}${matches(t) ? "" : " dim"}`,
+            const b = el("button", { type: "button", class: `${t.outcome}${t.cameras.length ? "" : " novideo"}${matches(t) ? "" : " dim"}${EDIT && drafted(t) ? " picked" : ""}`,
               "aria-current": T && T.id === t.id ? "true" : "false", "aria-label": `Trial ${t.trial}, ${OUTCOMES[t.outcome].label}`,
               onclick: () => openTrial(t, true), text: OUTCOMES[t.outcome].icon });
             return hoverable(b, () => [tipRow(`Trial ${t.trial}`, `${m.name} · ${c.short}`),
               tipRow(OUTCOMES[t.outcome].label, t.time_to_success_s ? `in ${fmt.sec(t.time_to_success_s)}` : ""),
-              el("div", { class: "k small", text: t.cameras.length ? `video: ${t.cameras.join(" + ")}` : "no video" })]);
+              el("div", { class: "k small", text: t.cameras.length ? `video: ${t.cameras.join(" + ")}` : "no video" }),
+              EDIT ? el("div", { class: "k small", text: drafted(t) ? "★ chosen" : t.cameras.length ? "not chosen" : "no video: cannot be chosen" }) : null]);
           })));
       })))),
     el("div", { class: "legend small" }, ["success", "failed", "time_limit", "fault", "not_counted"].map((o) =>
       el("span", {}, el("span", { class: "sw", style: { background: OUTCOMES[o].color } }), OUTCOMES[o].short || OUTCOMES[o].label)),
-      el("span", {}, "• = no video")));
-  side.replaceChildren(filters, matrix);
+      el("span", {}, "• = no video"), EDIT ? el("span", {}, el("span", { class: "sw", style: { background: "transparent", boxShadow: "0 0 0 2px var(--accent)" } }), "chosen") : null));
+  side.replaceChildren(EDIT ? chooseBar() : showingChosen() ? chosenNote() : null, filters, matrix);
 }
 
 function refreshCurrent() {
@@ -120,6 +143,7 @@ addEventListener("keydown", (e) => {
     const n = o[(i + (e.key === "ArrowRight" ? 1 : -1) + o.length) % o.length];
     if (n) { e.preventDefault(); openTrial(n, true); }
   } else if (e.key === " " && document.activeElement?.tagName !== "BUTTON") { e.preventDefault(); togglePlay(); }
+  else if ((e.key === "c" || e.key === "C") && EDIT && T) { e.preventDefault(); pick(T); }
 });
 
 // --- one trial ----------------------------------------------------------------------------------------------------------
@@ -156,7 +180,7 @@ function renderPlayer() {
     el("h1", { text: `${m.name} · trial ${T.trial}` }),
     outcomeBadge(T.outcome),
     T.time_to_success_s ? el("span", { class: "muted", text: `done in ${fmt.sec(T.time_to_success_s)}` }) : null,
-    el("span", { class: "spacer" }), nav(-1), nav(1),
+    el("span", { class: "spacer" }), EDIT ? pickButton() : null, nav(-1), nav(1),
     el("a", { class: "iconbtn", style: { textDecoration: "none" }, href: `/#eval=${encodeURIComponent(E.name)}`, text: "Results ↗" }));
 
   videos = [];
@@ -465,4 +489,84 @@ function factsCard() {
     el("h3", { style: { marginTop: "14px" }, text: "Events (click to jump)" }),
     el("div", { class: "tbl" }, el("table", { class: "events" }, el("tbody", {}, events.map((e) =>
       el("tr", { onclick: () => seek(e.t - 0.3) }, el("td", { class: "n", text: `${fmt.num(e.t, 2)} s` }), el("td", { text: e.text })))))));
+}
+
+// --- choosing the videos --------------------------------------------------------------------------------------------------
+function startChoosing() {
+  DRAFT = Object.fromEntries(B.evals.filter((e) => !e.missing).map((e) => [e.name, new Set(SEL?.[e.name] || [])]));
+  EDIT = true;
+  document.getElementById("choosebtn").style.display = "none";
+  if (!E) E = B.evals.find((e) => !e.missing);
+  if (!T) { renderSide(); openTrial(ordered().find((x) => x.cameras.length) || ordered()[0] || null, true); return; }
+  rerender();
+}
+
+function stopChoosing() {
+  EDIT = false;
+  const b = document.getElementById("choosebtn"); if (b) b.style.display = "";
+  const shown = evalsShown();
+  if (!shown.length) return nothingChosen();
+  if (!shown.includes(E)) E = shown[0];
+  F.conditions.clear(); F.models.clear(); F.outcomes.clear(); F.videoOnly = false;
+  renderSide();
+  if (!T || !matches(T)) openTrial(ordered()[0] || null, true); else rerender();
+}
+
+function rerender() {
+  renderSide();
+  if (T && D) { const t = clockT; renderPlayer(); clockT = t; } else if (T) openTrial(T, false);
+}
+
+function pick(t) {
+  if (!t.cameras.length) return;
+  const set = DRAFT[E.name];
+  if (set.has(t.id)) set.delete(t.id); else set.add(t.id);
+  renderSide();
+  const b = document.getElementById("pickbtn");
+  if (b) b.replaceWith(pickButton());
+}
+
+function pickButton() {
+  if (!T.cameras.length) return el("span", { class: "small muted", id: "pickbtn", text: "no video: cannot be chosen" });
+  const on = drafted(T);
+  return el("button", { class: on ? "playbtn" : "iconbtn", id: "pickbtn", type: "button", style: on ? { background: "var(--accent)", color: "#fff" } : { borderColor: "var(--accent)", color: "var(--accent)", fontWeight: 700 },
+    onclick: () => pick(T), text: on ? "★ Chosen (click to remove)" : "☆ Show this video" });
+}
+
+function chooseBar() {
+  const n = draftCount(), here = DRAFT[E.name]?.size || 0;
+  return el("div", { class: "panel", style: { borderColor: "var(--accent)", boxShadow: "inset 0 0 0 1px var(--accent)", display: "grid", gap: "8px" } },
+    el("h3", { text: "Choosing videos" }),
+    el("p", { class: "small muted", text: "Open a trial and press “☆ Show this video” (or the C key). After Save, the Trials window shows only the chosen trials." }),
+    el("p", { class: "small", text: `${n} chosen in total, ${here} in this evaluation.` }),
+    el("div", { class: "row", style: { display: "flex", gap: "8px", flexWrap: "wrap" } },
+      el("button", { class: "playbtn", type: "button", onclick: saveChoice, text: "Save" }),
+      el("button", { class: "iconbtn", type: "button", onclick: stopChoosing, text: "Cancel" }),
+      here ? el("button", { class: "iconbtn", type: "button", onclick: () => { DRAFT[E.name].clear(); rerender(); }, text: "Unchoose all here" }) : null));
+}
+
+function chosenNote() {
+  const n = Object.values(SEL).reduce((k, v) => k + v.length, 0);
+  return el("p", { class: "small muted", style: { margin: "0 4px" }, text: `Showing the ${n} chosen video${n === 1 ? "" : "s"}${B.editable ? ". “Choose videos” (top right) changes the choice." : "."}` });
+}
+
+async function saveChoice() {
+  const body = {};
+  for (const e of B.evals) if (!e.missing && DRAFT[e.name]?.size) body[e.name] = sortTrials(e, e.trials.filter((t) => DRAFT[e.name].has(t.id))).map((t) => t.id);
+  try {
+    const r = await fetch("/api/selection", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+    SEL = j.selection;
+    stopChoosing();
+  } catch (err) {
+    alert(`Could not save the choice: ${err.message}`);
+  }
+}
+
+function nothingChosen() {
+  document.getElementById("side").replaceChildren(el("div", { class: "panel", style: { display: "grid", gap: "8px" } },
+    el("h3", { text: "No videos chosen" }),
+    el("p", { class: "small muted", text: B.editable ? "The saved choice is empty. Press “Choose videos” (top right) to pick the trials to show." : "The saved choice is empty; start lab explore without --present to choose videos." })));
+  document.getElementById("player").replaceChildren();
 }

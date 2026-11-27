@@ -17,6 +17,8 @@ cd ~/Projects/drtc-major
 | `--port 8771` | another port (8080 is refused: that is the robot session's) |
 | `--no-open` | do not open the browser |
 | `--host 0.0.0.0` | open it from another device on the same network (a projector laptop, a tablet): `http://<this laptop's IP>:8770` |
+| `--present` | for the panel: the chosen videos only, no "Choose videos" button (nothing can be changed) |
+| `--videos FILE` | another file of chosen videos (default `lab/explorer/videos.yaml`), e.g. one per talk |
 | `--evals A B` | show other evals (default: the three below) |
 
 Ctrl-C stops it. It reads the results once at start; after a new `lab eval pull`, restart it (or open `/api/data?reload=1`).
@@ -58,9 +60,22 @@ Every tile, bar, dot and table row opens the matching trials in the Trials windo
 Good trials to show: the same policy and trial number under the four E4 conditions (the fault pattern is the same
 for a given trial number), e.g. GR00T N1.7: patient under faults ends at the link down, DRTC re-sends and finishes.
 
+## Choosing which videos to show
+
+1. Trials & videos → **☆ Choose videos** (top right). Every trial is shown while you choose.
+2. Open a trial (click its square) and press **☆ Show this video** (or the `C` key); it turns into **★ Chosen**, and
+   its square gets a blue ring. Only trials with a video can be chosen. Switch evaluations in the same mode.
+3. **Save**. From then on the Trials window shows **only the chosen trials** (the grid, the filters, ← / → and the
+   evaluation list); an evaluation with none chosen is left out. **Cancel** drops the changes.
+
+The choice is saved in `lab/explorer/videos.yaml` (one list of trial ids per evaluation, in grid order). Commit it to
+take it to another laptop. To change it, press **Choose videos** again; to show every trial again, delete the file (or
+an evaluation's list). For the panel, start with `lab explore --present`: the same chosen videos, without the button.
+The Results window is not affected (it shows no videos); its links open the chosen trials of that group, if any.
+
 ## How it works
 
 `src/drtc/explorer/`: `data.py` builds the numbers from the raw trial files with the same code as `lab eval report`
 (`drtc.evals.metrics`), so the explorer and each eval's report.md agree; `server.py` serves the two pages
 (`web/`), the data (`/api/data`, `/api/trial`) and the videos (byte ranges, only camera files of known trials).
-Fonts come from `presentation/fonts`. Next step (planned): choose which trials show their video.
+Fonts come from `presentation/fonts`. The choice: `POST /api/selection` (refused with `--present`) writes the file.

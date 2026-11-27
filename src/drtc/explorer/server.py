@@ -3,6 +3,7 @@
     lab explore                  # http://127.0.0.1:8770 : Results (the whole picture) and Trials (videos + timeline)
     lab explore --port 8771 --no-open
     lab explore --host 0.0.0.0   # reachable from another device on the same network (a projector laptop, a tablet)
+    lab explore --present        # for the panel: the chosen videos only, no "Choose videos" button
 
 Read only: it reads results/evals/<eval>/ (pull first with `lab eval pull <eval>`) and never writes there. Runs from
 the repository root; no GPU, no network. Videos are served with byte ranges, so scrubbing works in every browser.
@@ -34,8 +35,8 @@ CHUNK = 256 * 1024
 class Store:
     """The bundle (built once, rebuilt on ?reload=1) and the trial lookup id -> folder."""
 
-    def __init__(self, reg, names):
-        self.reg, self.names = reg, names
+    def __init__(self, reg, names, editable: bool = True, videos: Path = D.SELECTION):
+        self.reg, self.names, self.editable, self.videos = reg, names, editable, videos
         self.lock = threading.Lock()
         self.bundle: dict = {}
         self.paths: dict[tuple[str, str], Path] = {}
@@ -47,7 +48,6 @@ class Store:
             from drtc.evals import store
 
             self.bundle = D.build(self.reg, self.names)
-            self.body = json.dumps(self.bundle, allow_nan=False, default=str).encode()
             paths = {}
             for e in self.bundle["evals"]:
                 if e.get("missing"):
@@ -56,6 +56,15 @@ class Store:
                 for t in store.trials(e["name"], root):
                     paths[(e["name"], f"{t.session}/{t.condition}/{t.model}/t{t.number:02d}")] = t.path.resolve()
             self.paths = paths
+
+    def body(self) -> bytes:
+        """The bundle with the saved video choice (read fresh: it changes without a rebuild)."""
+        return json.dumps({**self.bundle, "selection": D.load_selection(self.videos), "editable": self.editable},
+                          allow_nan=False, default=str).encode()
+
+    def save_selection(self, sel: dict) -> dict:
+        with self.lock:
+            return D.save_selection(sel, set(self.paths), self.videos)
 
     def trial_path(self, name: str, tid: str) -> Path | None:
         return self.paths.get((name, tid))
@@ -135,6 +144,22 @@ def make_handler(st: Store):
             except (BrokenPipeError, ConnectionResetError):  # the browser seeks and drops the old request
                 pass
 
+        def do_POST(self):
+            if urlparse(self.path).path != "/api/selection":
+                return self.send_bytes(b"not found", "text/plain", 404)
+            if not st.editable:
+                return self.send_json({"error": "started with --present: the choice cannot be changed"}, 403)
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+                sel = json.loads(self.rfile.read(min(n, 2_000_000)) or b"{}")
+                if not isinstance(sel, dict) or not all(isinstance(v, list) for v in sel.values()):
+                    raise ValueError("expected {eval: [trial ids]}")
+            except (ValueError, json.JSONDecodeError) as e:
+                return self.send_json({"error": str(e)}, 400)
+            saved = st.save_selection(sel)
+            print(f"lab explore: saved {sum(len(v) for v in saved.values())} chosen videos to {st.videos}", flush=True)
+            return self.send_json({"selection": saved})
+
         def do_HEAD(self):
             self.do_GET()
 
@@ -152,7 +177,7 @@ def make_handler(st: Store):
             if path == "/api/data":
                 if q.get("reload"):
                     st.reload()
-                return self.send_bytes(st.body, "application/json")
+                return self.send_bytes(st.body(), "application/json")
             if path == "/api/trial":
                 p = st.trial_path(q.get("eval", [""])[0], q.get("id", [""])[0])
                 if p is None:
@@ -189,10 +214,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--host", default="127.0.0.1", help="0.0.0.0 to open it from another device on this network")
     ap.add_argument("--evals", nargs="+", default=list(D.EVALS), help="the evals to show (default: E4 + baselines)")
     ap.add_argument("--no-open", action="store_true", help="do not open the browser")
+    ap.add_argument("--present", action="store_true", help="for the panel: no 'Choose videos' button, the saved choice only")
+    ap.add_argument("--videos", type=Path, default=D.SELECTION, help=f"the file of chosen videos (default {D.SELECTION})")
     a = ap.parse_args(argv)
     if a.port == 8080:
         print("lab explore: 8080 is the robot session's port; pick another with --port", file=sys.stderr)
         return 2
+    cwd = os.getcwd()
     os.chdir(REPO)
     if not port_free(a.host, a.port):
         print(f"lab explore: port {a.port} is in use; choose another with --port", file=sys.stderr)
@@ -200,7 +228,11 @@ def main(argv: list[str] | None = None) -> int:
     from drtc.registry import Registry
 
     print("lab explore: reading the results ...", flush=True)
-    st = Store(Registry(), a.evals)
+    videos = REPO / D.SELECTION if a.videos == D.SELECTION else Path(os.path.abspath(Path(cwd) / a.videos))
+    st = Store(Registry(), a.evals, editable=not a.present, videos=videos)
+    sel = D.load_selection(videos)
+    print(f"  chosen videos ({a.videos}): " + ("none saved yet, every trial is shown" if sel is None else
+                                                  ", ".join(f"{k} {len(v)}" for k, v in sel.items()) or "none"))
     for e in st.bundle["evals"]:
         print(f"  {e['name']}: " + (e["missing"] if e.get("missing") else
                                      f"{len(e['trials'])} trials, {sum(1 for t in e['trials'] if t['cameras'])} with video"))

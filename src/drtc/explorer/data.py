@@ -258,6 +258,36 @@ def build_eval(reg, name: str) -> dict:
             "pooled_tests": pooled_tests, "sessions": sessions, "not_counted": not_counted, "trials": rows}
 
 
+# --- the chosen videos (the Trials window shows only these once a choice is saved) ------------------------------------
+
+SELECTION = Path("lab") / "explorer" / "videos.yaml"
+SELECTION_HEADER = ("# Written by `lab explore` (Trials & videos -> Choose videos -> Save): the trials whose videos the\n"
+                    "# explorer shows, per eval. Once this file exists, the Trials window shows only these trials.\n"
+                    "# Delete an eval's list (or the file) to show every trial again.\n")
+
+
+def load_selection(path: Path = SELECTION) -> dict[str, list[str]] | None:
+    """eval -> trial ids, in the saved order; None when nothing has been saved yet."""
+    if not path.is_file():
+        return None
+    d = yaml.safe_load(path.read_text()) or {}
+    return {str(k): [str(x) for x in (v or [])] for k, v in d.items()}
+
+
+def save_selection(sel: dict[str, list[str]], known: set[tuple[str, str]], path: Path = SELECTION) -> dict:
+    """Keep only known trials (eval, id), drop empty evals, write atomically. Returns what was written."""
+    clean = {}
+    for name, ids in sel.items():
+        keep = list(dict.fromkeys(i for i in ids if (name, i) in known))
+        if keep:
+            clean[name] = keep
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(SELECTION_HEADER + (yaml.safe_dump(clean, sort_keys=False, allow_unicode=True) if clean else "{}\n"))
+    tmp.replace(path)
+    return clean
+
+
 # --- one trial in full (the trial window) -----------------------------------------------------------------------------
 
 TICK_COLS = ["t", "action", "queue", "pending", "latency_est", "playback_rate"]
