@@ -170,6 +170,8 @@ def make_handler(st: Store):
                 return self.send_file(WEB / "index.html")
             if path in ("/trials", "/trials.html"):
                 return self.send_file(WEB / "trials.html")
+            if path in ("/videos", "/videos.html"):
+                return self.send_file(WEB / "videos.html")
             if path.startswith("/static/"):
                 return self.send_file(_inside(WEB, path[len("/static/"):]))
             if path.startswith("/fonts/"):
@@ -238,7 +240,8 @@ def main(argv: list[str] | None = None) -> int:
                                      f"{len(e['trials'])} trials, {sum(1 for t in e['trials'] if t['cameras'])} with video"))
     httpd = ThreadingHTTPServer((a.host, a.port), make_handler(st))
     url = f"http://{'127.0.0.1' if a.host in ('0.0.0.0', '') else a.host}:{a.port}"
-    print(f"lab explore: {url}  (Results) and {url}/trials  (Trials). Ctrl-C to stop.", flush=True)
+    print(f"lab explore: {url}  (Results), {url}/trials  (Trials) and {url}/videos  (the chosen videos, one after "
+          "another). Ctrl-C to stop.", flush=True)
     if not a.no_open:
         threading.Timer(0.5, lambda: webbrowser.open(url)).start()
     try:

@@ -118,7 +118,8 @@ function themeButton() {
 function topbar(page) {
   const nav = el("nav", { class: "nav", "aria-label": "Windows" },
     el("a", { href: "/", "aria-current": page === "results" ? "page" : null, text: "Results" }),
-    el("a", { href: "/trials", "aria-current": page === "trials" ? "page" : null, text: "Trials & videos" }));
+    el("a", { href: "/trials", "aria-current": page === "trials" ? "page" : null, text: "Trials & videos" }),
+    el("a", { href: "/videos", "aria-current": page === "videos" ? "page" : null, text: "Videos" }));
   return el("header", { class: "topbar" },
     el("div", { class: "brand" }, "DRTC ", el("span", { text: "results explorer" })), nav,
     el("div", { class: "spacer" }), themeButton());

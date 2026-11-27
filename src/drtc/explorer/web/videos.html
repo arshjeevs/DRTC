@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DRTC Videos</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect width=%2216%22 height=%2216%22 rx=%224%22 fill=%22%23257de0%22/%3E%3Cpath d=%22M4 11V7M8 11V4M12 11V8%22 stroke=%22white%22 stroke-width=%222%22 stroke-linecap=%22round%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/app.css">
+<style>
+  .stage { background: #0b0b0b; border-radius: 14px; padding: 12px; display: grid; gap: 10px; color: #f2f2f2; }
+  .stage:fullscreen { border-radius: 0; padding: 18px; align-content: center; }
+  .cams { display: grid; grid-template-columns: 3fr 2fr; gap: 10px; }
+  .cams.one { grid-template-columns: minmax(0, 1fr); }
+  @media (max-width: 700px) { .cams { grid-template-columns: minmax(0, 1fr); } }
+  .cam { position: relative; aspect-ratio: 4 / 3; background: #000; border-radius: 10px; overflow: hidden; }
+  .stage:fullscreen .cam { max-height: 78vh; }
+  .cam video { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .cam .cap { position: absolute; left: 10px; top: 10px; background: rgba(0,0,0,.55); font-size: 12.5px; font-weight: 600; padding: 2px 9px; border-radius: 5px; }
+  .flag { position: absolute; right: 10px; font-size: 14px; font-weight: 700; padding: 4px 11px; border-radius: 6px; display: none; }
+  .flag.fault { top: 10px; background: var(--serious); color: #0b0b0b; }
+  .flag.stall { bottom: 10px; background: var(--critical); color: #fff; }
+  .caption { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 2px 4px; }
+  .caption .title { font: 700 clamp(18px, 2.2vw, 26px)/1.2 var(--display); }
+  .caption .cond { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; color: #d6d6d6; }
+  .caption .count { margin-left: auto; color: #a8a8a8; font-variant-numeric: tabular-nums; }
+  .strip { position: relative; height: 16px; background: #1f1f1f; border-radius: 5px; cursor: pointer; overflow: hidden; }
+  .strip i { position: absolute; top: 0; bottom: 0; }
+  .strip .fb { background: rgba(241, 138, 89, 0.45); }
+  .strip .st { background: rgba(220, 60, 61, 0.8); top: 11px; }
+  .strip .ph { width: 2px; background: #fff; }
+  .strip-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: #a8a8a8; }
+  .strip-legend span { display: inline-flex; gap: 6px; align-items: center; }
+  .ctrl { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .ctrl button { border: 1px solid #3a3a3a; background: #1c1c1c; color: #f2f2f2; border-radius: 8px; padding: 7px 12px; cursor: pointer; font-weight: 600; font-size: 13.5px; }
+  .ctrl button:hover { border-color: #6a6a6a; }
+  .ctrl button[aria-pressed="true"] { background: #f2f2f2; color: #0b0b0b; border-color: #f2f2f2; }
+  .ctrl .main { background: #f2f2f2; color: #0b0b0b; min-width: 96px; }
+  .ctrl .clock { font: 600 14px var(--mono); color: #d6d6d6; font-variant-numeric: tabular-nums; }
+  .list { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; margin-top: 16px; }
+  .item { text-align: left; border: 1px solid var(--grid); background: var(--surface); border-radius: 10px; padding: 10px 12px; cursor: pointer; display: grid; gap: 5px; }
+  .item:hover { border-color: var(--axis); }
+  .item[aria-current="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+  .item .n { font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .item .t { font-weight: 700; }
+  .item .c { display: inline-flex; gap: 6px; align-items: center; font-size: 12.5px; color: var(--ink-2); }
+</style>
+</head>
+<body>
+<div id="top"></div>
+<main class="wrap" id="app"><div class="empty">Reading the results…</div></main>
+<script src="/static/app.js"></script>
+<script src="/static/videos.js"></script>
+</body>
+</html>

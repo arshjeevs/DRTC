@@ -72,7 +72,15 @@ Every tile, bar, dot and table row opens the matching trials in the Trials windo
 Good trials to show: the same policy and trial number under the four E4 conditions (the fault pattern is the same
 for a given trial number), e.g. GR00T N1.7: patient under faults ends at the link down, DRTC re-sends and finishes.
 
+**Videos** (`/videos`): plays every chosen video one after another (in the saved order), scene and wrist camera in
+sync, with a caption (policy, condition, trial, how it ended), live flags while a fault is on ("⚡ Link down") or the
+arm waits for actions, and a strip of the trial's faults (orange) and stalls (red); click the strip to jump. Previous /
+next, speed 0.5-2×, Loop (on: starts again after the last), Full screen (`F`); space pauses, ← / → change video;
+"details ↗" opens the trial in Trials & videos. Nothing chosen yet: it says how to choose.
+
 ## Choosing which videos to show
+
+The chosen videos are what the Trials window and the Videos page show.
 
 1. Trials & videos → **☆ Choose videos** (top right). Every trial is shown while you choose.
 2. Open a trial (click its square) and press **☆ Show this video** (or the `C` key); it turns into **★ Chosen**, and
